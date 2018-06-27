@@ -35,4 +35,4 @@ $(OUT): $(OBJ)
 	ar rcs $(OUT) $(OBJ)
 
 clean:
-	rm -f $(OBJ) $(OUT) Makefile.bak# DO NOT DELETE
+	rm -f $(OBJ) $(OUT)
