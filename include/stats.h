@@ -23,18 +23,18 @@
 
 #ifndef _WIN32
 #include <string.h>
-#include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/time.h>
 #include <time.h>
 #else
-#include <windows.h>
 #include <psapi.h>
 #include <stdint.h>
+#include <windows.h>
 #endif
 
-
 /// @brief Measures memory consumption.
-static inline int get_exec_stats(long *max_mem_kb, double *utime, double *stime) {
+static inline int get_exec_stats(long *max_mem_kb, double *utime,
+                                 double *stime) {
 #ifndef _WIN32
 
   struct rusage res;
@@ -54,7 +54,8 @@ static inline int get_exec_stats(long *max_mem_kb, double *utime, double *stime)
   *max_mem_kb = (long)(res.PeakWorkingSetSize >> 10);
 
   uint64_t tc, te, tk, tu;
-  if (!GetProcessTimes(GetCurrentProcess(), (FILETIME*)&tc, (FILETIME*)&te, (FILETIME*)&tk, (FILETIME*)&tu)) {
+  if (!GetProcessTimes(GetCurrentProcess(), (FILETIME *)&tc, (FILETIME *)&te,
+                       (FILETIME *)&tk, (FILETIME *)&tu)) {
     return -1;
   }
   *utime = 1.0e-7 * tu;
@@ -64,7 +65,6 @@ static inline int get_exec_stats(long *max_mem_kb, double *utime, double *stime)
 
 #endif
 }
-
 
 /// @brief Returns monotonic time in seconds related to unspecified point.
 static inline double get_clock_sec() {
@@ -77,13 +77,12 @@ static inline double get_clock_sec() {
 #else
 
   int64_t ts, fr;
-  QueryPerformanceCounter((LARGE_INTEGER*)&ts);
-  QueryPerformanceFrequency((LARGE_INTEGER*)&fr);
+  QueryPerformanceCounter((LARGE_INTEGER *)&ts);
+  QueryPerformanceFrequency((LARGE_INTEGER *)&fr);
   return (double)ts / fr;
 
 #endif
 }
-
 
 #ifdef __cplusplus
 #ifndef _WIN32
@@ -93,16 +92,16 @@ class TimeIntervalEx {
   /// @brief Constructs object for delta time measurements.
   /// @param clock_id Clock ID from clock_gettime():
   ///                 CLOCK_MONOTONIC - to measure real time difference,
-  ///                 CLOCK_PROCESS_CPUTIME_ID - to measure process CPU time difference,
-  ///                 CLOCK_THREAD_CPUTIME_ID - to measure current thread CPU time difference.
+  ///                 CLOCK_PROCESS_CPUTIME_ID - to measure process CPU time
+  ///                 difference,
+  ///                 CLOCK_THREAD_CPUTIME_ID - to measure current thread CPU
+  ///                 time difference.
   TimeIntervalEx(int clock_id = CLOCK_MONOTONIC) {
     clock_id_ = clock_id;
     reset();
   }
 
-  void reset() {
-    clock_gettime(clock_id_, &ts0_);
-  }
+  void reset() { clock_gettime(clock_id_, &ts0_); }
 
   double get_ms() {
     struct timespec ts1;
@@ -136,23 +135,21 @@ class TimeIntervalEx {
 /// @brief Helper class for delta time measurements of real time.
 class TimeIntervalReal : public TimeIntervalEx {
  public:
-  TimeIntervalReal() : TimeIntervalEx(CLOCK_MONOTONIC) {
-  }
+  TimeIntervalReal() : TimeIntervalEx(CLOCK_MONOTONIC) {}
 };
 
 /// @brief Helper class for delta time measurements of process CPU time.
-/// @details If the process was using 8 cores for 1 second, the time will be 8 seconds.
+/// @details If the process was using 8 cores for 1 second, the time will be 8
+/// seconds.
 class TimeIntervalProcess : public TimeIntervalEx {
  public:
-  TimeIntervalProcess() : TimeIntervalEx(CLOCK_PROCESS_CPUTIME_ID) {
-  }
+  TimeIntervalProcess() : TimeIntervalEx(CLOCK_PROCESS_CPUTIME_ID) {}
 };
 
 /// @brief Helper class for delta time measurements of thread CPU time.
 class TimeIntervalThread : public TimeIntervalEx {
  public:
-  TimeIntervalThread() : TimeIntervalEx(CLOCK_THREAD_CPUTIME_ID) {
-  }
+  TimeIntervalThread() : TimeIntervalEx(CLOCK_THREAD_CPUTIME_ID) {}
 };
 
 /// @brief Select the default clock.

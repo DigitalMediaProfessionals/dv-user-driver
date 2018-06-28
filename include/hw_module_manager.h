@@ -16,72 +16,90 @@
 
 #pragma once
 
-
 namespace dmp {
 namespace modules {
-	
+
 /*!
-		@brief Utility function. Get the i/o memory address of the FPGA convolution module. Used by the driver, most likely not to be used in the application, except for debugging or verification.
+                @brief Utility function. Get the i/o memory address of the FPGA
+   convolution module. Used by the driver, most likely not to be used in the
+   application, except for debugging or verification.
 */
 unsigned long get_iomap_cnv();
 
 /*!
-		@brief Utility function. Get the i/o memory address of the FPGA fully connected module. Used by the driver, most likely not to be used in the application, except for debugging or verification.
+                @brief Utility function. Get the i/o memory address of the FPGA
+   fully connected module. Used by the driver, most likely not to be used in the
+   application, except for debugging or verification.
 */
-unsigned long get_iomap_fc ();
+unsigned long get_iomap_fc();
 
 /*!
-		@brief Utility function. Get the i/o memory address of the FPGA display controller module. Used by the driver, most likely not to be used in the application, except for debugging or verification.
+                @brief Utility function. Get the i/o memory address of the FPGA
+   display controller module. Used by the driver, most likely not to be used in
+   the application, except for debugging or verification.
 */
 unsigned long get_iomap_pdc();
 
 /*!
-		@brief Utility function. Get the i/o memory address of the FPGA display controller module. Used by the driver, most likely not to be used in the application, except for debugging or verification.
+                @brief Utility function. Get the i/o memory address of the FPGA
+   display controller module. Used by the driver, most likely not to be used in
+   the application, except for debugging or verification.
 */
 unsigned long get_iomap_ddr();
 
 /*!
-		@brief Utility function. Get the address of the FPGA convolution module. Used by the driver, most likely not to be used in the application, except for debugging or verification.
+                @brief Utility function. Get the address of the FPGA convolution
+   module. Used by the driver, most likely not to be used in the application,
+   except for debugging or verification.
 */
-int          get_fdC();
+int get_fdC();
 
 /*!
-		@brief Utility function. Get the address of the FPGA fully connected module. Used by the driver, most likely not to be used in the application, except for debugging or verification.
+                @brief Utility function. Get the address of the FPGA fully
+   connected module. Used by the driver, most likely not to be used in the
+   application, except for debugging or verification.
 */
-int          get_fdF();
+int get_fdF();
 /*!
-		@brief Utility function. Get the address of the FPGA display controler module. Used by the driver, most likely not to be used in the application, except for debugging or verification.
+                @brief Utility function. Get the address of the FPGA display
+   controler module. Used by the driver, most likely not to be used in the
+   application, except for debugging or verification.
 */
-int          get_fdP();
+int get_fdP();
 /*!
-		@brief Utility function. Get the memory address which will be displayed by the FPGA display controller . Used by the driver, most likely not to be used in the application, except for debugging or verification.
+                @brief Utility function. Get the memory address which will be
+   displayed by the FPGA display controller . Used by the driver, most likely
+   not to be used in the application, except for debugging or verification.
 */
 unsigned int get_fbA();
 
-
 /*!
-@brief Interrupt handles.  Read busy state of a module and wait until interrupt is raised. 
+@brief Interrupt handles.  Read busy state of a module and wait until interrupt
+is raised.
 @param[in] module: Either convolution or fully connected module
 */
 void cnvWaitInt(unsigned int module);
 
 /*!
-@brief Swap display buffer. 
+@brief Swap display buffer.
 */
 void swap_buffer();
 
 /*!
-@brief Initialize hardware modules, including convolution, fully connected, display controller and memory controller. 
+@brief Initialize hardware modules, including convolution, fully connected,
+display controller and memory controller.
 */
 bool initialize();
 
 /*!
-@brief Close hardware modules, including convolution, fully connected, display controller and memory controller. 
+@brief Close hardware modules, including convolution, fully connected, display
+controller and memory controller.
 */
 void shutdown();
 
 /*!
-@brief Display in the output console information about the hardware modules, including each module frequency. 
+@brief Display in the output console information about the hardware modules,
+including each module frequency.
 */
 
 void get_hw_info();
@@ -96,14 +114,16 @@ enum {
 void get_info(unsigned int v, unsigned int *ret);
 
 /*!
-@brief In the case the fpga has buttons, reset the state the state of all buttons. <B>This function may be modified depending on the FPGA board.</B> 
+@brief In the case the fpga has buttons, reset the state the state of all
+buttons. <B>This function may be modified depending on the FPGA board.</B>
 */
 void reset_button_state();
 
 /*!
-@brief In the case the fpga has buttons, read and reset the state the state of all buttons. <B>This function may be modified depending on the FPGA board.</B> 
+@brief In the case the fpga has buttons, read and reset the state the state of
+all buttons. <B>This function may be modified depending on the FPGA board.</B>
 */
 unsigned int get_button_state();
 
-};//end of namespace modules 
-};//end of dmp
+};  // end of namespace modules
+};  // end of dmp
