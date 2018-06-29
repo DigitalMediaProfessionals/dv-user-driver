@@ -1,3 +1,3 @@
 #!/bin/bash
 make
-LD_LIBRARY_PATH=. ./test_dv $@
+sudo env LD_LIBRARY_PATH=. ./test_dv $@
