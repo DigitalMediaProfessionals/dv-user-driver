@@ -37,8 +37,9 @@ const char* dv_get_last_error_message();
 
 
 /// @brief Creates context for working with DV accelerator.
+/// @param path Path to the device, use NULL or empty string to select default device.
 /// @return Non-NULL on success, NULL on error.
-dv_context* dv_context_create();
+dv_context* dv_context_create(const char *path);
 
 
 /// @brief Destroys context for working with DV accelerator.

@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <string>
+
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -50,8 +52,10 @@ class CDVContext {
     dma_heap_id_mask_ = 0;
   }
 
-  bool Initialize() {
+  bool Initialize(const char *path) {
     Cleanup();
+
+    path_ = path ? path : "";
 
     fd_ion_ = open("/dev/ion", O_RDONLY | O_CLOEXEC);  // O_CLOEXEC is suggested for security
     if (fd_ion_ < 0) {
@@ -114,6 +118,9 @@ class CDVContext {
   }
 
  private:
+  /// @brief Path to the device.
+  std::string path_;
+
   /// @brief File handle for ION memory allocator.
   int fd_ion_;
 
@@ -269,13 +276,13 @@ const char *dv_get_version_string() {
 }
 
 
-dv_context* dv_context_create() {
+dv_context* dv_context_create(const char *path) {
   CDVContext *ctx = new CDVContext();
   if (!ctx) {
     SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDVContext));
     return NULL;
   }
-  if (!ctx->Initialize()) {
+  if (!ctx->Initialize(path)) {
     delete ctx;
     return NULL;
   }

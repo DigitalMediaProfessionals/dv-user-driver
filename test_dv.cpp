@@ -36,7 +36,7 @@ int test_mem(size_t size) {
   LOG("ENTER: test_api(%zu)\n", size);
   LOG("dv_get_version_string(): %s\n", dv_get_version_string());
 
-  dv_context *ctx = dv_context_create();
+  dv_context *ctx = dv_context_create(NULL);
   if (!ctx) {
     ERR("dv_context_create() failed: %s\n", dv_get_last_error_message());
     return -1;
