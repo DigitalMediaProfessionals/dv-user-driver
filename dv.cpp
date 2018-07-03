@@ -117,6 +117,16 @@ class CDVContext {
     return dma_heap_id_mask_;
   }
 
+  int Flush() {
+    // TODO: implement.
+    return 0;
+  }
+
+  int Finish() {
+    // TODO: implement.
+    return 0;
+  }
+
  private:
   /// @brief Path to the device.
   std::string path_;
@@ -354,4 +364,22 @@ int dv_mem_sync_end(dv_mem *mem) {
     return -1;
   }
   return ((CDVMem*)mem)->SyncEnd();
+}
+
+
+int dv_flush(dv_context *ctx) {
+  if (!ctx) {
+    SET_ERR("Invalid argument: ctx is NULL");
+    return -1;
+  }
+  return ((CDVContext*)ctx)->Flush();
+}
+
+
+int dv_finish(dv_context *ctx) {
+  if (!ctx) {
+    SET_ERR("Invalid argument: ctx is NULL");
+    return -1;
+  }
+  return ((CDVContext*)ctx)->Finish();
 }
