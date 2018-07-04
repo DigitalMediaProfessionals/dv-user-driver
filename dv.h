@@ -20,7 +20,9 @@ extern "C" {
 #endif
 
 
+#ifdef __GNUC__
 #pragma GCC visibility push(default)
+#endif
 
 
 /// @brief Device execution context.
@@ -118,7 +120,9 @@ dv_cmdlist *dv_cmdlist_create(dv_context *ctx);
 void dv_cmdlist_destroy(dv_cmdlist *cmdlist);
 
 
+#ifdef __GNUC__
 #pragma GCC visibility pop
+#endif
 
 
 #ifdef __cplusplus
