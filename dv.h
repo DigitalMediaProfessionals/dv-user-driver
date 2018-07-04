@@ -50,7 +50,7 @@ dv_context* dv_context_create(const char *path);
 
 
 /// @brief Returns some information about context.
-const char *dv_context_info(dv_context* ctx);
+const char *dv_context_get_info_string(dv_context* ctx);
 
 
 /// @brief Destroys context for working with DV accelerator.

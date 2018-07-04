@@ -31,7 +31,7 @@ int test_cmdlist() {
     ERR("dv_context_create() failed: %s\n", dv_get_last_error_message());
     return -1;
   }
-  LOG("Successfully created context: %s\n", dv_context_info(ctx));
+  LOG("Successfully created context: %s\n", dv_context_get_info_string(ctx));
 
   const int size = 65536;
   dv_mem *mem = dv_mem_alloc(ctx, size);

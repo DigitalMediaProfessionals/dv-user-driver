@@ -124,7 +124,7 @@ class CDVContext {
     return 0;
   }
 
-  const char *Info() {
+  const char *GetInfoString() {
     return info_.c_str();
   }
 
@@ -340,12 +340,12 @@ dv_context* dv_context_create(const char *path) {
 
 
 extern "C"
-const char *dv_context_info(dv_context* ctx) {
+const char *dv_context_get_info_string(dv_context* ctx) {
   if (!ctx) {
     SET_ERR("Invalid argument: ctx is NULL");
     return "";
   }
-  return ((CDVContext*)ctx)->Info();
+  return ((CDVContext*)ctx)->GetInfoString();
 }
 
 

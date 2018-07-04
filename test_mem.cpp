@@ -41,7 +41,7 @@ int test_mem(size_t size) {
     ERR("dv_context_create() failed: %s\n", dv_get_last_error_message());
     return -1;
   }
-  LOG("Successfully created context: %s\n", dv_context_info(ctx));
+  LOG("Successfully created context: %s\n", dv_context_get_info_string(ctx));
 
   dv_mem *mem = dv_mem_alloc(ctx, size);
   if (!mem) {
