@@ -151,6 +151,10 @@ typedef struct dv_cmdraw_v0_impl {
 int dv_cmdlist_add_raw(dv_cmdlist *cmdlist, dv_cmdraw *cmd);
 
 
+/// @brief Returns maximum supported version of dv_cmdraw structure.
+int32_t dv_get_cmdraw_max_version();
+
+
 #ifdef __GNUC__
 #pragma GCC visibility pop
 #endif

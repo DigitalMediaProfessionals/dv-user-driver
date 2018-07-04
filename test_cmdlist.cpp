@@ -76,6 +76,16 @@ int test_cmdlist() {
   }
   LOG("Created command list\n");
 
+  const int32_t cmdraw_max_version = dv_get_cmdraw_max_version();
+  if (cmdraw_max_version < 0) {
+    ERR("dv_get_cmdraw_max_version() returned %d\n", (int)cmdraw_max_version);
+    dv_cmdlist_destroy(cmdlist);
+    dv_mem_free(mem);
+    dv_context_destroy(ctx);
+    return -1;
+  }
+  LOG("Maximum supported version for raw command is %d\n", (int)cmdraw_max_version);
+
   dv_cmdraw_v0 cmd;
   memset(&cmd, 0, sizeof(cmd));
   cmd.size = sizeof(cmd);

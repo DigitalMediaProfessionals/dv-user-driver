@@ -322,6 +322,10 @@ class CDVCmdList {
     return 0;
   }
 
+  static inline int32_t get_cmdraw_max_version() {
+    return 0;
+  }
+
  private:
   CDVContext *ctx_;
 };
@@ -499,4 +503,10 @@ int dv_cmdlist_add_raw(dv_cmdlist *cmdlist, dv_cmdraw *cmd) {
     return -1;
   }
   return ((CDVCmdList*)cmdlist)->AddRaw(cmd);
+}
+
+
+extern "C"
+int32_t dv_get_cmdraw_max_version() {
+  return CDVCmdList::get_cmdraw_max_version();
 }
