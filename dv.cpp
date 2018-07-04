@@ -32,7 +32,7 @@ static char s_last_error_message[256];
 #define SET_ERR(...) snprintf(s_last_error_message, sizeof(s_last_error_message), __VA_ARGS__)
 
 
-/// @brief Implementation of dv_context structure.
+/// @brief Implementation of dv_context.
 class CDVContext {
  public:
   CDVContext() {
@@ -106,6 +106,8 @@ class CDVContext {
       return false;
     }
 
+    info_ = std::string("DV700: UBUF=640Kb PATH=") + path_;
+
     return true;
   }
 
@@ -122,9 +124,16 @@ class CDVContext {
     return 0;
   }
 
+  const char *Info() {
+    return info_.c_str();
+  }
+
  private:
   /// @brief Path to the device.
   std::string path_;
+
+  /// @brief Device information.
+  std::string info_;
 
   /// @brief File handle for ION memory allocator.
   int fd_ion_;
@@ -134,6 +143,7 @@ class CDVContext {
 };
 
 
+/// @brief Implementation of dv_mem.
 class CDVMem {
  public:
   CDVMem() {
@@ -271,6 +281,37 @@ class CDVMem {
 };
 
 
+/// @brief Implementation of dv_cmdlist.
+class CDVCmdList {
+ public:
+  CDVCmdList() {
+    ctx_ = NULL;
+  }
+
+  virtual ~CDVCmdList() {
+    Cleanup();
+  }
+
+  bool Initialize(CDVContext *ctx) {
+    Cleanup();
+    if (!ctx) {
+      SET_ERR("Invalid argument: ctx is NULL");
+      return NULL;
+    }
+    ctx_ = ctx;
+
+    return true;
+  }
+
+  void Cleanup() {
+    ctx_ = NULL;
+  }
+
+ private:
+  CDVContext *ctx_;
+};
+
+
 extern "C"
 const char *dv_get_last_error_message() {
   return s_last_error_message;
@@ -295,6 +336,16 @@ dv_context* dv_context_create(const char *path) {
     return NULL;
   }
   return (dv_context*)ctx;
+}
+
+
+extern "C"
+const char *dv_context_info(dv_context* ctx) {
+  if (!ctx) {
+    SET_ERR("Invalid argument: ctx is NULL");
+    return "";
+  }
+  return ((CDVContext*)ctx)->Info();
 }
 
 
@@ -384,8 +435,16 @@ int dv_sync(dv_context *ctx) {
 
 extern "C"
 dv_cmdlist *dv_cmdlist_create(dv_context *ctx) {
-  // TODO: implement.
-  return NULL;
+  CDVCmdList *cmdlist = new CDVCmdList();
+  if (!cmdlist) {
+    SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDVCmdList));
+    return NULL;
+  }
+  if (!cmdlist->Initialize((CDVContext*)ctx)) {
+    delete cmdlist;
+    return NULL;
+  }
+  return (dv_cmdlist*)cmdlist;
 }
 
 
@@ -394,5 +453,5 @@ void dv_cmdlist_destroy(dv_cmdlist *cmdlist) {
   if (!cmdlist) {
     return;
   }
-  // TODO: implement.
+  delete (CDVCmdList*)cmdlist;
 }

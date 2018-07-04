@@ -41,6 +41,7 @@ int test_mem(size_t size) {
     ERR("dv_context_create() failed: %s\n", dv_get_last_error_message());
     return -1;
   }
+  LOG("Successfully created context: %s\n", dv_context_info(ctx));
 
   dv_mem *mem = dv_mem_alloc(ctx, size);
   if (!mem) {
@@ -190,7 +191,7 @@ int test_mem(size_t size) {
 
 int main(int argc, char **argv) {
   if (argc < 2) {
-    fprintf(stdout, "USAGE: ./test_dv N_KB\n");
+    fprintf(stdout, "USAGE: ./test_mem N_KB\n");
     return 1;
   }
   int n_kb = atoi(argv[1]);

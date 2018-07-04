@@ -49,6 +49,10 @@ const char* dv_get_last_error_message();
 dv_context* dv_context_create(const char *path);
 
 
+/// @brief Returns some information about context.
+const char *dv_context_info(dv_context* ctx);
+
+
 /// @brief Destroys context for working with DV accelerator.
 /// @param ctx Context for working with DV accelerator, when NULL the error is returned.
 void dv_context_destroy(dv_context *ctx);
