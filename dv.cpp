@@ -271,16 +271,19 @@ class CDVMem {
 };
 
 
+extern "C"
 const char *dv_get_last_error_message() {
   return s_last_error_message;
 }
 
 
+extern "C"
 const char *dv_get_version_string() {
   return "0.1.0 Initial release.";
 }
 
 
+extern "C"
 dv_context* dv_context_create(const char *path) {
   CDVContext *ctx = new CDVContext();
   if (!ctx) {
@@ -295,6 +298,7 @@ dv_context* dv_context_create(const char *path) {
 }
 
 
+extern "C"
 void dv_context_destroy(dv_context *ctx) {
   if (!ctx) {
     return;
@@ -303,6 +307,7 @@ void dv_context_destroy(dv_context *ctx) {
 }
 
 
+extern "C"
 dv_mem* dv_mem_alloc(dv_context *ctx, size_t size) {
   CDVMem *mem = new CDVMem();
   if (!mem) {
@@ -318,6 +323,7 @@ dv_mem* dv_mem_alloc(dv_context *ctx, size_t size) {
 }
 
 
+extern "C"
 void dv_mem_free(dv_mem *mem) {
   if (!mem) {
     return;
@@ -326,6 +332,7 @@ void dv_mem_free(dv_mem *mem) {
 }
 
 
+extern "C"
 uint8_t *dv_mem_map(dv_mem *mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
@@ -335,6 +342,7 @@ uint8_t *dv_mem_map(dv_mem *mem) {
 }
 
 
+extern "C"
 void dv_mem_unmap(dv_mem *mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
@@ -344,6 +352,7 @@ void dv_mem_unmap(dv_mem *mem) {
 }
 
 
+extern "C"
 int dv_mem_sync_start(dv_mem *mem, int rd, int wr) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
@@ -353,6 +362,7 @@ int dv_mem_sync_start(dv_mem *mem, int rd, int wr) {
 }
 
 
+extern "C"
 int dv_mem_sync_end(dv_mem *mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
@@ -362,10 +372,27 @@ int dv_mem_sync_end(dv_mem *mem) {
 }
 
 
+extern "C"
 int dv_sync(dv_context *ctx) {
   if (!ctx) {
     SET_ERR("Invalid argument: ctx is NULL");
     return -1;
   }
   return ((CDVContext*)ctx)->Sync();
+}
+
+
+extern "C"
+dv_cmdlist *dv_cmdlist_create(dv_context *ctx) {
+  // TODO: implement.
+  return NULL;
+}
+
+
+extern "C"
+void dv_cmdlist_destroy(dv_cmdlist *cmdlist) {
+  if (!cmdlist) {
+    return;
+  }
+  // TODO: implement.
 }

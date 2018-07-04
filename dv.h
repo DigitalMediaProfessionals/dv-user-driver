@@ -20,11 +20,18 @@ extern "C" {
 #endif
 
 
-/// @brief Forward reference for dv_context structure.
+/// @brief Device execution context.
+/// @details Context is bound to the specific device and has single execution queue.
+///          Multiple contexts can coexist, commands are executed in exclusive mode:
+///          execution from several contexts is possible but occure sequentially.
 typedef struct dv_context_impl dv_context;
 
-/// @brief Forward reference for dv_mem structure.
+/// @brief Device-accessible memory allocation.
 typedef struct dv_mem_impl dv_mem;
+
+/// @brief Command list for execution.
+/// @details Contains prepacked in hardware specific format commands for execution, thus reducing argument packing overhead.
+typedef struct dv_cmdlist_impl dv_cmdlist;
 
 
 /// @brief Returns version string of the driver interface.
@@ -91,6 +98,17 @@ int dv_mem_sync_end(dv_mem *mem);
 /// @param ctx Context for working with DV accelerator, when NULL the error is returned.
 /// @return 0 on success, non-zero otherwise.
 int dv_sync(dv_context *ctx);
+
+
+/// @brief Creates command list.
+/// @param ctx Context for working with DV accelerator, when NULL the error is returned.
+/// @return Handle to command list or NULL on error.
+dv_cmdlist *dv_cmdlist_create(dv_context *ctx);
+
+
+/// @brief Destroys command list.
+/// @param cmdlist Handle to command list, when NULL it is ignored.
+void dv_cmdlist_destroy(dv_cmdlist *cmdlist);
 
 
 #ifdef __cplusplus
