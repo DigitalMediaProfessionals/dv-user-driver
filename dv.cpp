@@ -317,6 +317,11 @@ class CDVCmdList {
     return 0;
   }
 
+  int AddRaw(dv_cmdraw *cmd) {
+    // TODO: implement.
+    return 0;
+  }
+
  private:
   CDVContext *ctx_;
 };
@@ -484,4 +489,14 @@ int dv_cmdlist_exec(dv_cmdlist *cmdlist) {
     return -1;
   }
   return ((CDVCmdList*)cmdlist)->Exec();
+}
+
+
+extern "C"
+int dv_cmdlist_add_raw(dv_cmdlist *cmdlist, dv_cmdraw *cmd) {
+  if (!cmdlist) {
+    SET_ERR("Invalid argument: cmdlist is NULL");
+    return -1;
+  }
+  return ((CDVCmdList*)cmdlist)->AddRaw(cmd);
 }

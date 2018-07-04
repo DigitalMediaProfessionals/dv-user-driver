@@ -76,6 +76,19 @@ int test_cmdlist() {
   }
   LOG("Created command list\n");
 
+  dv_cmdraw_v0 cmd;
+  memset(&cmd, 0, sizeof(cmd));
+  cmd.size = sizeof(cmd);
+  cmd.version = 0;
+
+  if (dv_cmdlist_add_raw(cmdlist, (dv_cmdraw*)&cmd)) {
+    ERR("dv_cmdlist_add_raw() failed: %s\n", dv_get_last_error_message());
+    dv_cmdlist_destroy(cmdlist);
+    dv_mem_free(mem);
+    dv_context_destroy(ctx);
+    return -1;
+  }
+
   // TODO: implement.
 
   if (dv_cmdlist_end(cmdlist)) {
