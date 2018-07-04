@@ -58,5 +58,5 @@ typedef struct dv_cmdraw_v0_impl {
   dv_buf eltwise_buf;    // Buffer for elementwise add (0 = UBUF Input Buffer)
   uint16_t output_mode;  // 0 = concat, 1 = elementwise add
 
-  dv_cmdraw_v0_conv_run run[32];  // description for each run
+  dv_cmdraw_v0_conv_run run[32];  // description of each run
 } __attribute__((packed)) dv_cmdraw_v0;
