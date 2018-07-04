@@ -20,6 +20,9 @@ extern "C" {
 #endif
 
 
+#pragma GCC visibility push(default)
+
+
 /// @brief Device execution context.
 /// @details Context is bound to the specific device and has single execution queue.
 ///          Multiple contexts can coexist, commands are executed in exclusive mode:
@@ -113,6 +116,9 @@ dv_cmdlist *dv_cmdlist_create(dv_context *ctx);
 /// @brief Destroys command list.
 /// @param cmdlist Handle to command list, when NULL it is ignored.
 void dv_cmdlist_destroy(dv_cmdlist *cmdlist);
+
+
+#pragma GCC visibility pop
 
 
 #ifdef __cplusplus
