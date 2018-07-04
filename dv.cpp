@@ -307,6 +307,16 @@ class CDVCmdList {
     ctx_ = NULL;
   }
 
+  int End() {
+    // TODO: implement.
+    return 0;
+  }
+
+  int Exec() {
+    // TODO: implement.
+    return 0;
+  }
+
  private:
   CDVContext *ctx_;
 };
@@ -454,4 +464,24 @@ void dv_cmdlist_destroy(dv_cmdlist *cmdlist) {
     return;
   }
   delete (CDVCmdList*)cmdlist;
+}
+
+
+extern "C"
+int dv_cmdlist_end(dv_cmdlist *cmdlist) {
+  if (!cmdlist) {
+    SET_ERR("Invalid argument: cmdlist is NULL");
+    return -1;
+  }
+  return ((CDVCmdList*)cmdlist)->End();
+}
+
+
+extern "C"
+int dv_cmdlist_exec(dv_cmdlist *cmdlist) {
+  if (!cmdlist) {
+    SET_ERR("Invalid argument: cmdlist is NULL");
+    return -1;
+  }
+  return ((CDVCmdList*)cmdlist)->Exec();
 }

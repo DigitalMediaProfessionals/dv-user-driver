@@ -35,7 +35,7 @@ typedef struct dv_context_impl dv_context;
 typedef struct dv_mem_impl dv_mem;
 
 /// @brief Command list for execution.
-/// @details Contains prepacked in hardware specific format commands for execution, thus reducing argument packing overhead.
+/// @details Contains prepacked in device specific format commands for execution, thus reducing argument packing overhead.
 typedef struct dv_cmdlist_impl dv_cmdlist;
 
 
@@ -118,6 +118,18 @@ dv_cmdlist *dv_cmdlist_create(dv_context *ctx);
 /// @brief Destroys command list.
 /// @param cmdlist Handle to command list, when NULL it is ignored.
 void dv_cmdlist_destroy(dv_cmdlist *cmdlist);
+
+
+/// @brief Ends the command list, preparing device-specific structures for further execution.
+/// @param cmdlist Handle to command list, when NULL the error is returned.
+/// @return 0 on success, non-zero otherwise.
+int dv_cmdlist_end(dv_cmdlist *cmdlist);
+
+
+/// @brief Schedules command list for execution.
+/// @param cmdlist Handle to command list, when NULL the error is returned.
+/// @return 0 on success, non-zero otherwise.
+int dv_cmdlist_exec(dv_cmdlist *cmdlist);
 
 
 #ifdef __GNUC__

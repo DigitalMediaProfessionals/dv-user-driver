@@ -78,11 +78,25 @@ int test_cmdlist() {
 
   // TODO: implement.
 
-  dv_cmdlist_destroy(cmdlist);
-  LOG("Destroyed command list\n");
+  if (dv_cmdlist_end(cmdlist)) {
+    ERR("dv_cmdlist_end() failed: %s\n", dv_get_last_error_message());
+    dv_cmdlist_destroy(cmdlist);
+    dv_mem_free(mem);
+    dv_context_destroy(ctx);
+    return -1;
+  }
+  LOG("Ended the command list");
 
-  dv_mem_unmap(mem);
-  LOG("Unmapped the buffer\n");
+  if (dv_cmdlist_exec(cmdlist)) {
+    ERR("dv_cmdlist_exec() failed: %s\n", dv_get_last_error_message());
+    dv_cmdlist_destroy(cmdlist);
+    dv_mem_free(mem);
+    dv_context_destroy(ctx);
+    return -1;
+  }
+  LOG("Executed the command list");
+
+  dv_cmdlist_destroy(cmdlist);
   dv_mem_free(mem);
   dv_context_destroy(ctx);
 
