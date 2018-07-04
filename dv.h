@@ -87,16 +87,10 @@ int dv_mem_sync_start(dv_mem *mem, int rd, int wr);
 int dv_mem_sync_end(dv_mem *mem);
 
 
-/// @brief Flushes queued tasks for execution if any.
+/// @brief Waits for all scheduled commands to be executed.
 /// @param ctx Context for working with DV accelerator, when NULL the error is returned.
 /// @return 0 on success, non-zero otherwise.
-int dv_flush(dv_context *ctx);
-
-
-/// @brief Waits until all scheduled tasks are complete.
-/// @param ctx Context for working with DV accelerator, when NULL the error is returned.
-/// @return 0 on success, non-zero otherwise.
-int dv_finish(dv_context *ctx);
+int dv_sync(dv_context *ctx);
 
 
 #ifdef __cplusplus

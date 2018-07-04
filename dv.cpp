@@ -117,12 +117,7 @@ class CDVContext {
     return dma_heap_id_mask_;
   }
 
-  int Flush() {
-    // TODO: implement.
-    return 0;
-  }
-
-  int Finish() {
+  int Sync() {
     // TODO: implement.
     return 0;
   }
@@ -367,19 +362,10 @@ int dv_mem_sync_end(dv_mem *mem) {
 }
 
 
-int dv_flush(dv_context *ctx) {
+int dv_sync(dv_context *ctx) {
   if (!ctx) {
     SET_ERR("Invalid argument: ctx is NULL");
     return -1;
   }
-  return ((CDVContext*)ctx)->Flush();
-}
-
-
-int dv_finish(dv_context *ctx) {
-  if (!ctx) {
-    SET_ERR("Invalid argument: ctx is NULL");
-    return -1;
-  }
-  return ((CDVContext*)ctx)->Finish();
+  return ((CDVContext*)ctx)->Sync();
 }
