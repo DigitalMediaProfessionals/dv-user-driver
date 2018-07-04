@@ -132,12 +132,6 @@ int dv_cmdlist_end(dv_cmdlist *cmdlist);
 int dv_cmdlist_exec(dv_cmdlist *cmdlist);
 
 
-/// @brief Raw command for execution.
-typedef struct dv_cmdraw_impl {
-  int32_t size;     // size of this structure
-  int32_t version;  // version of this structure
-} __attribute__((packed)) dv_cmdraw;
-
 
 /// @brief Description for array arguments.
 typedef struct dv_buf_impl {
@@ -147,11 +141,10 @@ typedef struct dv_buf_impl {
 
 
 /// @brief Raw command for execution.
-typedef struct dv_cmdraw_v0_impl {
+typedef struct dv_cmdraw_impl {
   int32_t size;     // size of this structure
   int32_t version;  // version of this structure
-  // TODO: add more fields.
-} __attribute__((packed)) dv_cmdraw_v0;
+} __attribute__((packed)) dv_cmdraw;
 
 
 /// @brief Adds raw command to the command list.

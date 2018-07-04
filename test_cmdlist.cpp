@@ -16,6 +16,7 @@
 #include <memory>
 
 #include "dv.h"
+#include "dv_cmdraw_v0.h"
 
 
 #define LOG(...) fprintf(stdout, __VA_ARGS__); fflush(stdout)
