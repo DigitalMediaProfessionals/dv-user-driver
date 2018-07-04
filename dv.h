@@ -139,6 +139,13 @@ typedef struct dv_cmdraw_impl {
 } __attribute__((packed)) dv_cmdraw;
 
 
+/// @brief Description for array arguments.
+typedef struct dv_buf_impl {
+  dv_mem *mem;  // handle for allocated memory chunk
+  size_t offs;  // offset in bytes from the start of the allocated memory chunk
+} __attribute__((packed)) dv_buf;
+
+
 /// @brief Raw command for execution.
 typedef struct dv_cmdraw_v0_impl {
   int32_t size;     // size of this structure
