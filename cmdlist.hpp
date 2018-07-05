@@ -36,6 +36,8 @@ class CDVCmdList {
     }
     ctx_ = ctx;
 
+    // TODO: increase reference counter on context.
+
     return true;
   }
 
@@ -45,11 +47,29 @@ class CDVCmdList {
   }
 
   int End() {
+    // Check list content
+    const int n = (int)commands_.size();
+    for (int i = 0; i < n; ++i) {
+      switch (commands_[i].type) {
+        case kCommandTypeRaw_v0:
+          break;
+        default:
+          SET_ERR("Invalid command type %d detected at command list at position %d", commands_[i].type, i);
+          return -1;
+      }
+    }
+
+    // Allocate and fill memory chunk suitable for sharing with kernel module replacing dv_mem pointers with ION file descriptors
     // TODO: implement.
+
+    // Pass this chunk to kernel module
+    // TODO: implement.
+
     return 0;
   }
 
   int Exec() {
+    // Issue ioctl on the kernel module requesting this list execution
     // TODO: implement.
     return 0;
   }
@@ -77,8 +97,9 @@ class CDVCmdList {
 
  protected:
   enum CommandType {
-    kCommandTypeRaw_v0 = 0,
-    kCommandTypeSIZE
+    kCommandTypeSTART = 0,
+    kCommandTypeRaw_v0,
+    kCommandTypeEND
   };
 
   struct Command {

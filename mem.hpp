@@ -61,6 +61,8 @@ class CDVMem {
       return false;
     }
 
+    // TODO: increase reference counter on context.
+
     return true;
   }
 

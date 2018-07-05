@@ -104,21 +104,21 @@ int test_cmdlist() {
     ERR("dv_cmdlist_end() failed: %s\n", dv_get_last_error_message());
     goto L_EXIT;
   }
-  LOG("Ended the command list");
+  LOG("Ended the command list\n");
 
   if (dv_cmdlist_exec(cmdlist)) {
     ERR("dv_cmdlist_exec() failed: %s\n", dv_get_last_error_message());
     goto L_EXIT;
   }
-  LOG("Scheduled command list for execution");
+  LOG("Scheduled command list for execution\n");
 
   if (dv_sync(ctx)) {
     ERR("dv_sync() failed: %s\n", dv_get_last_error_message());
     goto L_EXIT;
   }
-  LOG("Execution has completed");
+  LOG("Execution has completed\n");
 
-  LOG("TODO: check the correctness of the result");
+  LOG("TODO: check the correctness of the result\n");
 
   result = 0;
   LOG("SUCCESS: test_cmdlist\n");

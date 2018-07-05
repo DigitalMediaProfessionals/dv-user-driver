@@ -18,6 +18,8 @@
 class CDVContext {
  public:
   CDVContext() {
+    // TODO: add reference counter.
+
     fd_ion_ = -1;
     dma_heap_id_mask_ = 0;
   }
