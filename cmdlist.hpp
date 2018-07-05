@@ -11,6 +11,8 @@
  */
 #pragma once
 
+#include <vector>
+
 #include "mem.hpp"
 #include "dv_cmdraw_v0.h"
 
@@ -38,6 +40,7 @@ class CDVCmdList {
   }
 
   void Cleanup() {
+    commands_.clear();
     ctx_ = NULL;
   }
 
@@ -73,6 +76,18 @@ class CDVCmdList {
   }
 
  protected:
+  enum CommandType {
+    kCommandTypeRaw_v0 = 0,
+    kCommandTypeSIZE
+  };
+
+  struct Command {
+    CommandType type;
+    union {
+      dv_cmdraw_v0 raw_v0;
+    };
+  };
+
   int AddRaw_v0(dv_cmdraw_v0 *cmd) {
     if (cmd->size != sizeof(dv_cmdraw_v0)) {
       SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d", (int)cmd->size, (int)cmd->version);
@@ -105,11 +120,20 @@ class CDVCmdList {
       }
     }
 
-    // TODO: add cmd to the queue.
+    Command command;
+    memset(&command, 0, sizeof(command));
+    command.type = kCommandTypeRaw_v0;
+    memcpy(&command.raw_v0, cmd, sizeof(dv_cmdraw_v0));
+
+    commands_.push_back(std::move(command));
 
     return 0;
   }
 
  private:
+  /// @brief Reference to device context.
   CDVContext *ctx_;
+
+  /// @brief List of commands this list contains.
+  std::vector<Command> commands_;
 };
