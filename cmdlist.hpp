@@ -74,7 +74,13 @@ class CDVCmdList {
 
  protected:
   int AddRaw_v0(dv_cmdraw_v0 *cmd) {
+    if (cmd->size != sizeof(dv_cmdraw_v0)) {
+      SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d", (int)cmd->size, (int)cmd->version);
+      return -1;
+    }
+
     // TODO: implement.
+
     return 0;
   }
 
