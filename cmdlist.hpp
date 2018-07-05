@@ -120,6 +120,8 @@ class CDVCmdList {
       }
     }
 
+    // TODO: increase reference counters on provided mem pointers.
+
     Command command;
     memset(&command, 0, sizeof(command));
     command.type = kCommandTypeRaw_v0;
