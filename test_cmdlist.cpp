@@ -95,6 +95,8 @@ int test_cmdlist() {
   cmd.run[0].weight_buf.offs = 0;
   cmd.run[0].weight_fmt = 2;
 
+  // TODO: fill weights and input.
+
   if (dv_cmdlist_add_raw(cmdlist, (dv_cmdraw*)&cmd)) {
     ERR("dv_cmdlist_add_raw() failed: %s\n", dv_get_last_error_message());
     goto L_EXIT;
