@@ -79,7 +79,33 @@ class CDVCmdList {
       return -1;
     }
 
-    // TODO: implement.
+    if (!cmd->input_buf.mem) {
+      SET_ERR("Invalid argument: cmd->input_buf.mem is NULL");
+      return -1;
+    }
+
+    if (!cmd->output_buf.mem) {
+      SET_ERR("Invalid argument: cmd->output_buf.mem is NULL");
+      return -1;
+    }
+
+    if (!cmd->topo) {
+      SET_ERR("Invalid argument: cmd->topo is 0");
+      return -1;
+    }
+
+    for (int topo = cmd->topo, i = 0; topo; topo >>= 1, ++i) {
+      if ((!cmd->run[i].conv_enable) && (!cmd->run[i].pool_enable) && (!cmd->run[i].actfunc)) {
+        SET_ERR("Invalid argument: cmd->run[%d] specify no operation", i);
+        return -1;
+      }
+      if ((cmd->run[i].conv_enable == 1) && (!cmd->run[i].weight_buf.mem)) {
+        SET_ERR("Invalid argument: cmd->run[%d].weight_buf.mem is NULL", i);
+        return -1;
+      }
+    }
+
+    // TODO: add cmd to the queue.
 
     return 0;
   }
