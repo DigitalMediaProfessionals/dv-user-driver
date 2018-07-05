@@ -11,8 +11,8 @@
  */
 #pragma once
 
-#include "common.hpp"
 #include "mem.hpp"
+#include "dv_cmdraw_v0.h"
 
 
 /// @brief Implementation of dv_cmdlist.
@@ -52,11 +52,29 @@ class CDVCmdList {
   }
 
   int AddRaw(dv_cmdraw *cmd) {
-    // TODO: implement.
-    return 0;
+    if (cmd->size < 8) {
+      SET_ERR("Invalid argument: cmd->size %d is too small", (int)cmd->size);
+      return -1;
+    }
+    switch (cmd->version) {
+      case 0:
+        return AddRaw_v0((dv_cmdraw_v0*)cmd);
+
+      default:
+        SET_ERR("Invalid argument: cmd->version %d is not supported", (int)cmd->version);
+        return -1;
+    }
+    SET_ERR("Control should not reach line %d of file %s", __LINE__, __FILE__);
+    return -1;
   }
 
   static inline int32_t get_cmdraw_max_version() {
+    return 0;
+  }
+
+ protected:
+  int AddRaw_v0(dv_cmdraw_v0 *cmd) {
+    // TODO: implement.
     return 0;
   }
 
