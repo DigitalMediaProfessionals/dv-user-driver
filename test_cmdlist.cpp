@@ -25,65 +25,34 @@
 
 int test_cmdlist() {
   LOG("ENTER: test_cmdlist\n");
+
+  int result = -1;
+  dv_context *ctx = NULL;
+  dv_cmdlist *cmdlist = NULL;
+  dv_mem *io_mem = NULL, *weights_mem = NULL;
+  size_t io_size, weights_size;
+  int32_t cmdraw_max_version;
+
   LOG("dv_get_version_string(): %s\n", dv_get_version_string());
 
-  dv_context *ctx = dv_context_create(NULL);
+  ctx  = dv_context_create(NULL);
   if (!ctx) {
     ERR("dv_context_create() failed: %s\n", dv_get_last_error_message());
-    return -1;
+    goto L_EXIT;
   }
   LOG("Successfully created context: %s\n", dv_context_get_info_string(ctx));
 
-  const int size = 65536;
-  dv_mem *mem = dv_mem_alloc(ctx, size);
-  if (!mem) {
-    ERR("dv_mem_alloc() failed: %s\n", dv_get_last_error_message());
-    dv_context_destroy(ctx);
-    return -1;
-  }
-  LOG("Successfully allocated %zu bytes of memory\n", size);
-
-  uint8_t *arr = dv_mem_map(mem);
-  if (!arr) {
-    ERR("dv_mem_map() failed: %s\n", dv_get_last_error_message());
-    dv_mem_free(mem);
-    dv_context_destroy(ctx);
-    return -1;
-  }
-  LOG("Successfully mapped to user space %zu bytes of memory, address is %zu\n", size, (size_t)arr);
-
-  // Start Write memory transaction
-  if (dv_mem_sync_start(mem, 0, 1)) {
-    ERR("dv_mem_sync_start() failed for writing: %s\n", dv_get_last_error_message());
-    dv_mem_free(mem);
-    dv_context_destroy(ctx);
-    return -1;
-  }
-  memset(arr, 0, size);
-  if (dv_mem_sync_end(mem)) {
-    ERR("dv_mem_sync_end() failed: %s\n", dv_get_last_error_message());
-    dv_mem_free(mem);
-    dv_context_destroy(ctx);
-    return -1;
-  }
-  LOG("Successfully filled the buffer and synced with physical memory\n");
-
-  dv_cmdlist *cmdlist = dv_cmdlist_create(ctx);
+  cmdlist = dv_cmdlist_create(ctx);
   if (!cmdlist) {
     ERR("dv_cmdlist_create() failed: %s\n", dv_get_last_error_message());
-    dv_mem_free(mem);
-    dv_context_destroy(ctx);
-    return -1;
+    goto L_EXIT;
   }
   LOG("Created command list\n");
 
-  const int32_t cmdraw_max_version = dv_get_cmdraw_max_version();
+  cmdraw_max_version = dv_get_cmdraw_max_version();
   if (cmdraw_max_version < 0) {
     ERR("dv_get_cmdraw_max_version() returned %d\n", (int)cmdraw_max_version);
-    dv_cmdlist_destroy(cmdlist);
-    dv_mem_free(mem);
-    dv_context_destroy(ctx);
-    return -1;
+    goto L_EXIT;
   }
   LOG("Maximum supported version for raw command is %d\n", (int)cmdraw_max_version);
 
@@ -91,41 +60,77 @@ int test_cmdlist() {
   memset(&cmd, 0, sizeof(cmd));
   cmd.size = sizeof(cmd);
   cmd.version = 0;
+  cmd.w = 64;
+  cmd.h = 32;
+  cmd.c = 3;
+  cmd.z = 1;
+  cmd.tiles = 1;
+  cmd.topo = 1;
+  cmd.run[0].m = 32;
+  cmd.run[0].conv_enable = 1;
+  cmd.run[0].p = 3;
+  cmd.run[0].conv_pad = 0x01010101;
+  cmd.run[0].conv_stride = 0x0101;
+  cmd.run[0].actfunc = 5;
+
+  io_size = ((size_t)cmd.w * cmd.h * cmd.c + (size_t)cmd.w * cmd.h * cmd.run[0].m) * 2;
+  io_mem = dv_mem_alloc(ctx, io_size);
+  if (!io_mem) {
+    ERR("dv_mem_alloc() failed for %zu bytes: %s\n", io_size, dv_get_last_error_message());
+    goto L_EXIT;
+  }
+  cmd.input_buf.mem = io_mem;
+  cmd.input_buf.offs = 0;
+  cmd.output_buf.mem = io_mem;
+  cmd.output_buf.offs = (size_t)cmd.w * cmd.h * cmd.c * 2;
+
+  weights_size = 65536;  // TODO: put real size here.
+  weights_mem = dv_mem_alloc(ctx, weights_size);
+  if (!io_mem) {
+    ERR("dv_mem_alloc() failed for %zu bytes: %s\n", weights_size, dv_get_last_error_message());
+    goto L_EXIT;
+  }
+
+  cmd.run[0].weight_buf.mem = weights_mem;
+  cmd.run[0].weight_buf.offs = 0;
+  cmd.run[0].weight_fmt = 2;
 
   if (dv_cmdlist_add_raw(cmdlist, (dv_cmdraw*)&cmd)) {
     ERR("dv_cmdlist_add_raw() failed: %s\n", dv_get_last_error_message());
-    dv_cmdlist_destroy(cmdlist);
-    dv_mem_free(mem);
-    dv_context_destroy(ctx);
-    return -1;
+    goto L_EXIT;
   }
-
-  // TODO: implement.
 
   if (dv_cmdlist_end(cmdlist)) {
     ERR("dv_cmdlist_end() failed: %s\n", dv_get_last_error_message());
-    dv_cmdlist_destroy(cmdlist);
-    dv_mem_free(mem);
-    dv_context_destroy(ctx);
-    return -1;
+    goto L_EXIT;
   }
   LOG("Ended the command list");
 
   if (dv_cmdlist_exec(cmdlist)) {
     ERR("dv_cmdlist_exec() failed: %s\n", dv_get_last_error_message());
-    dv_cmdlist_destroy(cmdlist);
-    dv_mem_free(mem);
-    dv_context_destroy(ctx);
-    return -1;
+    goto L_EXIT;
   }
-  LOG("Executed the command list");
+  LOG("Scheduled command list for execution");
 
+  if (dv_sync(ctx)) {
+    ERR("dv_sync() failed: %s\n", dv_get_last_error_message());
+    goto L_EXIT;
+  }
+  LOG("Execution has completed");
+
+  LOG("TODO: check the correctness of the result");
+
+  result = 0;
+  LOG("SUCCESS: test_cmdlist\n");
+
+  L_EXIT:
   dv_cmdlist_destroy(cmdlist);
-  dv_mem_free(mem);
+  dv_mem_free(weights_mem);
+  dv_mem_free(io_mem);
   dv_context_destroy(ctx);
 
   LOG("EXIT: test_cmdlist\n");
-  return 0;
+  return result;
 }
 
 

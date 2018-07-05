@@ -27,13 +27,13 @@ typedef struct dv_cmdraw_v0_conv_run_impl {
   dv_buf weight_buf;       // Buffer with packed weights
   uint16_t weight_fmt;     // Weight format (0 = random access blocks, 1 = compact stream, 2 = 8-bit qunatized stream)
 
-  uint16_t pool_enable;     // 0 = disabled, 1 = max pooling, 2 = average pooling
+  uint16_t pool_enable;     // 0 = disabled, 1 = max pooling, 2 = average pooling, 4 - upsampling
   uint16_t pool_avg_param;  // Usually be set to 1/pool_size^2 in FP16 when using average pooling (average pooling assumes square size)
   uint16_t pool_size;       // Bits [7:0] = width, bits [15:8] = height
   uint16_t pool_stride;     // Bits [7:0] = X stride, bits [15:8] = Y stride
   uint32_t pool_pad;        // Bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
 
-  uint16_t actfunc;        // Activation Function: 0 = None, 1 = Tanh, 2 = Leaky ReLU
+  uint16_t actfunc;        // Activation Function: 0 = None, 1 = Tanh, 2 = Leaky ReLU, 3 = Sigmoid, 4 = PReLU, 5 = ELU, 6 = ReLU6
   uint16_t actfunc_param;  // Leaky ReLU parameter in FP16
   uint16_t rectifi_en;     // Rectification, i.e. max(0, x) (NOTE: Can be applied after non-ReLU activation function)
   uint16_t lrn;            // Bits [0]: 1 = LRN enable, 0 = LRN disable, [1]: 1 = incl. power func, 0 = excl., [8:11]: x^2 scale factor log2
