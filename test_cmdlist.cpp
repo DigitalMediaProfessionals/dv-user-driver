@@ -33,6 +33,8 @@ int test_cmdlist() {
   size_t io_size, weights_size;
   int32_t cmdraw_max_version;
   uint16_t quant_map[256];
+  uint8_t *weights;
+  __fp16 *io;
 
   LOG("dv_get_version_string(): %s\n", dv_get_version_string());
 
@@ -80,6 +82,7 @@ int test_cmdlist() {
     ERR("dv_mem_alloc() failed for %zu bytes: %s\n", io_size, dv_get_last_error_message());
     goto L_EXIT;
   }
+  LOG("Allocated %zu (%zu requested) bytes for input/output\n", dv_mem_get_size(io_mem), io_size);
   cmd.input_buf.mem = io_mem;
   cmd.input_buf.offs = 0;
   cmd.output_buf.mem = io_mem;
@@ -104,7 +107,36 @@ int test_cmdlist() {
   cmd.run[0].weight_buf.offs = 0;
   cmd.run[0].weight_fmt = 2;
 
-  // TODO: fill weights and input.
+  weights = dv_mem_map(weights_mem);
+  if (!weights) {
+    ERR("dv_mem_map() failed for weights: %s\n", dv_get_last_error_message());
+    goto L_EXIT;
+  }
+  if (dv_mem_sync_start(weights_mem, 0, 1)) {
+    ERR("dv_mem_sync_start() failed for weights: %s\n", dv_get_last_error_message());
+    goto L_EXIT;
+  }
+  // TODO: fill weights.
+  if (dv_mem_sync_end(weights_mem)) {
+    ERR("dv_mem_sync_end() failed for weights: %s\n", dv_get_last_error_message());
+    goto L_EXIT;
+  }
+  dv_mem_unmap(weights_mem);
+
+  io = (__fp16*)dv_mem_map(io_mem);
+  if (!io) {
+    ERR("dv_mem_map() failed for input/output: %s\n", dv_get_last_error_message());
+    goto L_EXIT;
+  }
+  if (dv_mem_sync_start(io_mem, 0, 1)) {
+    ERR("dv_mem_sync_start() failed for input/output: %s\n", dv_get_last_error_message());
+    goto L_EXIT;
+  }
+  // TODO: fill input.
+  if (dv_mem_sync_end(io_mem)) {
+    ERR("dv_mem_sync_end() failed for input/output: %s\n", dv_get_last_error_message());
+    goto L_EXIT;
+  }
 
   if (dv_cmdlist_add_raw(cmdlist, (dv_cmdraw*)&cmd)) {
     ERR("dv_cmdlist_add_raw() failed: %s\n", dv_get_last_error_message());
@@ -129,7 +161,15 @@ int test_cmdlist() {
   }
   LOG("Execution has completed\n");
 
-  LOG("TODO: check the correctness of the result\n");
+  if (dv_mem_sync_start(io_mem, 1, 0)) {
+    ERR("dv_mem_sync_start() failed for input/output: %s\n", dv_get_last_error_message());
+    goto L_EXIT;
+  }
+  // TODO: check the correctness of the result.
+  if (dv_mem_sync_end(io_mem)) {
+    ERR("dv_mem_sync_end() failed for input/output: %s\n", dv_get_last_error_message());
+    goto L_EXIT;
+  }
 
   result = 0;
   LOG("SUCCESS: test_cmdlist\n");
