@@ -25,7 +25,7 @@ class Main(object):
         except OSError:
             pass
 
-        quant_map = numpy.random.rand(256).astype(numpy.float16)
+        quant_map = numpy.random.uniform(-1.0, 1.0, 256).astype(numpy.float16)
         quant_map[0] = 0
         fnme = "data/map.f16"
         quant_map.tofile(fnme)
