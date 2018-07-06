@@ -29,8 +29,8 @@
 #include "dv.h"
 
 
-/// @brief Last error message.
-static char s_last_error_message[256];
+/// @brief Last error message (forward declaration).
+extern char s_last_error_message[256];
 
 
 /// @brief Helper to set the last error message.

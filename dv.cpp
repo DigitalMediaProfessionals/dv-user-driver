@@ -10,10 +10,14 @@
  * @brief Shared library exported functions implementation.
  */
 #include "dv.h"
-#include "common.hpp"
+#include "common.h"
 #include "context.hpp"
 #include "mem.hpp"
 #include "cmdlist.hpp"
+
+
+/// @brief Last error message (instantiation).
+char s_last_error_message[256];
 
 
 extern "C"

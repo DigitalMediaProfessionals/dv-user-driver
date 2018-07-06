@@ -11,7 +11,7 @@
  */
 #pragma once
 
-#include "common.hpp"
+#include "common.h"
 
 
 /// @brief Implementation of dv_context.

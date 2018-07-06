@@ -155,11 +155,29 @@ int dv_cmdlist_add_raw(dv_cmdlist *cmdlist, dv_cmdraw *cmd);
 int32_t dv_get_cmdraw_max_version();
 
 
+/// @brief Packs convolution layer weights and biases into output array.
+/// @param n_channels Number of input channels.
+/// @param kx Kernel width.
+/// @param ky Kernel height (must be equal to kx in current implementation).
+/// @param n_kernels Number of output channels.
+/// @param quant_map Quantization table for weights (but not bias), can be NULL.
+/// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format, else array of 1-byte indices.
+/// @param bias Array of half precision floating point biases of size n_kernels.
+/// @param output Output buffer for packed weights information (can be NULL if output_size is 0).
+/// @param output_size On input, contains the size of the output buffer in bytes (can be 0, in such case it will be filled with the required output size), on output will contain the required output size.
+/// @return 0 on success, non-zero otherwise.
+int pack_conv_weights(
+    int n_channels, int kx, int ky, int n_kernels,
+    const uint16_t quant_map[256],
+    const void *weights, const uint16_t *bias,
+    uint8_t *output, int *output_size);
+
+
 #ifdef __GNUC__
 #pragma GCC visibility pop
 #endif
 
 
 #ifdef __cplusplus
-}
+}  // extern "C"
 #endif
