@@ -51,7 +51,7 @@ class CDVMem {
     fd_mem_ = alloc_param.fd;
     size_ = size;
     off_t buf_size = lseek(fd_mem_, 0, SEEK_END);
-    if ((buf_size < 0) || ((size_t)buf_size != size)) {
+    if ((buf_size < 0) || ((size_t)buf_size < size)) {
       SET_ERR("Could not confirm size of allocated continuous memory for %zu bytes", size);
       return false;
     }

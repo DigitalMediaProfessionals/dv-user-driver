@@ -15,8 +15,8 @@
 
 
 /// @brief Writes bias to packed weights buffer.
-static inline void write_bias(int& m_start, const int& m_stop, int &out_offs, int *output_size, uint8_t *output, const uint16_t *bias) {
-  int n = (m_stop - m_start) << 1;
+static inline void write_bias(int& m_start, const int& m_stop, size_t &out_offs, size_t *output_size, uint8_t *output, const uint16_t *bias) {
+  size_t n = (m_stop - m_start) << 1;
   if (out_offs + n <= *output_size) {
     memcpy(output + out_offs, bias + m_start, n);
   }
@@ -37,7 +37,7 @@ static inline void write_bias(int& m_start, const int& m_stop, int &out_offs, in
 /// @param kx Kernel width.
 /// @param ky Kernel height (must be equal to kx in current implementation).
 /// @param n_kernels Number of output channels.
-/// @param quant_map Quantization table for weights (but not bias), can be NULL.
+/// @param quant_map Quantization table for weights (but not bias), when NULL, no quantization is assumed.
 /// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format, else array of 1-byte indices.
 /// @param bias Array of half precision floating point biases of size n_kernels.
 /// @param output Output buffer for packed weights information (can be NULL if output_size is 0).
@@ -50,7 +50,7 @@ int pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],
     const void *weights, const uint16_t *bias,
-    uint8_t *output, int *output_size) {
+    uint8_t *output, size_t *output_size) {
 
   // TODO: Optimize it to become O(n) (now it is completely non-optimal and very slow).
 
@@ -74,15 +74,19 @@ int pack_conv_weights(
     SET_ERR("output_size must not be NULL");
     return -1;
   }
+  if ((!output) && (*output_size)) {
+    SET_ERR("output is NULL but *output_size is non-zero");
+    return -1;
+  }
 
   int retval = 0;
 
-  if (*output_size > 0) {
+  if (*output_size) {
     memset(output, 0, *output_size);
   }
 
-  int out_offs = 0;
-  int n;
+  size_t out_offs = 0;
+  size_t n;
   if (quant_map) {
     n = 512;
     if (out_offs + n <= *output_size) {
@@ -239,16 +243,16 @@ int pack_conv_weights(
   }
 
   if ((!retval) && (*output_size)) {  // sanity check for debugging purposes
-    n = n_channels * kx * ky * n_kernels;
-    for (int i = 0; i < n; ++i) {
+    const int n_idx = n_channels * kx * ky * n_kernels;
+    for (int i = 0; i < n_idx; ++i) {
       auto it = w_idx.find(i);
       if (it == w_idx.end()) {
         SET_ERR("Index %d was not handled (must handle all %d indices)", i, n);
         return -1;
       }
     }
-    if ((int)w_idx.size() != n) {
-      SET_ERR("Handled different number of indices than expected: %d vs %d", (int)w_idx.size(), n);
+    if ((int)w_idx.size() != n_idx) {
+      SET_ERR("Handled different number of indices than expected: %d vs %d", (int)w_idx.size(), n_idx);
       return EINVAL;
     }
   }

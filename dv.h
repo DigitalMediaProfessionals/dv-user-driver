@@ -170,7 +170,7 @@ int pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],
     const void *weights, const uint16_t *bias,
-    uint8_t *output, int *output_size);
+    uint8_t *output, size_t *output_size);
 
 
 #ifdef __GNUC__

@@ -32,6 +32,7 @@ int test_cmdlist() {
   dv_mem *io_mem = NULL, *weights_mem = NULL;
   size_t io_size, weights_size;
   int32_t cmdraw_max_version;
+  uint16_t quant_map[256];
 
   LOG("dv_get_version_string(): %s\n", dv_get_version_string());
 
@@ -84,9 +85,17 @@ int test_cmdlist() {
   cmd.output_buf.mem = io_mem;
   cmd.output_buf.offs = (size_t)cmd.w * cmd.h * cmd.c * 2;
 
-  weights_size = 65536;  // TODO: put real size here.
+  weights_size = 0;
+  if (pack_conv_weights(
+        cmd.c, cmd.run[0].p, cmd.run[0].p, cmd.run[0].m,
+        quant_map, NULL, NULL, NULL, &weights_size)) {
+    ERR("pack_conv_weights() failed: %s\n", dv_get_last_error_message());
+    goto L_EXIT;
+  }
+  LOG("weights_size is %zu\n", weights_size);
+
   weights_mem = dv_mem_alloc(ctx, weights_size);
-  if (!io_mem) {
+  if (!weights_mem) {
     ERR("dv_mem_alloc() failed for %zu bytes: %s\n", weights_size, dv_get_last_error_message());
     goto L_EXIT;
   }
