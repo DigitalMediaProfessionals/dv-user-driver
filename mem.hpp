@@ -20,7 +20,8 @@ class CDVMem {
   CDVMem() {
     ctx_ = NULL;
     fd_mem_ = -1;
-    size_ = 0;
+    requested_size_ = 0;
+    real_size_ = 0;
     map_ptr_ = NULL;
     sync_flags_ = 0;
   }
@@ -49,7 +50,7 @@ class CDVMem {
       return false;
     }
     fd_mem_ = alloc_param.fd;
-    size_ = size;
+    requested_size_ = size;
     off_t buf_size = lseek(fd_mem_, 0, SEEK_END);
     if ((buf_size < 0) || ((size_t)buf_size < size)) {
       SET_ERR("Could not confirm size of allocated continuous memory for %zu bytes", size);
@@ -59,6 +60,7 @@ class CDVMem {
       SET_ERR("Could not confirm size of allocated continuous memory for %zu bytes", size);
       return false;
     }
+    real_size_ = buf_size;
 
     // TODO: increase reference counter on context.
 
@@ -71,7 +73,8 @@ class CDVMem {
       close(fd_mem_);
       fd_mem_ = -1;
     }
-    size_ = 0;
+    requested_size_ = 0;
+    real_size_ = 0;
     ctx_ = NULL;
   }
 
@@ -79,9 +82,9 @@ class CDVMem {
     if (map_ptr_) {
       return map_ptr_;
     }
-    map_ptr_ = (uint8_t*)mmap(NULL, size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd_mem_, 0);
+    map_ptr_ = (uint8_t*)mmap(NULL, real_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd_mem_, 0);
     if (map_ptr_ == MAP_FAILED) {
-      SET_ERR("mmap() on allocated from /dev/ion file descriptor failed for %zu bytes", size_);
+      SET_ERR("mmap() on allocated from /dev/ion file descriptor failed for %zu bytes", real_size_);
       return NULL;
     }
     return map_ptr_;
@@ -92,7 +95,7 @@ class CDVMem {
     if (!map_ptr_) {
       return;
     }
-    munmap(map_ptr_, size_);
+    munmap(map_ptr_, real_size_);
     map_ptr_ = NULL;
   }
 
@@ -136,6 +139,10 @@ class CDVMem {
     return 0;
   }
 
+  inline size_t get_size() const {
+    return real_size_;
+  }
+
  private:
   /// @brief Pointer to dv context.
   CDVContext *ctx_;
@@ -143,8 +150,11 @@ class CDVMem {
   /// @brief File handle for allocated memory.
   int fd_mem_;
 
-  /// @brief Size of allocated memory.
-  size_t size_;
+  /// @brief Requested size of allocated memory.
+  size_t requested_size_;
+
+  /// @brief Real size of allocated memory.
+  size_t real_size_;
 
   /// @brief Mapped memory pointer.
   uint8_t *map_ptr_;

@@ -92,13 +92,13 @@ int test_cmdlist() {
     ERR("pack_conv_weights() failed: %s\n", dv_get_last_error_message());
     goto L_EXIT;
   }
-  LOG("weights_size is %zu\n", weights_size);
 
   weights_mem = dv_mem_alloc(ctx, weights_size);
   if (!weights_mem) {
     ERR("dv_mem_alloc() failed for %zu bytes: %s\n", weights_size, dv_get_last_error_message());
     goto L_EXIT;
   }
+  LOG("Allocated %zu (%zu requested) bytes for weights\n", dv_mem_get_size(weights_mem), weights_size);
 
   cmd.run[0].weight_buf.mem = weights_mem;
   cmd.run[0].weight_buf.offs = 0;

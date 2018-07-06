@@ -103,6 +103,10 @@ int dv_mem_sync_start(dv_mem *mem, int rd, int wr);
 int dv_mem_sync_end(dv_mem *mem);
 
 
+/// @brief Returns allocated size in bytes for provided memory handle.
+size_t dv_mem_get_size(dv_mem *mem);
+
+
 /// @brief Waits for all scheduled commands to be executed.
 /// @param ctx Context for working with DV accelerator, when NULL the error is returned.
 /// @return 0 on success, non-zero otherwise.

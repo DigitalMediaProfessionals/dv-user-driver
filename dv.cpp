@@ -132,6 +132,16 @@ int dv_mem_sync_end(dv_mem *mem) {
 
 
 extern "C"
+size_t dv_mem_get_size(dv_mem *mem) {
+  if (!mem) {
+    SET_ERR("Invalid argument: mem is NULL");
+    return -1;
+  }
+  return ((CDVMem*)mem)->get_size();
+}
+
+
+extern "C"
 int dv_sync(dv_context *ctx) {
   if (!ctx) {
     SET_ERR("Invalid argument: ctx is NULL");
