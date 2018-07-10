@@ -12,34 +12,111 @@ Generates weights, input and computes output.
 import numpy
 import os
 
+import caffe
+
 
 class Main(object):
     def __init__(self):
-        self.generate_weights()
-        self.generate_input()
-        self.compute_output()
+        self.generate(64, 32, 3, 3, 3, 32, 1, 1, 5)
 
-    def generate_weights(self):
-        try:
-            os.mkdir("data")
-        except OSError:
-            pass
+    def get_ox(self, width, kx, pad, stride):
+        return (pad + width + pad - kx) // stride + 1
 
-        quant_map = numpy.random.uniform(-1.0, 1.0, 256).astype(numpy.float16)
-        quant_map[0] = 0
-        fnme = "data/map.f16"
-        quant_map.tofile(fnme)
-        print("Saved quantization map to %s" % fnme)
+    def generate(self, width, height, n_channels, kx, ky, n_kernels,
+                 pad, stride, activation):
+        prefix = ("data/%dx%dx%d_%dx%dx%d_%d_%d_%d" %
+                  (width, height, n_channels, kx, ky, n_kernels,
+                   pad, stride, activation))
 
-        # TODO: implement.
+        bias = numpy.random.uniform(-1.0, 1.0, n_kernels).astype(numpy.float16)
+        bias.tofile("%s.b.bin" % prefix)
 
-    def generate_input(self):
-        # TODO: implement.
-        pass
+        input = numpy.random.uniform(
+            -1.0, 1.0, width * height * n_channels).astype(numpy.float16)
+        input.tofile("%s.i.bin" % prefix)
 
-    def compute_output(self):
-        # TODO: implement.
-        pass
+        quant = numpy.random.uniform(-1.0, 1.0, 256).astype(numpy.float16)
+        quant[0] = 0
+        quant.tofile("%s.q.bin" % prefix)
+
+        assert len(quant) == 256
+        assert numpy.count_nonzero(numpy.isnan(quant)) == 0
+        i_weights = numpy.random.randint(
+            0, 256, kx * ky * n_channels * n_kernels).astype(numpy.uint8)
+        i_weights.tofile("%s.w.bin" % prefix)
+        weights = quant[i_weights].copy().reshape(
+            n_kernels, n_channels, ky, kx)
+        assert numpy.count_nonzero(numpy.isnan(weights)) == 0
+        del i_weights
+        del quant
+
+        caffe.set_mode_cpu()
+
+        with open("data/test.prototxt", "w") as fout:
+            fout.write("""name: "Test"
+state {
+  phase: TEST
+  level: 0
+}
+layer {
+  name: "data"
+  type: "Input"
+  top: "data"
+  input_param {
+    shape {
+      dim: 1
+      dim: %d
+      dim: %d
+      dim: %d
+    }
+  }
+}
+layer {
+  name: "conv1"
+  type: "Convolution"
+  bottom: "data"
+  top: "conv1"
+  convolution_param {
+    num_output: %d
+    pad: %d
+    kernel_size: %d
+    stride: %d
+  }
+}
+""" % (n_channels, height, width, n_kernels, pad, kx, stride))
+            if activation == 5:
+                fout.write("""
+layer {
+  name: "conv1/ELU"
+  type: "ELU"
+  bottom: "conv1"
+  top: "conv1"
+}
+""")
+            # TODO: add more activations.
+
+        net = caffe.Net("data/test.prototxt", caffe.TEST)
+        net.params["conv1"][0].data[:] = weights.astype(
+            numpy.float32).reshape(n_kernels, n_channels, ky, kx)
+        del weights
+        net.params["conv1"][1].data[:] = bias.astype(numpy.float32)
+        del bias
+
+        net.blobs["data"].data[0, :, :, :] = input.astype(
+            numpy.float32).reshape(n_channels, height, width)
+        del input
+
+        results = net.forward()
+        output = results["conv1"].copy()
+
+        ox = self.get_ox(width, kx, pad, stride)
+        oy = self.get_ox(height, ky, pad, stride)
+        assert output.shape == (1, n_kernels, oy, ox)
+
+        output.astype(numpy.float16).tofile("%s.o.bin" % prefix)
+
+        print("Successfully generated test input/weights/output for %s" %
+              prefix)
 
 
 if __name__ == "__main__":

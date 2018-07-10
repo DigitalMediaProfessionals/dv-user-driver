@@ -52,7 +52,6 @@ typedef struct dv_cmdraw_v0_impl {
   uint16_t c;                      // Input Channels
   dv_buf   input_buf;              // Input buffer
   uint16_t input_circular_offset;  // Input Depth circular offset
-  uint16_t tiles;                  // Number of horizontal tiles  // TODO: calculate in kernel module.
 
   dv_buf output_buf;     // Output buffer
   dv_buf eltwise_buf;    // Buffer for elementwise add (0 = UBUF Input Buffer)
