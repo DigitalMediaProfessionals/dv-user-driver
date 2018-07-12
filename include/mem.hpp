@@ -7,17 +7,17 @@
 *------------------------------------------------------------
 */
 /*
- * @brief dv_mem implementation.
+ * @brief dmp_dv_mem implementation.
  */
 #pragma once
 
 #include "context.hpp"
 
 
-/// @brief Implementation of dv_mem.
-class CDVMem {
+/// @brief Implementation of dmp_dv_mem.
+class CDMPDVMem {
  public:
-  CDVMem() {
+  CDMPDVMem() {
     ctx_ = NULL;
     fd_mem_ = -1;
     requested_size_ = 0;
@@ -26,11 +26,11 @@ class CDVMem {
     sync_flags_ = 0;
   }
 
-  virtual ~CDVMem() {
+  virtual ~CDMPDVMem() {
     Cleanup();
   }
 
-  bool Initialize(CDVContext *ctx, size_t size) {
+  bool Initialize(CDMPDVContext *ctx, size_t size) {
     Cleanup();
     if (!ctx) {
       SET_ERR("Invalid argument: ctx is NULL");
@@ -145,7 +145,7 @@ class CDVMem {
 
  private:
   /// @brief Pointer to dv context.
-  CDVContext *ctx_;
+  CDMPDVContext *ctx_;
 
   /// @brief File handle for allocated memory.
   int fd_mem_;

@@ -17,8 +17,8 @@
 #include <memory>
 #include <set>
 
-#include "dv.h"
-#include "dv_cmdraw_v0.h"
+#include "dmp_dv.h"
+#include "dmp_dv_cmdraw_v0.h"
 
 
 #define LOG(...) fprintf(stdout, __VA_ARGS__); fflush(stdout)
@@ -114,38 +114,38 @@ int test_cmdlist(const conv_config& config) {
   }
 
   int result = -1;
-  dv_context *ctx = NULL;
-  dv_cmdlist *cmdlist = NULL;
-  dv_mem *io_mem = NULL, *weights_mem = NULL;
+  dmp_dv_context *ctx = NULL;
+  dmp_dv_cmdlist *cmdlist = NULL;
+  dmp_dv_mem *io_mem = NULL, *weights_mem = NULL;
   size_t io_size, weights_size;
   int32_t cmdraw_max_version;
   uint8_t *weights;
   __fp16 *io;
 
-  LOG("dv_get_version_string(): %s\n", dv_get_version_string());
+  LOG("dmp_dv_get_version_string(): %s\n", dmp_dv_get_version_string());
 
-  ctx  = dv_context_create(NULL);
+  ctx  = dmp_dv_context_create(NULL);
   if (!ctx) {
-    ERR("dv_context_create() failed: %s\n", dv_get_last_error_message());
+    ERR("dmp_dv_context_create() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  LOG("Successfully created context: %s\n", dv_context_get_info_string(ctx));
+  LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
 
-  cmdlist = dv_cmdlist_create(ctx);
+  cmdlist = dmp_dv_cmdlist_create(ctx);
   if (!cmdlist) {
-    ERR("dv_cmdlist_create() failed: %s\n", dv_get_last_error_message());
+    ERR("dmp_dv_cmdlist_create() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   LOG("Created command list\n");
 
-  cmdraw_max_version = dv_get_cmdraw_max_version();
+  cmdraw_max_version = dmp_dv_get_cmdraw_max_version();
   if (cmdraw_max_version < 0) {
-    ERR("dv_get_cmdraw_max_version() returned %d\n", (int)cmdraw_max_version);
+    ERR("dmp_dv_get_cmdraw_max_version() returned %d\n", (int)cmdraw_max_version);
     goto L_EXIT;
   }
   LOG("Maximum supported version for raw command is %d\n", (int)cmdraw_max_version);
 
-  dv_cmdraw_v0 cmd;
+  dmp_dv_cmdraw_v0 cmd;
   memset(&cmd, 0, sizeof(cmd));
   cmd.size = sizeof(cmd);
   cmd.version = 0;
@@ -168,12 +168,12 @@ int test_cmdlist(const conv_config& config) {
   cmd.run[0].actfunc = config.activation;
 
   io_size = ((size_t)cmd.w * cmd.h * cmd.c + (size_t)cmd.w * cmd.h * cmd.run[0].m) * 2;
-  io_mem = dv_mem_alloc(ctx, io_size);
+  io_mem = dmp_dv_mem_alloc(ctx, io_size);
   if (!io_mem) {
-    ERR("dv_mem_alloc() failed for %zu bytes: %s\n", io_size, dv_get_last_error_message());
+    ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", io_size, dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  LOG("Allocated %zu (%zu requested) bytes for input/output\n", dv_mem_get_size(io_mem), io_size);
+  LOG("Allocated %zu (%zu requested) bytes for input/output\n", dmp_dv_mem_get_size(io_mem), io_size);
   cmd.input_buf.mem = io_mem;
   cmd.input_buf.offs = 0;
   cmd.output_buf.mem = io_mem;
@@ -183,82 +183,82 @@ int test_cmdlist(const conv_config& config) {
   if (pack_conv_weights(
         cmd.c, cmd.run[0].p, cmd.run[0].p, cmd.run[0].m,
         quant_map, NULL, NULL, NULL, &weights_size)) {
-    ERR("pack_conv_weights() failed: %s\n", dv_get_last_error_message());
+    ERR("pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
 
-  weights_mem = dv_mem_alloc(ctx, weights_size);
+  weights_mem = dmp_dv_mem_alloc(ctx, weights_size);
   if (!weights_mem) {
-    ERR("dv_mem_alloc() failed for %zu bytes: %s\n", weights_size, dv_get_last_error_message());
+    ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", weights_size, dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  LOG("Allocated %zu (%zu requested) bytes for weights\n", dv_mem_get_size(weights_mem), weights_size);
+  LOG("Allocated %zu (%zu requested) bytes for weights\n", dmp_dv_mem_get_size(weights_mem), weights_size);
 
   cmd.run[0].weight_buf.mem = weights_mem;
   cmd.run[0].weight_buf.offs = 0;
   cmd.run[0].weight_fmt = 2;
 
-  weights = dv_mem_map(weights_mem);
+  weights = dmp_dv_mem_map(weights_mem);
   if (!weights) {
-    ERR("dv_mem_map() failed for weights: %s\n", dv_get_last_error_message());
+    ERR("dmp_dv_mem_map() failed for weights: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  if (dv_mem_sync_start(weights_mem, 0, 1)) {
-    ERR("dv_mem_sync_start() failed for weights: %s\n", dv_get_last_error_message());
+  if (dmp_dv_mem_sync_start(weights_mem, 0, 1)) {
+    ERR("dmp_dv_mem_sync_start() failed for weights: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   // TODO: fill weights.
-  if (dv_mem_sync_end(weights_mem)) {
-    ERR("dv_mem_sync_end() failed for weights: %s\n", dv_get_last_error_message());
+  if (dmp_dv_mem_sync_end(weights_mem)) {
+    ERR("dmp_dv_mem_sync_end() failed for weights: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  dv_mem_unmap(weights_mem);
+  dmp_dv_mem_unmap(weights_mem);
 
-  io = (__fp16*)dv_mem_map(io_mem);
+  io = (__fp16*)dmp_dv_mem_map(io_mem);
   if (!io) {
-    ERR("dv_mem_map() failed for input/output: %s\n", dv_get_last_error_message());
+    ERR("dmp_dv_mem_map() failed for input/output: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  if (dv_mem_sync_start(io_mem, 0, 1)) {
-    ERR("dv_mem_sync_start() failed for input/output: %s\n", dv_get_last_error_message());
+  if (dmp_dv_mem_sync_start(io_mem, 0, 1)) {
+    ERR("dmp_dv_mem_sync_start() failed for input/output: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   // TODO: fill input.
-  if (dv_mem_sync_end(io_mem)) {
-    ERR("dv_mem_sync_end() failed for input/output: %s\n", dv_get_last_error_message());
+  if (dmp_dv_mem_sync_end(io_mem)) {
+    ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
 
-  if (dv_cmdlist_add_raw(cmdlist, (dv_cmdraw*)&cmd)) {
-    ERR("dv_cmdlist_add_raw() failed: %s\n", dv_get_last_error_message());
+  if (dmp_dv_cmdlist_add_raw(cmdlist, (dmp_dv_cmdraw*)&cmd)) {
+    ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
 
-  if (dv_cmdlist_end(cmdlist)) {
-    ERR("dv_cmdlist_end() failed: %s\n", dv_get_last_error_message());
+  if (dmp_dv_cmdlist_end(cmdlist)) {
+    ERR("dmp_dv_cmdlist_end() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   LOG("Ended the command list\n");
 
-  if (dv_cmdlist_exec(cmdlist)) {
-    ERR("dv_cmdlist_exec() failed: %s\n", dv_get_last_error_message());
+  if (dmp_dv_cmdlist_exec(cmdlist)) {
+    ERR("dmp_dv_cmdlist_exec() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   LOG("Scheduled command list for execution\n");
 
-  if (dv_sync(ctx)) {
-    ERR("dv_sync() failed: %s\n", dv_get_last_error_message());
+  if (dmp_dv_sync(ctx)) {
+    ERR("dmp_dv_sync() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   LOG("Execution has completed\n");
 
-  if (dv_mem_sync_start(io_mem, 1, 0)) {
-    ERR("dv_mem_sync_start() failed for input/output: %s\n", dv_get_last_error_message());
+  if (dmp_dv_mem_sync_start(io_mem, 1, 0)) {
+    ERR("dmp_dv_mem_sync_start() failed for input/output: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   // TODO: check the correctness of the result.
-  if (dv_mem_sync_end(io_mem)) {
-    ERR("dv_mem_sync_end() failed for input/output: %s\n", dv_get_last_error_message());
+  if (dmp_dv_mem_sync_end(io_mem)) {
+    ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
 
@@ -266,10 +266,10 @@ int test_cmdlist(const conv_config& config) {
   LOG("SUCCESS: test_cmdlist\n");
 
   L_EXIT:
-  dv_cmdlist_destroy(cmdlist);
-  dv_mem_free(weights_mem);
-  dv_mem_free(io_mem);
-  dv_context_destroy(ctx);
+  dmp_dv_cmdlist_destroy(cmdlist);
+  dmp_dv_mem_free(weights_mem);
+  dmp_dv_mem_free(io_mem);
+  dmp_dv_context_destroy(ctx);
 
   LOG("EXIT: test_cmdlist: %s\n", prefix);
   return result;

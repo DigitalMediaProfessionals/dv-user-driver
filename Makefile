@@ -1,19 +1,19 @@
 .PHONY:	all clean tests
 
-all:	libdv.so tests
+all:	libdmpdv.so tests
 
-weights.o:	src/weights.cpp include/dv.h
+weights.o:	src/weights.cpp include/dmp_dv.h
 	g++ -fPIC -c src/weights.cpp -o weights.o -std=c++11 -Wall -Werror -I./include -O3 -march=native -mtune=native -fvisibility=hidden
 
-dv.o:	src/dv.cpp include/dv.h
-	g++ -fPIC -c src/dv.cpp -o dv.o -std=c++11 -Wall -Werror -I./include -O3 -march=native -mtune=native -fvisibility=hidden
+dmp_dv.o:	src/dmp_dv.cpp include/dmp_dv.h
+	g++ -fPIC -c src/dmp_dv.cpp -o dmp_dv.o -std=c++11 -Wall -Werror -I./include -O3 -march=native -mtune=native -fvisibility=hidden
 
-libdv.so:	dv.o weights.o
-	g++ -fPIC -shared dv.o weights.o -o libdv.so -std=c++11 -Wall -Werror -O3 -march=native -mtune=native -fvisibility=hidden
+libdmpdv.so:	dmp_dv.o weights.o
+	g++ -fPIC -shared dmp_dv.o weights.o -o libdmpdv.so -std=c++11 -Wall -Werror -O3 -march=native -mtune=native -fvisibility=hidden
 
-tests:	libdv.so
+tests:	libdmpdv.so
 	$(MAKE) -C tests $@
 
 clean:
-	rm -f libdv.so *.o
+	rm -f libdmpdv.so *.o
 	$(MAKE) -C tests $@

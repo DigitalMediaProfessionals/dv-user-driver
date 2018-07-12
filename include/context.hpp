@@ -7,24 +7,24 @@
 *------------------------------------------------------------
 */
 /*
- * @brief dv_context implementation.
+ * @brief dmp_dv_context implementation.
  */
 #pragma once
 
 #include "common.h"
 
 
-/// @brief Implementation of dv_context.
-class CDVContext {
+/// @brief Implementation of dmp_dv_context.
+class CDMPDVContext {
  public:
-  CDVContext() {
+  CDMPDVContext() {
     // TODO: add reference counter.
 
     fd_ion_ = -1;
     dma_heap_id_mask_ = 0;
   }
 
-  virtual ~CDVContext() {
+  virtual ~CDMPDVContext() {
     Cleanup();
   }
 

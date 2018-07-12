@@ -24,6 +24,11 @@ class Main(object):
 
     def generate(self, width, height, n_channels, kx, ky, n_kernels,
                  pad, stride, activation):
+        try:
+            os.mkdir("data")
+        except OSError:
+            pass
+
         prefix = ("data/%dx%dx%d_%dx%dx%d_%d_%d_%d" %
                   (width, height, n_channels, kx, ky, n_kernels,
                    pad, stride, activation))

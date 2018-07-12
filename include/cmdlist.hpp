@@ -7,28 +7,28 @@
 *------------------------------------------------------------
 */
 /*
- * @brief dv_cmdlist implementation.
+ * @brief dmp_dv_cmdlist implementation.
  */
 #pragma once
 
 #include <vector>
 
 #include "mem.hpp"
-#include "dv_cmdraw_v0.h"
+#include "dmp_dv_cmdraw_v0.h"
 
 
-/// @brief Implementation of dv_cmdlist.
-class CDVCmdList {
+/// @brief Implementation of dmp_dv_cmdlist.
+class CDMPDVCmdList {
  public:
-  CDVCmdList() {
+  CDMPDVCmdList() {
     ctx_ = NULL;
   }
 
-  virtual ~CDVCmdList() {
+  virtual ~CDMPDVCmdList() {
     Cleanup();
   }
 
-  bool Initialize(CDVContext *ctx) {
+  bool Initialize(CDMPDVContext *ctx) {
     Cleanup();
     if (!ctx) {
       SET_ERR("Invalid argument: ctx is NULL");
@@ -59,7 +59,7 @@ class CDVCmdList {
       }
     }
 
-    // Allocate and fill memory chunk suitable for sharing with kernel module replacing dv_mem pointers with ION file descriptors
+    // Allocate and fill memory chunk suitable for sharing with kernel module replacing dmp_dv_mem pointers with ION file descriptors
     // TODO: implement.
 
     // Pass this chunk to kernel module
@@ -74,14 +74,14 @@ class CDVCmdList {
     return 0;
   }
 
-  int AddRaw(dv_cmdraw *cmd) {
+  int AddRaw(dmp_dv_cmdraw *cmd) {
     if (cmd->size < 8) {
       SET_ERR("Invalid argument: cmd->size %d is too small", (int)cmd->size);
       return -1;
     }
     switch (cmd->version) {
       case 0:
-        return AddRaw_v0((dv_cmdraw_v0*)cmd);
+        return AddRaw_v0((dmp_dv_cmdraw_v0*)cmd);
 
       default:
         SET_ERR("Invalid argument: cmd->version %d is not supported", (int)cmd->version);
@@ -103,14 +103,17 @@ class CDVCmdList {
   };
 
   struct Command {
-    CommandType type;
     union {
-      dv_cmdraw_v0 raw_v0;
+      CommandType type;  // command type
+      uint64_t rsvd;     // padding to 64-bit size
+    };
+    union {
+      dmp_dv_cmdraw_v0 raw_v0;  // command content
     };
   };
 
-  int AddRaw_v0(dv_cmdraw_v0 *cmd) {
-    if (cmd->size != sizeof(dv_cmdraw_v0)) {
+  int AddRaw_v0(dmp_dv_cmdraw_v0 *cmd) {
+    if (cmd->size != sizeof(dmp_dv_cmdraw_v0)) {
       SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d", (int)cmd->size, (int)cmd->version);
       return -1;
     }
@@ -143,19 +146,19 @@ class CDVCmdList {
 
     // TODO: increase reference counters on provided mem pointers.
 
-    Command command;
-    memset(&command, 0, sizeof(command));
-    command.type = kCommandTypeRaw_v0;
-    memcpy(&command.raw_v0, cmd, sizeof(dv_cmdraw_v0));
-
-    commands_.push_back(std::move(command));
+    const int n = (int)commands_.size();
+    commands_.resize(n + 1);
+    Command *command = &commands_[n];
+    memset(command, 0, sizeof(Command));
+    command->type = kCommandTypeRaw_v0;
+    memcpy(&command->raw_v0, cmd, sizeof(dmp_dv_cmdraw_v0));
 
     return 0;
   }
 
  private:
   /// @brief Reference to device context.
-  CDVContext *ctx_;
+  CDMPDVContext *ctx_;
 
   /// @brief List of commands this list contains.
   std::vector<Command> commands_;

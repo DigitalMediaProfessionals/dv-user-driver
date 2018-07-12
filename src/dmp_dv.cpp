@@ -9,7 +9,7 @@
 /*
  * @brief Shared library exported functions implementation.
  */
-#include "dv.h"
+#include "dmp_dv.h"
 #include "common.h"
 #include "context.hpp"
 #include "mem.hpp"
@@ -21,44 +21,44 @@ char s_last_error_message[256];
 
 
 extern "C"
-const char *dv_get_last_error_message() {
+const char *dmp_dv_get_last_error_message() {
   return s_last_error_message;
 }
 
 
 extern "C"
-const char *dv_get_version_string() {
+const char *dmp_dv_get_version_string() {
   return "0.1.0 Initial release.";
 }
 
 
 extern "C"
-dv_context* dv_context_create(const char *path) {
-  CDVContext *ctx = new CDVContext();
+dmp_dv_context* dmp_dv_context_create(const char *path) {
+  CDMPDVContext *ctx = new CDMPDVContext();
   if (!ctx) {
-    SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDVContext));
+    SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDMPDVContext));
     return NULL;
   }
   if (!ctx->Initialize(path)) {
     delete ctx;
     return NULL;
   }
-  return (dv_context*)ctx;
+  return (dmp_dv_context*)ctx;
 }
 
 
 extern "C"
-const char *dv_context_get_info_string(dv_context* ctx) {
+const char *dmp_dv_context_get_info_string(dmp_dv_context* ctx) {
   if (!ctx) {
     SET_ERR("Invalid argument: ctx is NULL");
     return "";
   }
-  return ((CDVContext*)ctx)->GetInfoString();
+  return ((CDMPDVContext*)ctx)->GetInfoString();
 }
 
 
 extern "C"
-void dv_context_destroy(dv_context *ctx) {
+void dmp_dv_context_destroy(dmp_dv_context *ctx) {
   if (!ctx) {
     return;
   }
@@ -67,145 +67,145 @@ void dv_context_destroy(dv_context *ctx) {
 
 
 extern "C"
-dv_mem* dv_mem_alloc(dv_context *ctx, size_t size) {
-  CDVMem *mem = new CDVMem();
+dmp_dv_mem* dmp_dv_mem_alloc(dmp_dv_context *ctx, size_t size) {
+  CDMPDVMem *mem = new CDMPDVMem();
   if (!mem) {
-    SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDVMem));
+    SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDMPDVMem));
     return NULL;
   }
-  if (!mem->Initialize((CDVContext*)ctx, size)) {
+  if (!mem->Initialize((CDMPDVContext*)ctx, size)) {
     delete mem;
     return NULL;
   }
 
-  return (dv_mem*)mem;
+  return (dmp_dv_mem*)mem;
 }
 
 
 extern "C"
-void dv_mem_free(dv_mem *mem) {
+void dmp_dv_mem_free(dmp_dv_mem *mem) {
   if (!mem) {
     return;
   }
-  delete (CDVMem*)mem;
+  delete (CDMPDVMem*)mem;
 }
 
 
 extern "C"
-uint8_t *dv_mem_map(dv_mem *mem) {
+uint8_t *dmp_dv_mem_map(dmp_dv_mem *mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return NULL;
   }
-  return ((CDVMem*)mem)->Map();
+  return ((CDMPDVMem*)mem)->Map();
 }
 
 
 extern "C"
-void dv_mem_unmap(dv_mem *mem) {
+void dmp_dv_mem_unmap(dmp_dv_mem *mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return;
   }
-  ((CDVMem*)mem)->Unmap();
+  ((CDMPDVMem*)mem)->Unmap();
 }
 
 
 extern "C"
-int dv_mem_sync_start(dv_mem *mem, int rd, int wr) {
+int dmp_dv_mem_sync_start(dmp_dv_mem *mem, int rd, int wr) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return -1;
   }
-  return ((CDVMem*)mem)->SyncStart(rd, wr);
+  return ((CDMPDVMem*)mem)->SyncStart(rd, wr);
 }
 
 
 extern "C"
-int dv_mem_sync_end(dv_mem *mem) {
+int dmp_dv_mem_sync_end(dmp_dv_mem *mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return -1;
   }
-  return ((CDVMem*)mem)->SyncEnd();
+  return ((CDMPDVMem*)mem)->SyncEnd();
 }
 
 
 extern "C"
-size_t dv_mem_get_size(dv_mem *mem) {
+size_t dmp_dv_mem_get_size(dmp_dv_mem *mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return -1;
   }
-  return ((CDVMem*)mem)->get_size();
+  return ((CDMPDVMem*)mem)->get_size();
 }
 
 
 extern "C"
-int dv_sync(dv_context *ctx) {
+int dmp_dv_sync(dmp_dv_context *ctx) {
   if (!ctx) {
     SET_ERR("Invalid argument: ctx is NULL");
     return -1;
   }
-  return ((CDVContext*)ctx)->Sync();
+  return ((CDMPDVContext*)ctx)->Sync();
 }
 
 
 extern "C"
-dv_cmdlist *dv_cmdlist_create(dv_context *ctx) {
-  CDVCmdList *cmdlist = new CDVCmdList();
+dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx) {
+  CDMPDVCmdList *cmdlist = new CDMPDVCmdList();
   if (!cmdlist) {
-    SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDVCmdList));
+    SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDMPDVCmdList));
     return NULL;
   }
-  if (!cmdlist->Initialize((CDVContext*)ctx)) {
+  if (!cmdlist->Initialize((CDMPDVContext*)ctx)) {
     delete cmdlist;
     return NULL;
   }
-  return (dv_cmdlist*)cmdlist;
+  return (dmp_dv_cmdlist*)cmdlist;
 }
 
 
 extern "C"
-void dv_cmdlist_destroy(dv_cmdlist *cmdlist) {
+void dmp_dv_cmdlist_destroy(dmp_dv_cmdlist *cmdlist) {
   if (!cmdlist) {
     return;
   }
-  delete (CDVCmdList*)cmdlist;
+  delete (CDMPDVCmdList*)cmdlist;
 }
 
 
 extern "C"
-int dv_cmdlist_end(dv_cmdlist *cmdlist) {
+int dmp_dv_cmdlist_end(dmp_dv_cmdlist *cmdlist) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return -1;
   }
-  return ((CDVCmdList*)cmdlist)->End();
+  return ((CDMPDVCmdList*)cmdlist)->End();
 }
 
 
 extern "C"
-int dv_cmdlist_exec(dv_cmdlist *cmdlist) {
+int dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return -1;
   }
-  return ((CDVCmdList*)cmdlist)->Exec();
+  return ((CDMPDVCmdList*)cmdlist)->Exec();
 }
 
 
 extern "C"
-int dv_cmdlist_add_raw(dv_cmdlist *cmdlist, dv_cmdraw *cmd) {
+int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return -1;
   }
-  return ((CDVCmdList*)cmdlist)->AddRaw(cmd);
+  return ((CDMPDVCmdList*)cmdlist)->AddRaw(cmd);
 }
 
 
 extern "C"
-int32_t dv_get_cmdraw_max_version() {
-  return CDVCmdList::get_cmdraw_max_version();
+int32_t dmp_dv_get_cmdraw_max_version() {
+  return CDMPDVCmdList::get_cmdraw_max_version();
 }
