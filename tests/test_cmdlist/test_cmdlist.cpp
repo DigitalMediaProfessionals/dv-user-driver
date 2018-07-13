@@ -17,6 +17,7 @@
 #include <memory>
 #include <set>
 #include <vector>
+#include <cmath>
 
 #include "dmp_dv.h"
 #include "dmp_dv_cmdraw_v0.h"
@@ -114,7 +115,7 @@ int test_cmdlist(const conv_config& config) {
     ERR("fopen() failed for %s\n", fnme);
     return -1;
   }
-  int n = fread(quant_map, 2, 256, fin);
+  int n = fread(quant_map, sizeof(quant_map[0]), sizeof(quant_map) / sizeof(quant_map[0]), fin);
   char c;
   bool fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
   fclose(fin);
@@ -136,7 +137,7 @@ int test_cmdlist(const conv_config& config) {
   }
   std::vector<__fp16> caffe_input;
   caffe_input.resize(config.n_channels * config.height * config.width);
-  n = fread(caffe_input.data(), 2, config.n_channels * config.height * config.width, fin);
+  n = fread(caffe_input.data(), sizeof(caffe_input[0]), caffe_input.size(), fin);
   fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
   fclose(fin);
   if (n != config.n_channels * config.height * config.width) {
@@ -157,7 +158,7 @@ int test_cmdlist(const conv_config& config) {
   }
   std::vector<uint8_t> caffe_weights;
   caffe_weights.resize(config.n_kernels * config.n_channels * config.kx * config.ky);
-  n = fread(caffe_weights.data(), 1, config.n_kernels * config.n_channels * config.kx * config.ky, fin);
+  n = fread(caffe_weights.data(), sizeof(caffe_weights[0]), caffe_weights.size(), fin);
   fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
   fclose(fin);
   if (n != config.n_kernels * config.n_channels * config.kx * config.ky) {
@@ -178,7 +179,7 @@ int test_cmdlist(const conv_config& config) {
   }
   std::vector<__fp16> caffe_bias;
   caffe_bias.resize(config.n_kernels);
-  n = fread(caffe_bias.data(), 2, config.n_kernels, fin);
+  n = fread(caffe_bias.data(), sizeof(caffe_bias[0]), caffe_bias.size(), fin);
   fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
   fclose(fin);
   if (n != config.n_kernels) {
@@ -201,7 +202,7 @@ int test_cmdlist(const conv_config& config) {
   const int out_height = get_conv_out_width(config.height, config.ky, config.pad, config.stride);
   std::vector<__fp16> caffe_output;
   caffe_output.resize(out_width * out_height * config.n_kernels);
-  n = fread(caffe_output.data(), 2, out_width * out_height * config.n_kernels, fin);
+  n = fread(caffe_output.data(), sizeof(caffe_output[0]), caffe_output.size(), fin);
   fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
   fclose(fin);
   if (n != out_width * out_height * config.n_kernels) {
@@ -222,6 +223,7 @@ int test_cmdlist(const conv_config& config) {
   int32_t cmdraw_max_version;
   uint8_t *weights;
   __fp16 *io;
+  float max_diff, max_diff_pt;
 
   LOG("dmp_dv_get_version_string(): %s\n", dmp_dv_get_version_string());
 
@@ -268,7 +270,7 @@ int test_cmdlist(const conv_config& config) {
   }
   cmd.run[0].actfunc = config.activation;
 
-  io_size = ((size_t)cmd.w * cmd.h * cmd.c + (size_t)cmd.w * cmd.h * cmd.run[0].m) * 2;
+  io_size = (config.width * config.height * config.n_channels + out_width * out_height * config.n_kernels) * sizeof(__fp16);
   io_mem = dmp_dv_mem_alloc(ctx, io_size);
   if (!io_mem) {
     ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", io_size, dmp_dv_get_last_error_message());
@@ -278,7 +280,7 @@ int test_cmdlist(const conv_config& config) {
   cmd.input_buf.mem = io_mem;
   cmd.input_buf.offs = 0;
   cmd.output_buf.mem = io_mem;
-  cmd.output_buf.offs = (size_t)cmd.w * cmd.h * cmd.c * 2;
+  cmd.output_buf.offs = config.width * config.height * config.n_channels * sizeof(__fp16);
 
   weights_size = 0;
   if (dmp_dv_pack_conv_weights(
@@ -330,7 +332,21 @@ int test_cmdlist(const conv_config& config) {
     ERR("dmp_dv_mem_sync_start() failed for input/output: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  // TODO: fill input.
+  // Caffe's input is stored as channel, height, width
+  // DV input should be stored as chunks by max of 8 channels as width, height, channel
+  for (int chan_group = 0, o_offs = 0; chan_group < config.n_channels; chan_group += 8) {
+    const int last_chan = std::min(chan_group + 8, config.n_channels);
+    for (int i = 0; i < config.width; ++i) {
+      for (int j = 0; j < config.height; ++j) {
+        for (int k = chan_group; k < last_chan; ++k, ++o_offs) {
+          const int i_offs = k * config.width * config.height + j * config.width + i;
+          const __fp16 vle = caffe_input[i_offs];
+          io[o_offs] = vle;
+        }
+      }
+    }
+  }
+  memset(io + config.width * config.height * config.n_channels, 0, out_width * out_height * config.n_kernels * sizeof(__fp16));
   if (dmp_dv_mem_sync_end(io_mem)) {
     ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
@@ -363,9 +379,36 @@ int test_cmdlist(const conv_config& config) {
     ERR("dmp_dv_mem_sync_start() failed for input/output: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  // TODO: check the correctness of the result.
+  // Caffe's output is stored as channels, height, width
+  // DV output is stored as chunks by max of 8 channels as width, height, channel
+  max_diff = 0;
+  max_diff_pt = 0;
+  for (int chan_group = 0, o_offs = config.width * config.height * config.n_channels;
+       chan_group < config.n_kernels; chan_group += 8) {
+    const int last_chan = std::min(chan_group + 8, config.n_kernels);
+    for (int i = 0; i < out_width; ++i) {
+      for (int j = 0; j < out_height; ++j) {
+        for (int k = chan_group; k < last_chan; ++k, ++o_offs) {
+          const int i_offs = k * out_width * out_height + j * out_width + i;
+          const __fp16 vle = caffe_output[i_offs];
+          const float y = (float)io[o_offs], t = (float)vle;
+          const float diff = std::abs(y - t);
+          const float mx = std::max(std::abs(y), std::abs(t));
+          float diff_pt = std::abs((float)io[o_offs] - (float)vle);
+          diff_pt *= 100.0f / std::max(mx, 1.0e-8f);
+          max_diff = std::max(max_diff, diff);
+          max_diff_pt = std::max(max_diff_pt, diff_pt);
+        }
+      }
+    }
+  }
   if (dmp_dv_mem_sync_end(io_mem)) {
     ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
+    goto L_EXIT;
+  }
+  LOG("max_diff=%.6f max_diff_pt=%.1f%%\n", max_diff, max_diff_pt);
+  if (max_diff_pt > 5.0f) {
+    ERR("Difference is too large: max_diff_pt=%.1f%%\n", max_diff_pt);
     goto L_EXIT;
   }
 
