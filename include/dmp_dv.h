@@ -173,7 +173,7 @@ int32_t dmp_dv_get_cmdraw_max_version();
 /// @param output Output buffer for packed weights information (can be NULL if output_size is 0).
 /// @param output_size On input, contains the size of the output buffer in bytes (can be 0, in such case it will be filled with the required output size), on output will contain the required output size.
 /// @return 0 on success, non-zero otherwise.
-int pack_conv_weights(
+int dmp_dv_pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],
     const void *weights, const uint16_t *bias,

@@ -46,12 +46,13 @@ static inline void write_bias(int& m_start, const int& m_stop, size_t &out_offs,
 /// @param msg_size Size of msg in bytes.
 /// @return 0 on success, non-zero otherwise.
 extern "C"
-int pack_conv_weights(
+int dmp_dv_pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],
     const void *weights, const uint16_t *bias,
     uint8_t *output, size_t *output_size) {
 
+  // TODO: Add 1x1 path.
   // TODO: Optimize it to become O(n) (now it is completely non-optimal and very slow).
 
   if (kx != ky) {

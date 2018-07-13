@@ -180,7 +180,7 @@ int test_cmdlist(const conv_config& config) {
   cmd.output_buf.offs = (size_t)cmd.w * cmd.h * cmd.c * 2;
 
   weights_size = 0;
-  if (pack_conv_weights(
+  if (dmp_dv_pack_conv_weights(
         cmd.c, cmd.run[0].p, cmd.run[0].p, cmd.run[0].m,
         quant_map, NULL, NULL, NULL, &weights_size)) {
     ERR("pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
