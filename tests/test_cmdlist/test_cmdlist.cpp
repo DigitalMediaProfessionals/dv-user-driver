@@ -16,6 +16,7 @@
 
 #include <memory>
 #include <set>
+#include <vector>
 
 #include "dmp_dv.h"
 #include "dmp_dv_cmdraw_v0.h"
@@ -85,6 +86,12 @@ typedef struct conv_config_impl {
 } conv_config;
 
 
+/// @brief Returns width of the output based on kernel size, padding and stride.
+int get_conv_out_width(int width, int kx, int pad, int stride) {
+  return (pad + width + pad - kx) / stride + 1;
+}
+
+
 int test_cmdlist(const conv_config& config) {
   char prefix[256];
   snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_%dx%dx%d_%d_%d_%d",
@@ -98,6 +105,7 @@ int test_cmdlist(const conv_config& config) {
     return -1;
   }
 
+  // Load quantization map
   char fnme[512];
   snprintf(fnme, sizeof(fnme), "%s.q.bin", prefix);
   uint16_t quant_map[256];
@@ -106,15 +114,106 @@ int test_cmdlist(const conv_config& config) {
     ERR("fopen() failed for %s\n", fnme);
     return -1;
   }
-  int n = fread(quant_map, 1, 256, fin);
+  int n = fread(quant_map, 2, 256, fin);
+  char c;
+  bool fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
   fclose(fin);
   if (n != 256) {
     ERR("fread() returned %d while expecting %d for %s\n", n, 256, fnme);
     return -1;
   }
+  if (!fend) {
+    ERR("File is bigger than expected: %s\n", fnme);
+    return -1;
+  }
 
-  // TODO: load weight/input/output.
+  // Load input
+  snprintf(fnme, sizeof(fnme), "%s.i.bin", prefix);
+  fin = fopen(fnme, "rb");
+  if (!fin) {
+    ERR("fopen() failed for %s\n", fnme);
+    return -1;
+  }
+  std::vector<__fp16> caffe_input;
+  caffe_input.resize(config.n_channels * config.height * config.width);
+  n = fread(caffe_input.data(), 2, config.n_channels * config.height * config.width, fin);
+  fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
+  fclose(fin);
+  if (n != config.n_channels * config.height * config.width) {
+    ERR("fread() returned %d while expecting %d for %s\n", n, config.n_channels * config.height * config.width, fnme);
+    return -1;
+  }
+  if (!fend) {
+    ERR("File is bigger than expected: %s\n", fnme);
+    return -1;
+  }
 
+  // Load weights
+  snprintf(fnme, sizeof(fnme), "%s.w.bin", prefix);
+  fin = fopen(fnme, "rb");
+  if (!fin) {
+    ERR("fopen() failed for %s\n", fnme);
+    return -1;
+  }
+  std::vector<uint8_t> caffe_weights;
+  caffe_weights.resize(config.n_kernels * config.n_channels * config.kx * config.ky);
+  n = fread(caffe_weights.data(), 1, config.n_kernels * config.n_channels * config.kx * config.ky, fin);
+  fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
+  fclose(fin);
+  if (n != config.n_kernels * config.n_channels * config.kx * config.ky) {
+    ERR("fread() returned %d while expecting %d for %s\n", n, config.n_kernels * config.n_channels * config.kx * config.ky, fnme);
+    return -1;
+  }
+  if (!fend) {
+    ERR("File is bigger than expected: %s\n", fnme);
+    return -1;
+  }
+
+  // Load bias
+  snprintf(fnme, sizeof(fnme), "%s.b.bin", prefix);
+  fin = fopen(fnme, "rb");
+  if (!fin) {
+    ERR("fopen() failed for %s\n", fnme);
+    return -1;
+  }
+  std::vector<__fp16> caffe_bias;
+  caffe_bias.resize(config.n_kernels);
+  n = fread(caffe_bias.data(), 2, config.n_kernels, fin);
+  fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
+  fclose(fin);
+  if (n != config.n_kernels) {
+    ERR("fread() returned %d while expecting %d for %s\n", n, config.n_kernels, fnme);
+    return -1;
+  }
+  if (!fend) {
+    ERR("File is bigger than expected: %s\n", fnme);
+    return -1;
+  }
+
+  // Load output
+  snprintf(fnme, sizeof(fnme), "%s.o.bin", prefix);
+  fin = fopen(fnme, "rb");
+  if (!fin) {
+    ERR("fopen() failed for %s\n", fnme);
+    return -1;
+  }
+  const int out_width = get_conv_out_width(config.width, config.kx, config.pad, config.stride);
+  const int out_height = get_conv_out_width(config.height, config.ky, config.pad, config.stride);
+  std::vector<__fp16> caffe_output;
+  caffe_output.resize(out_width * out_height * config.n_kernels);
+  n = fread(caffe_output.data(), 2, out_width * out_height * config.n_kernels, fin);
+  fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
+  fclose(fin);
+  if (n != out_width * out_height * config.n_kernels) {
+    ERR("fread() returned %d while expecting %d for %s\n", n, out_width * out_height * config.n_kernels, fnme);
+    return -1;
+  }
+  if (!fend) {
+    ERR("File is bigger than expected: %s\n", fnme);
+    return -1;
+  }
+
+  // Initialize DV context
   int result = -1;
   dmp_dv_context *ctx = NULL;
   dmp_dv_cmdlist *cmdlist = NULL;
