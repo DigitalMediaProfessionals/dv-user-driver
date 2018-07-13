@@ -113,6 +113,8 @@ int test_cmdlist(const conv_config& config) {
     return -1;
   }
 
+  // TODO: load weight/input/output.
+
   int result = -1;
   dmp_dv_context *ctx = NULL;
   dmp_dv_cmdlist *cmdlist = NULL;
