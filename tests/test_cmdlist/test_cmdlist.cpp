@@ -284,7 +284,7 @@ int test_cmdlist(const conv_config& config) {
   if (dmp_dv_pack_conv_weights(
         cmd.c, cmd.run[0].p, cmd.run[0].p, cmd.run[0].m,
         quant_map, NULL, NULL, NULL, &weights_size)) {
-    ERR("pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
+    ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
 
@@ -308,7 +308,13 @@ int test_cmdlist(const conv_config& config) {
     ERR("dmp_dv_mem_sync_start() failed for weights: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  // TODO: fill weights.
+  // Fill weights
+  if (dmp_dv_pack_conv_weights(
+        cmd.c, cmd.run[0].p, cmd.run[0].p, cmd.run[0].m,
+        quant_map, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size)) {
+    ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
+    goto L_EXIT;
+  }
   if (dmp_dv_mem_sync_end(weights_mem)) {
     ERR("dmp_dv_mem_sync_end() failed for weights: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
