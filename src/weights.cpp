@@ -97,7 +97,7 @@ int dmp_dv_pack_conv_weights(
   const int s1 = ky * kx;
   const int s0 = n_channels * ky * kx;
 
-  std::set<int> w_idx;  // for debugging purposes
+  std::set<int> w_idx;  // for debugging purposes  // TODO: Remove it when optimization will be done.
 
   uint8_t buf8[12][6];
   memset(&buf8[0][0], 0, sizeof(buf8));
