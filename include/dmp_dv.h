@@ -165,7 +165,7 @@ int32_t dmp_dv_get_cmdraw_max_version();
 /// @brief Packs convolution layer weights and biases into output array.
 /// @param n_channels Number of input channels.
 /// @param kx Kernel width.
-/// @param ky Kernel height (must be equal to kx in current implementation).
+/// @param ky Kernel height.
 /// @param n_kernels Number of output channels.
 /// @param quant_map Quantization table for weights (but not bias), can be NULL.
 /// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format, else array of 1-byte indices.

@@ -35,7 +35,7 @@ static inline void write_bias(int& m_start, const int& m_stop, size_t &out_offs,
 /// @brief Packs convolution layer weights and biases into output array.
 /// @param n_channels Number of input channels.
 /// @param kx Kernel width.
-/// @param ky Kernel height (must be equal to kx in current implementation).
+/// @param ky Kernel height.
 /// @param n_kernels Number of output channels.
 /// @param quant_map Quantization table for weights (but not bias), when NULL, no quantization is assumed.
 /// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format, else array of 1-byte indices.
@@ -54,17 +54,14 @@ int dmp_dv_pack_conv_weights(
 
   // TODO: Add 1x1 path.
   // TODO: Optimize it to become O(n) (now it is completely non-optimal and very slow).
+  const int p = std::max(kx, ky) | 1;  // next odd number
 
-  if (kx != ky) {
-    SET_ERR("Only square kernels are supported, got %d x %d", kx, ky);
+  if ((p > 7) || (std::min(kx, ky) <= 0)) {
+    SET_ERR("Only kernels of sizes {1, 2, 3, 4, 5, 6, 7} are supported, got %dx%d", kx, ky);
     return -1;
   }
   if (n_channels <= 0) {
     SET_ERR("Number of input channels must be positive, got %d", n_channels);
-    return -1;
-  }
-  if (kx <= 0) {
-    SET_ERR("Kernel size must be positive, got %d", kx);
     return -1;
   }
   if (n_kernels <= 0) {
@@ -106,7 +103,7 @@ int dmp_dv_pack_conv_weights(
   uint8_t buf8[12][6];
   memset(&buf8[0][0], 0, sizeof(buf8));
 
-  switch (kx) {
+  switch (p) {
     case 7:
     {
       for (int m_start = 0; m_start < n_kernels; m_start += 8) {
@@ -205,7 +202,7 @@ int dmp_dv_pack_conv_weights(
           for (int m = m_start; m < m_stop; ++m) {
             if (quant_map) {
               if ((c_stop - c_start >= 1) && (c_stop - c_start <= 7)) {
-                memset(buf8, 0, sizeof(buf8));
+                memset(&buf8[0][0], 0, sizeof(buf8));
               }
               n = sizeof(buf8);
               if (out_offs + n <= *output_size) {
@@ -232,9 +229,46 @@ int dmp_dv_pack_conv_weights(
       }
       break;
     }
+    case 1:
+    {
+      for (int m_start = 0; m_start < n_kernels; m_start += 8) {
+        const int m_stop = std::min(m_start + 8, n_kernels);
+
+        write_bias(m_start, m_stop, out_offs, output_size, output, bias);
+
+        for (int c_start = 0; c_start < n_channels; c_start += 64) {
+          const int c_stop = std::min(c_start + 64, n_channels);
+          for (int m = m_start; m < m_stop; ++m) {
+            if (quant_map) {
+              if ((c_stop - c_start >= 1) && (c_stop - c_start <= 63)) {
+                memset(&buf8[0][0], 0, sizeof(buf8));
+              }
+              n = sizeof(buf8);
+              if (out_offs + n <= *output_size) {
+                const uint8_t *w = (const uint8_t*)weights;
+                for (int c = c_start; c < c_stop; ++c) {
+                  const int t = c % 8;
+                  const int x = c % 64 / 8 % 3;
+                  const int y = c % 64 / 8 / 3;
+                  buf8[11 - t / 2 * 3 - y][t % 2 * 3 + x] = w[m * s0 + c * s1];
+                  w_idx.emplace(m * s0 + c * s1);
+                }
+                memcpy(output + out_offs, buf8, n);
+              }
+              out_offs += n;
+            }
+            else {
+              SET_ERR("Branch is disabled for now");
+              return -1;
+            }
+          }
+        }
+      }
+      break;
+    }
     default:
     {
-      SET_ERR("Unsupported kernel size %d", kx);
+      SET_ERR("Unsupported kernel configuration %dx%d", kx, ky);
       return -1;
     }
   }
@@ -260,28 +294,4 @@ int dmp_dv_pack_conv_weights(
 
   *output_size = out_offs;
   return retval;
-    /*
-        elif kernel_size[0] == 1:
-            for m_start in range(0, n_m, 8):
-                m_stop = min(m_start + 8, n_m)
-                bias16[m_start:m_stop].tofile(of)
-                for i in range(m_stop, m_start + 8):
-                    of.write(b'\0\0')
-                for c_start in range(0, n_c, 64):
-                    c_stop = min(c_start + 64, n_c)
-                    for m in range(m_start, m_stop):
-                        if c_stop - c_start >= 1 and c_stop - c_start <= 63:
-                            buffer = np.zeros(shape=(12, 6), dtype=weight_type)
-                        for c in range(c_start, c_stop):
-                            t = c % 8
-                            x = c % 64 // 8 % 3
-                            y = c % 64 // 8 // 3
-                            buffer[11 - t // 2 * 3 - y, t % 2 * 3 + x] = (
-                                    labels[m, c, 0, 0])
-                        buffer.tofile(of)
-        else:
-            logging.exception('Encountered unsupported kernel size %d.',
-                              kernel_size[0])
-            raise cnn_exception.ConvertError('Unsupported kernel size' +
-                                             kernel_size[0])*/
 }
