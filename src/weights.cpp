@@ -9,7 +9,6 @@
 /*
  * @brief Weights-packing helper functions.
  */
-#include <set>
 
 #include "common.h"
 
