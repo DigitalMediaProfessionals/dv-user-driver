@@ -51,7 +51,6 @@ int dmp_dv_pack_conv_weights(
     const void *weights, const uint16_t *bias,
     uint8_t *output, size_t *output_size) {
 
-  // TODO: Optimize it to become O(n) (now it is completely non-optimal and very slow).
   const int p = std::max(kx, ky) | 1;  // next odd number
 
   if ((p > 7) || (std::min(kx, ky) <= 0)) {
