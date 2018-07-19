@@ -93,8 +93,21 @@ int dmp_dv_pack_conv_weights(
   const int s1 = ky * kx;
   const int s0 = n_channels * ky * kx;
 
-  uint8_t buf8[12][6];
-  memset(&buf8[0][0], 0, sizeof(buf8));
+  union {
+    uint8_t buf8[12][6];
+    uint16_t buf16[12][6];
+  };
+  if (quant_map) {
+    memset(&buf8[0][0], 0, sizeof(buf8));
+  }
+  else {
+    memset(&buf16[0][0], 0, sizeof(buf16));
+  }
+  if ((sizeof(buf8) != 12 * 6) || (sizeof(buf16) != 12 * 6 * 2)) {
+    SET_ERR("sizeof mismatch: sizeof(buf8)=%zu sizeof(buf16)=%zu while expecting %d, %d",
+            sizeof(buf8), sizeof(buf16), 12 * 6, 12 * 6 * 2);
+    return -1;
+  }
 
   switch (p) {
     case 7:
@@ -109,7 +122,7 @@ int dmp_dv_pack_conv_weights(
           for (int m = m_start; m < m_stop; ++m) {  // loop by specific kernel inside chunk
             for (int c = c_start; c < c_stop; ++c) {  // loop by specific channel inside chunk
               const int offs2 = m * s0 + c * s1;
-              if (quant_map) {
+              if (quant_map) {  // Quantized 8-bit weights
                 if (out_offs + sizeof(buf8) <= *output_size) {
                   const uint8_t *w = (const uint8_t*)weights;
                   for (int y = 0; y < ky; ++y) {
@@ -124,13 +137,28 @@ int dmp_dv_pack_conv_weights(
                       buf8[y][0] = ky > y + 4 ? w[offs2 + (y + 4) * s2 + 6] : 0;  // y in (4, 5, 6)
                     }
                   }
-                  memcpy(output + out_offs, buf8, sizeof(buf8));
+                  memcpy(output + out_offs, &buf8[0][0], sizeof(buf8));
                 }
                 out_offs += sizeof(buf8);
               }
-              else {
-                SET_ERR("Branch is disabled for now");
-                return -1;
+              else {  // Half float 16-bit weights
+                if (out_offs + sizeof(buf16) <= *output_size) {
+                  const uint16_t *w = (const uint16_t*)weights;
+                  for (int y = 0; y < ky; ++y) {
+                    for (int x = 0; x < std::min(6, kx); ++x) {
+                      buf16[5 + y][x] = w[offs2 + y * s2 + x];
+                    }
+                  }
+                  if (kx > 6) {
+                    buf16[2][5] = w[offs2 + 0 * s2 + 6];  // y == 0
+                    for (int y = 0; y < 3; ++y) {
+                      buf16[y][3] = ky > y + 1 ? w[offs2 + (y + 1) * s2 + 6] : 0;  // y in (1, 2, 3)
+                      buf16[y][0] = ky > y + 4 ? w[offs2 + (y + 4) * s2 + 6] : 0;  // y in (4, 5, 6)
+                    }
+                  }
+                  memcpy(output + out_offs, &buf16[0][0], sizeof(buf16));
+                }
+                out_offs += sizeof(buf16);
               }
             }
           }
@@ -148,7 +176,7 @@ int dmp_dv_pack_conv_weights(
         for (int c_start = 0; c_start < n_channels; c_start += 8) {
           const int c_stop = std::min(c_start + 8, n_channels);
           for (int m = m_start; m < m_stop; ++m) {
-            if (quant_map) {
+            if (quant_map) {  // Quantized 8-bit weights
               const uint8_t *w = (const uint8_t*)weights;
               for (int c = c_start; c < c_stop; ++c) {
                 const int offs2 = m * s0 + c * s1;
@@ -165,15 +193,34 @@ int dmp_dv_pack_conv_weights(
                 }
                 if ((t == 1) || ((t == 0) && (c == c_stop - 1))) {
                   if (out_offs + sizeof(buf8) <= *output_size) {
-                    memcpy(output + out_offs, buf8, sizeof(buf8));
+                    memcpy(output + out_offs, &buf8[0][0], sizeof(buf8));
                   }
                   out_offs += sizeof(buf8);
                 }
               }
             }
-            else {
-              SET_ERR("Branch is disabled for now");
-              return -1;
+            else {  // Half float 16-bit weights
+              const uint16_t *w = (const uint16_t*)weights;
+              for (int c = c_start; c < c_stop; ++c) {
+                const int offs2 = m * s0 + c * s1;
+                const int t = c & 1;
+                if ((t == 0) && (c == c_stop - 1)) {
+                  memset(&buf16[0][0], 0, sizeof(buf16));
+                }
+                if (out_offs + sizeof(buf16) <= *output_size) {
+                  for (int y = 0; y < ky; ++y) {
+                    for (int x = 0; x < kx; ++x) {
+                      buf16[7 - t * 6 + y][x] = w[offs2 + y * s2 + x];
+                    }
+                  }
+                }
+                if ((t == 1) || ((t == 0) && (c == c_stop - 1))) {
+                  if (out_offs + sizeof(buf16) <= *output_size) {
+                    memcpy(output + out_offs, &buf16[0][0], sizeof(buf16));
+                  }
+                  out_offs += sizeof(buf16);
+                }
+              }
             }
           }
         }
@@ -190,10 +237,15 @@ int dmp_dv_pack_conv_weights(
         for (int c_start = 0; c_start < n_channels; c_start += 8) {
           const int c_stop = std::min(c_start + 8, n_channels);
           if (c_stop - c_start != 8) {
-            memset(&buf8[0][0], 0, sizeof(buf8));
+            if (quant_map) {
+              memset(&buf8[0][0], 0, sizeof(buf8));
+            }
+            else {
+              memset(&buf16[0][0], 0, sizeof(buf16));
+            }
           }
           for (int m = m_start; m < m_stop; ++m) {
-            if (quant_map) {
+            if (quant_map) {  // Quantized 8-bit weights
               if (out_offs + sizeof(buf8) <= *output_size) {
                 const uint8_t *w = (const uint8_t*)weights;
                 for (int c = c_start; c < c_stop; ++c) {
@@ -205,13 +257,25 @@ int dmp_dv_pack_conv_weights(
                     }
                   }
                 }
-                memcpy(output + out_offs, buf8, sizeof(buf8));
+                memcpy(output + out_offs, &buf8[0][0], sizeof(buf8));
               }
               out_offs += sizeof(buf8);
             }
-            else {
-              SET_ERR("Branch is disabled for now");
-              return -1;
+            else {  // Half float 16-bit weights
+              if (out_offs + sizeof(buf16) <= *output_size) {
+                const uint16_t *w = (const uint16_t*)weights;
+                for (int c = c_start; c < c_stop; ++c) {
+                  const int offs2 = m * s0 + c * s1;
+                  const int t = c & 7;
+                  for (int y = 0; y < ky; ++y) {
+                    for (int x = 0; x < kx; ++x) {
+                      buf16[9 - (t >> 1) * 3 + y][(t & 1) * 3 + x] = w[offs2 + y * s2 + x];
+                    }
+                  }
+                }
+                memcpy(output + out_offs, &buf16[0][0], sizeof(buf16));
+              }
+              out_offs += sizeof(buf16);
             }
           }
         }
@@ -228,10 +292,15 @@ int dmp_dv_pack_conv_weights(
         for (int c_start = 0; c_start < n_channels; c_start += 64) {
           const int c_stop = std::min(c_start + 64, n_channels);
           if (c_stop - c_start != 64) {
-            memset(&buf8[0][0], 0, sizeof(buf8));
+            if (quant_map) {
+              memset(&buf8[0][0], 0, sizeof(buf8));
+            }
+            else {
+              memset(&buf16[0][0], 0, sizeof(buf16));
+            }
           }
           for (int m = m_start; m < m_stop; ++m) {
-            if (quant_map) {
+            if (quant_map) {  // Quantized 8-bit weights
               if (out_offs + sizeof(buf8) <= *output_size) {
                 const uint8_t *w = (const uint8_t*)weights;
                 for (int c = c_start; c < c_stop; ++c) {
@@ -240,13 +309,22 @@ int dmp_dv_pack_conv_weights(
                   const int y = ((c & 63) >> 3) / 3;
                   buf8[11 - (t >> 1) * 3 - y][(t & 1) * 3 + x] = w[m * s0 + c * s1];
                 }
-                memcpy(output + out_offs, buf8, sizeof(buf8));
+                memcpy(output + out_offs, &buf8[0][0], sizeof(buf8));
               }
               out_offs += sizeof(buf8);
             }
-            else {
-              SET_ERR("Branch is disabled for now");
-              return -1;
+            else {  // Half float 16-bit weights
+              if (out_offs + sizeof(buf16) <= *output_size) {
+                const uint16_t *w = (const uint16_t*)weights;
+                for (int c = c_start; c < c_stop; ++c) {
+                  const int t = c & 7;
+                  const int x = ((c & 63) >> 3) % 3;
+                  const int y = ((c & 63) >> 3) / 3;
+                  buf16[11 - (t >> 1) * 3 - y][(t & 1) * 3 + x] = w[m * s0 + c * s1];
+                }
+                memcpy(output + out_offs, &buf16[0][0], sizeof(buf16));
+              }
+              out_offs += sizeof(buf16);
             }
           }
         }
