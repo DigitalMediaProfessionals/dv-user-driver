@@ -13,8 +13,7 @@
 
 #include <stdio.h>
 #include <string.h>
-
-#include <string>
+#include <stdint.h>
 
 #include <unistd.h>
 #include <sys/mman.h>
@@ -29,9 +28,19 @@
 #include "dmp_dv.h"
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /// @brief Last error message (forward declaration).
 extern char s_last_error_message[256];
 
 
 /// @brief Helper to set the last error message.
 #define SET_ERR(...) snprintf(s_last_error_message, sizeof(s_last_error_message), __VA_ARGS__)
+
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif

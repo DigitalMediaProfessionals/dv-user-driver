@@ -13,6 +13,8 @@
 
 #include "common.h"
 
+#include <string>
+
 
 /// @brief Implementation of dmp_dv_context.
 class CDMPDVContext {

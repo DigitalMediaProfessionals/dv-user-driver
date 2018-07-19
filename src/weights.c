@@ -13,20 +13,32 @@
 #include "common.h"
 
 
+/// @brief Minimum for integers.
+static inline int imin(int a, int b) {
+  return a < b ? a : b;
+}
+
+
+/// @brief Maximum for integers.
+static inline int imax(int a, int b) {
+  return a > b ? a : b;
+}
+
+
 /// @brief Writes bias to packed weights buffer.
-static inline void write_bias(int& m_start, const int& m_stop, size_t &out_offs, size_t *output_size, uint8_t *output, const uint16_t *bias) {
+static inline void write_bias(int m_start, int m_stop, size_t *out_offs, size_t *output_size, uint8_t *output, const uint16_t *bias) {
   size_t n = (m_stop - m_start) << 1;
-  if (out_offs + n <= *output_size) {
-    memcpy(output + out_offs, bias + m_start, n);
+  if (*out_offs + n <= *output_size) {
+    memcpy(output + *out_offs, bias + m_start, n);
   }
-  out_offs += n;
+  *out_offs += n;
   const int bias_pad = m_start + 8 - m_stop;
   if (bias_pad > 0) {
     n = bias_pad << 1;
-    if (out_offs + n <= *output_size) {
-      memset(output + out_offs, 0, n);
+    if (*out_offs + n <= *output_size) {
+      memset(output + *out_offs, 0, n);
     }
-    out_offs += n;
+    *out_offs += n;
   }
 }
 
@@ -44,16 +56,15 @@ static inline void write_bias(int& m_start, const int& m_stop, size_t &out_offs,
 /// @param msg Message with error description.
 /// @param msg_size Size of msg in bytes.
 /// @return 0 on success, non-zero otherwise.
-extern "C"
 int dmp_dv_pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],
     const void *weights, const uint16_t *bias,
     uint8_t *output, size_t *output_size) {
 
-  const int p = std::max(kx, ky) | 1;  // next odd number
+  const int p = imax(kx, ky) | 1;  // next odd number
 
-  if ((p > 7) || (std::min(kx, ky) <= 0)) {
+  if ((p > 7) || (imin(kx, ky) <= 0)) {
     SET_ERR("Only kernels of sizes {1, 2, 3, 4, 5, 6, 7} are supported, got %dx%d", kx, ky);
     return -1;
   }
@@ -93,10 +104,8 @@ int dmp_dv_pack_conv_weights(
   const int s1 = ky * kx;
   const int s0 = n_channels * ky * kx;
 
-  union {
-    uint8_t buf8[12][6];
-    uint16_t buf16[12][6];
-  };
+  uint8_t buf8[12][6];
+  uint16_t buf16[12][6];
   if (quant_map) {
     memset(&buf8[0][0], 0, sizeof(buf8));
   }
@@ -113,12 +122,12 @@ int dmp_dv_pack_conv_weights(
     case 7:
     {
       for (int m_start = 0; m_start < n_kernels; m_start += 8) {  // loop by kernels (chunks of size 8) i.e. output channels
-        const int m_stop = std::min(m_start + 8, n_kernels);
+        const int m_stop = imin(m_start + 8, n_kernels);
 
-        write_bias(m_start, m_stop, out_offs, output_size, output, bias);  // write bias values for a specific chunk with zero padding to 8
+        write_bias(m_start, m_stop, &out_offs, output_size, output, bias);  // write bias values for a specific chunk with zero padding to 8
 
         for (int c_start = 0; c_start < n_channels; c_start += 8) {  // loop by input channels (chunks of size 8)
-          const int c_stop = std::min(c_start + 8, n_channels);
+          const int c_stop = imin(c_start + 8, n_channels);
           for (int m = m_start; m < m_stop; ++m) {  // loop by specific kernel inside chunk
             for (int c = c_start; c < c_stop; ++c) {  // loop by specific channel inside chunk
               const int offs2 = m * s0 + c * s1;
@@ -126,7 +135,7 @@ int dmp_dv_pack_conv_weights(
                 if (out_offs + sizeof(buf8) <= *output_size) {
                   const uint8_t *w = (const uint8_t*)weights;
                   for (int y = 0; y < ky; ++y) {
-                    for (int x = 0; x < std::min(6, kx); ++x) {
+                    for (int x = 0; x < imin(6, kx); ++x) {
                       buf8[5 + y][x] = w[offs2 + y * s2 + x];
                     }
                   }
@@ -145,7 +154,7 @@ int dmp_dv_pack_conv_weights(
                 if (out_offs + sizeof(buf16) <= *output_size) {
                   const uint16_t *w = (const uint16_t*)weights;
                   for (int y = 0; y < ky; ++y) {
-                    for (int x = 0; x < std::min(6, kx); ++x) {
+                    for (int x = 0; x < imin(6, kx); ++x) {
                       buf16[5 + y][x] = w[offs2 + y * s2 + x];
                     }
                   }
@@ -169,12 +178,12 @@ int dmp_dv_pack_conv_weights(
     case 5:
     {
       for (int m_start = 0; m_start < n_kernels; m_start += 8) {
-        const int m_stop = std::min(m_start + 8, n_kernels);
+        const int m_stop = imin(m_start + 8, n_kernels);
 
-        write_bias(m_start, m_stop, out_offs, output_size, output, bias);
+        write_bias(m_start, m_stop, &out_offs, output_size, output, bias);
 
         for (int c_start = 0; c_start < n_channels; c_start += 8) {
-          const int c_stop = std::min(c_start + 8, n_channels);
+          const int c_stop = imin(c_start + 8, n_channels);
           for (int m = m_start; m < m_stop; ++m) {
             if (quant_map) {  // Quantized 8-bit weights
               const uint8_t *w = (const uint8_t*)weights;
@@ -230,12 +239,12 @@ int dmp_dv_pack_conv_weights(
     case 3:
     {
       for (int m_start = 0; m_start < n_kernels; m_start += 8) {
-        const int m_stop = std::min(m_start + 8, n_kernels);
+        const int m_stop = imin(m_start + 8, n_kernels);
 
-        write_bias(m_start, m_stop, out_offs, output_size, output, bias);
+        write_bias(m_start, m_stop, &out_offs, output_size, output, bias);
 
         for (int c_start = 0; c_start < n_channels; c_start += 8) {
-          const int c_stop = std::min(c_start + 8, n_channels);
+          const int c_stop = imin(c_start + 8, n_channels);
           if (c_stop - c_start != 8) {
             if (quant_map) {
               memset(&buf8[0][0], 0, sizeof(buf8));
@@ -285,12 +294,12 @@ int dmp_dv_pack_conv_weights(
     case 1:
     {
       for (int m_start = 0; m_start < n_kernels; m_start += 8) {
-        const int m_stop = std::min(m_start + 8, n_kernels);
+        const int m_stop = imin(m_start + 8, n_kernels);
 
-        write_bias(m_start, m_stop, out_offs, output_size, output, bias);
+        write_bias(m_start, m_stop, &out_offs, output_size, output, bias);
 
         for (int c_start = 0; c_start < n_channels; c_start += 64) {
-          const int c_stop = std::min(c_start + 64, n_channels);
+          const int c_stop = imin(c_start + 64, n_channels);
           if (c_stop - c_start != 64) {
             if (quant_map) {
               memset(&buf8[0][0], 0, sizeof(buf8));

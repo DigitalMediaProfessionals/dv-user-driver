@@ -2,8 +2,8 @@
 
 all:	libdmpdv.so tests
 
-weights.o:	src/weights.cpp include/dmp_dv.h
-	g++ -fPIC -c src/weights.cpp -o weights.o -std=c++11 -Wall -Werror -I./include -O3 -march=native -mtune=native -fvisibility=hidden
+weights.o:	src/weights.c include/dmp_dv.h
+	gcc -fPIC -c src/weights.c -o weights.o -std=c99 -Wall -Werror -I./include -O3 -march=native -mtune=native -fvisibility=hidden
 
 dmp_dv.o:	src/dmp_dv.cpp include/dmp_dv.h
 	g++ -fPIC -c src/dmp_dv.cpp -o dmp_dv.o -std=c++11 -Wall -Werror -I./include -O3 -march=native -mtune=native -fvisibility=hidden
