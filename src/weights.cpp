@@ -113,14 +113,16 @@ int dmp_dv_pack_conv_weights(
                 if (out_offs + sizeof(buf8) <= *output_size) {
                   const uint8_t *w = (const uint8_t*)weights;
                   for (int y = 0; y < ky; ++y) {
-                    for (int x = 0; x < 6; ++x) {
+                    for (int x = 0; x < std::min(6, kx); ++x) {
                       buf8[5 + y][x] = w[offs2 + y * s2 + x];
                     }
                   }
-                  buf8[2][5] = w[offs2 + 0 * s2 + 6];
-                  for (int y = 0; y < 3; ++y) {
-                    buf8[y][3] = w[offs2 + (y + 1) * s2 + 6];
-                    buf8[y][0] = w[offs2 + (y + 4) * s2 + 6];
+                  if (kx > 6) {
+                    buf8[2][5] = w[offs2 + 0 * s2 + 6];  // y == 0
+                    for (int y = 0; y < 3; ++y) {
+                      buf8[y][3] = ky > y + 1 ? w[offs2 + (y + 1) * s2 + 6] : 0;  // y in (1, 2, 3)
+                      buf8[y][0] = ky > y + 4 ? w[offs2 + (y + 4) * s2 + 6] : 0;  // y in (4, 5, 6)
+                    }
                   }
                   memcpy(output + out_offs, buf8, sizeof(buf8));
                 }
