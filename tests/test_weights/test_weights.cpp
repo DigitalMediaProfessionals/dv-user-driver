@@ -98,16 +98,16 @@ int test_weights(uint32_t state[4], const char *s_gold_hash,
     const double dt_ms = dt.get_ms();
     const double n_elems = n_channels * kx * ky * n_kernels;
     // Complexity should be O(n)
-    const double max_C = 1000.0;  // maximum O(n) constant
+    const double max_C = 25.0;  // maximum O(n) constant
     const double elems_per_ms = n_elems / dt_ms;
     const double clocks_per_elem = clocks_per_ms / elems_per_ms;
     if (clocks_per_elem > max_C) {
       int c = 1;
-      for (double clocks = clocks_per_elem; clocks > max_C; clocks /= n_elems) {
+      double clocks = clocks_per_elem;
+      for (; clocks > n_elems; clocks /= n_elems) {
         ++c;
       }
-      ERR("At least O(n^%d) complexity is detected: %lld elems %lld clocks\n",
-          c, std::llround(n_elems), std::llround(dt_ms * clocks_per_ms));
+      ERR("Complexity O(n^%d) is detected with constant: %.0f\n", c, clocks);
       --result;
     }
   }

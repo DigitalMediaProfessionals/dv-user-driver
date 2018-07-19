@@ -83,21 +83,17 @@ int dmp_dv_pack_conv_weights(
   }
 
   size_t out_offs = 0;
-  size_t n;
   if (quant_map) {
-    n = 512;
-    if (out_offs + n <= *output_size) {
-      memcpy(output + out_offs, quant_map, n);
+    if (out_offs + 512 <= *output_size) {
+      memcpy(output + out_offs, quant_map, 512);
     }
-    out_offs += n;
+    out_offs += 512;
   }
 
-  // labels.shape = (n_kernels, n_channels, ky, kx)
+  // weights.shape = (n_kernels, n_channels, ky, kx)
   const int s2 = kx;
   const int s1 = ky * kx;
   const int s0 = n_channels * ky * kx;
-
-  std::set<int> w_idx;  // for debugging purposes  // TODO: Remove it when optimization will be done.
 
   uint8_t buf8[12][6];
   memset(&buf8[0][0], 0, sizeof(buf8));
@@ -105,36 +101,32 @@ int dmp_dv_pack_conv_weights(
   switch (p) {
     case 7:
     {
-      for (int m_start = 0; m_start < n_kernels; m_start += 8) {
+      for (int m_start = 0; m_start < n_kernels; m_start += 8) {  // loop by kernels (chunks of size 8) i.e. output channels
         const int m_stop = std::min(m_start + 8, n_kernels);
 
-        write_bias(m_start, m_stop, out_offs, output_size, output, bias);
+        write_bias(m_start, m_stop, out_offs, output_size, output, bias);  // write bias values for a specific chunk with zero padding to 8
 
-        for (int c_start = 0; c_start < n_channels; c_start += 8) {
+        for (int c_start = 0; c_start < n_channels; c_start += 8) {  // loop by input channels (chunks of size 8)
           const int c_stop = std::min(c_start + 8, n_channels);
-          for (int m = m_start; m < m_stop; ++m) {
-            for (int c = c_start; c < c_stop; ++c) {
+          for (int m = m_start; m < m_stop; ++m) {  // loop by specific kernel inside chunk
+            for (int c = c_start; c < c_stop; ++c) {  // loop by specific channel inside chunk
+              const int offs2 = m * s0 + c * s1;
               if (quant_map) {
-                n = sizeof(buf8);
-                if (out_offs + n <= *output_size) {
+                if (out_offs + sizeof(buf8) <= *output_size) {
                   const uint8_t *w = (const uint8_t*)weights;
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < 6; ++x) {
-                      buf8[5 + y][x] = w[m * s0 + c * s1 + y * s2 + x];
-                      w_idx.emplace(m * s0 + c * s1 + y * s2 + x);
+                      buf8[5 + y][x] = w[offs2 + y * s2 + x];
                     }
                   }
-                  buf8[2][5] = w[m * s0 + c * s1 + 0 * s2 + 6];
-                  w_idx.emplace(m * s0 + c * s1 + 0 * s2 + 6);
+                  buf8[2][5] = w[offs2 + 0 * s2 + 6];
                   for (int y = 0; y < 3; ++y) {
-                    buf8[y][3] = w[m * s0 + c * s1 + (y + 1) * s2 + 6];
-                    w_idx.emplace(m * s0 + c * s1 + (y + 1) * s2 + 6);
-                    buf8[y][0] = w[m * s0 + c * s1 + (y + 4) * s2 + 6];
-                    w_idx.emplace(m * s0 + c * s1 + (y + 4) * s2 + 6);
+                    buf8[y][3] = w[offs2 + (y + 1) * s2 + 6];
+                    buf8[y][0] = w[offs2 + (y + 4) * s2 + 6];
                   }
-                  memcpy(output + out_offs, buf8, n);
+                  memcpy(output + out_offs, buf8, sizeof(buf8));
                 }
-                out_offs += n;
+                out_offs += sizeof(buf8);
               }
               else {
                 SET_ERR("Branch is disabled for now");
@@ -157,26 +149,25 @@ int dmp_dv_pack_conv_weights(
           const int c_stop = std::min(c_start + 8, n_channels);
           for (int m = m_start; m < m_stop; ++m) {
             if (quant_map) {
-              n = sizeof(buf8);
               const uint8_t *w = (const uint8_t*)weights;
               for (int c = c_start; c < c_stop; ++c) {
-                const int t = c % 2;
+                const int offs2 = m * s0 + c * s1;
+                const int t = c & 1;
                 if ((t == 0) && (c == c_stop - 1)) {
                   memset(&buf8[0][0], 0, sizeof(buf8));
                 }
-                if (out_offs + n <= *output_size) {
+                if (out_offs + sizeof(buf8) <= *output_size) {
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < kx; ++x) {
-                      buf8[7 - t * 6 + y][x] = w[m * s0 + c * s1 + y * s2 + x];
-                      w_idx.emplace(m * s0 + c * s1 + y * s2 + x);
+                      buf8[7 - t * 6 + y][x] = w[offs2 + y * s2 + x];
                     }
                   }
                 }
                 if ((t == 1) || ((t == 0) && (c == c_stop - 1))) {
-                  if (out_offs + n <= *output_size) {
-                    memcpy(output + out_offs, buf8, n);
+                  if (out_offs + sizeof(buf8) <= *output_size) {
+                    memcpy(output + out_offs, buf8, sizeof(buf8));
                   }
-                  out_offs += n;
+                  out_offs += sizeof(buf8);
                 }
               }
             }
@@ -198,26 +189,25 @@ int dmp_dv_pack_conv_weights(
 
         for (int c_start = 0; c_start < n_channels; c_start += 8) {
           const int c_stop = std::min(c_start + 8, n_channels);
+          if (c_stop - c_start != 8) {
+            memset(&buf8[0][0], 0, sizeof(buf8));
+          }
           for (int m = m_start; m < m_stop; ++m) {
             if (quant_map) {
-              if ((c_stop - c_start >= 1) && (c_stop - c_start <= 7)) {
-                memset(&buf8[0][0], 0, sizeof(buf8));
-              }
-              n = sizeof(buf8);
-              if (out_offs + n <= *output_size) {
+              if (out_offs + sizeof(buf8) <= *output_size) {
                 const uint8_t *w = (const uint8_t*)weights;
                 for (int c = c_start; c < c_stop; ++c) {
-                  const int t = c % 8;
+                  const int offs2 = m * s0 + c * s1;
+                  const int t = c & 7;
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < kx; ++x) {
-                      buf8[9 - t / 2 * 3 + y][t % 2 * 3 + x] = w[m * s0 + c * s1 + y * s2 + x];
-                      w_idx.emplace(m * s0 + c * s1 + y * s2 + x);
+                      buf8[9 - (t >> 1) * 3 + y][(t & 1) * 3 + x] = w[offs2 + y * s2 + x];
                     }
                   }
                 }
-                memcpy(output + out_offs, buf8, n);
+                memcpy(output + out_offs, buf8, sizeof(buf8));
               }
-              out_offs += n;
+              out_offs += sizeof(buf8);
             }
             else {
               SET_ERR("Branch is disabled for now");
@@ -237,24 +227,22 @@ int dmp_dv_pack_conv_weights(
 
         for (int c_start = 0; c_start < n_channels; c_start += 64) {
           const int c_stop = std::min(c_start + 64, n_channels);
+          if (c_stop - c_start != 64) {
+            memset(&buf8[0][0], 0, sizeof(buf8));
+          }
           for (int m = m_start; m < m_stop; ++m) {
             if (quant_map) {
-              if ((c_stop - c_start >= 1) && (c_stop - c_start <= 63)) {
-                memset(&buf8[0][0], 0, sizeof(buf8));
-              }
-              n = sizeof(buf8);
-              if (out_offs + n <= *output_size) {
+              if (out_offs + sizeof(buf8) <= *output_size) {
                 const uint8_t *w = (const uint8_t*)weights;
                 for (int c = c_start; c < c_stop; ++c) {
-                  const int t = c % 8;
-                  const int x = c % 64 / 8 % 3;
-                  const int y = c % 64 / 8 / 3;
-                  buf8[11 - t / 2 * 3 - y][t % 2 * 3 + x] = w[m * s0 + c * s1];
-                  w_idx.emplace(m * s0 + c * s1);
+                  const int t = c & 7;
+                  const int x = ((c & 63) >> 3) % 3;
+                  const int y = ((c & 63) >> 3) / 3;
+                  buf8[11 - (t >> 1) * 3 - y][(t & 1) * 3 + x] = w[m * s0 + c * s1];
                 }
-                memcpy(output + out_offs, buf8, n);
+                memcpy(output + out_offs, buf8, sizeof(buf8));
               }
-              out_offs += n;
+              out_offs += sizeof(buf8);
             }
             else {
               SET_ERR("Branch is disabled for now");
@@ -273,22 +261,8 @@ int dmp_dv_pack_conv_weights(
   }
 
   if ((!retval) && (*output_size) && (*output_size < out_offs)) {
+    SET_ERR("Not all weights were filled: provided buffer size %zu while %zu is required", *output_size, out_offs);
     retval = -1;
-  }
-
-  if ((!retval) && (*output_size)) {  // sanity check for debugging purposes
-    const int n_idx = n_channels * kx * ky * n_kernels;
-    for (int i = 0; i < n_idx; ++i) {
-      auto it = w_idx.find(i);
-      if (it == w_idx.end()) {
-        SET_ERR("Index %d was not handled (must handle all %d indices)", i, n);
-        return -1;
-      }
-    }
-    if ((int)w_idx.size() != n_idx) {
-      SET_ERR("Handled different number of indices than expected: %d vs %d", (int)w_idx.size(), n_idx);
-      return EINVAL;
-    }
   }
 
   *output_size = out_offs;
