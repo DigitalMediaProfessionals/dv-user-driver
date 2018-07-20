@@ -42,6 +42,10 @@ extern char s_last_error_message[256];
 #define SET_ERR(...) snprintf(s_last_error_message, sizeof(s_last_error_message), __VA_ARGS__)
 
 
+/// @brief Helper to set the last error message for ioctl call.
+#define SET_IOCTL_ERR(dev, cmd) SET_ERR("ioctl(%s) failed for %s", cmd, dev)
+
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

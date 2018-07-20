@@ -46,7 +46,7 @@ class CDMPDVMem {
     alloc_param.flags = ION_FLAG_CACHED;
     int res = ioctl(ctx->get_fd_ion(), ION_IOC_ALLOC, &alloc_param);
     if (res < 0) {
-      SET_ERR("ioctl() for ION_IOC_ALLOC failed to allocate %zu bytes", size);
+      SET_IOCTL_ERR("/dev/ion", "ION_IOC_ALLOC");
       return false;
     }
     fd_mem_ = alloc_param.fd;
@@ -117,7 +117,7 @@ class CDMPDVMem {
     sync_args.flags = DMA_BUF_SYNC_START | sync_flags_;
     res = ioctl(fd_mem_, DMA_BUF_IOCTL_SYNC, &sync_args);
     if (res < 0) {
-      SET_ERR("ioctl() for DMA_BUF_SYNC_START failed");
+      SET_IOCTL_ERR("/dev/ion", "DMA_BUF_SYNC_START");
       return res;
     }
     return 0;
@@ -132,7 +132,7 @@ class CDMPDVMem {
     sync_args.flags = DMA_BUF_SYNC_END | sync_flags_;
     int res = ioctl(fd_mem_, DMA_BUF_IOCTL_SYNC, &sync_args);
     if (res < 0) {
-      SET_ERR("ioctl() for DMA_BUF_SYNC_END failed");
+      SET_IOCTL_ERR("/dev/ion", "DMA_BUF_SYNC_END");
       return res;
     }
     sync_flags_ = 0;

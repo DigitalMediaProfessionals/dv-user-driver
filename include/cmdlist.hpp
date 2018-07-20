@@ -119,11 +119,22 @@ class CDMPDVCmdList {
     }
 
     // Pass this chunk to kernel module
-    // TODO: implement.
+    dmp_dv_kcmd dv_cmd;
+    dv_cmd.cmd_num = n;
+    dv_cmd.cmd_pointer = (__u64)raw_commands;
+    int res = ioctl(ctx_->get_fd_conv(), DMP_DV_IOC_APPEND_CMD, &dv_cmd);
+    if (res < 0) {
+      SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_APPEND_CMD");
+      res = -1;
+    }
+    else {
+      res = 0;
+    }
 
+    // Free temporary buffer
     free(raw_commands);
 
-    return 0;
+    return res;
   }
 
   int Exec() {

@@ -60,7 +60,7 @@ class CDMPDVContext {
     memset(&query, 0, sizeof(query));
     int res = ioctl(fd_ion_, ION_IOC_HEAP_QUERY, &query);
     if (res < 0) {
-      SET_ERR("ioctl() failed for ION_IOC_HEAP_QUERY");
+      SET_IOCTL_ERR("/dev/ion", "ION_IOC_HEAP_QUERY");
       return false;
     }
     const int n = query.cnt;
@@ -75,7 +75,7 @@ class CDMPDVContext {
     query.heaps = (size_t)&heaps[0];
     res = ioctl(fd_ion_, ION_IOC_HEAP_QUERY, &query);
     if (res < 0) {
-      SET_ERR("ioctl() failed for ION_IOC_HEAP_QUERY");
+      SET_IOCTL_ERR("/dev/ion", "ION_IOC_HEAP_QUERY");
       return false;
     }
     for (int i = 0; i < n; ++i) {
@@ -132,9 +132,9 @@ class CDMPDVContext {
 
   int get_kick_count() {
     int kick_count = -1;
-    int ret = ioctl(fd_conv_, DMP_DV_IOC_GET_KICK_COUNT, &kick_count);
-    if (ret < 0) {
-      SET_ERR("ioctrl(%s) failed for /dev/dv_conv", "DMP_DV_IOC_GET_KICK_COUNT");
+    int res = ioctl(fd_conv_, DMP_DV_IOC_GET_KICK_COUNT, &kick_count);
+    if (res < 0) {
+      SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_GET_KICK_COUNT");
       return -1;
     }
     return kick_count;
