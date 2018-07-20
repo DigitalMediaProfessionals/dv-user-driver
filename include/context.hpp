@@ -50,8 +50,8 @@ class CDMPDVContext {
     path_ = path ? path : "";
 
     fd_ion_ = open("/dev/ion", O_RDONLY | O_CLOEXEC);  // O_CLOEXEC is suggested for security
-    if (fd_ion_ < 0) {
-      SET_ERR("open() failed for /dev/ion");
+    if (fd_ion_ == -1) {
+      SET_ERR("open() failed for /dev/ion: %s", strerror(errno));
       return false;
     }
 
@@ -99,8 +99,8 @@ class CDMPDVContext {
     }
 
     fd_conv_ = open("/dev/dv_conv", O_RDONLY | O_CLOEXEC);
-    if (fd_conv_ < 0) {
-      SET_ERR("open() failed for /dev/dv_conv");
+    if (fd_conv_ == -1) {
+      SET_ERR("open() failed for /dev/dv_conv: %s", strerror(errno));
       return false;
     }
 

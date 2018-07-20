@@ -60,7 +60,7 @@ void dmp_dv_context_destroy(dmp_dv_context *ctx) {
   if (!ctx) {
     return;
   }
-  free(ctx);
+  delete (CDMPDVContext*)ctx;
 }
 
 

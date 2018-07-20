@@ -91,7 +91,31 @@ class CDMPDVCmdList {
       raw_commands[i].input_circular_offset = commands_[i].raw_v0.input_circular_offset;
       raw_commands[i].output_mode = commands_[i].raw_v0.output_mode;
 
-      // TODO: copy run structures.
+      const int n_run = 32;
+      for (int i_run = 0; i_run < n_run; ++i_run) {
+        raw_commands[i].run[i_run].weight_buf.fd = CDMPDVMem::get_fd(commands_[i].raw_v0.run[i_run].weight_buf.mem);
+        raw_commands[i].run[i_run].weight_buf.rsvd = 0;
+        raw_commands[i].run[i_run].weight_buf.offs = commands_[i].raw_v0.run[i_run].weight_buf.offs;
+
+        raw_commands[i].run[i_run].conv_pad = commands_[i].raw_v0.run[i_run].conv_pad;
+        raw_commands[i].run[i_run].pool_pad = commands_[i].raw_v0.run[i_run].pool_pad;
+        raw_commands[i].run[i_run].m = commands_[i].raw_v0.run[i_run].m;
+        raw_commands[i].run[i_run].conv_enable = commands_[i].raw_v0.run[i_run].conv_enable;
+        raw_commands[i].run[i_run].p = commands_[i].raw_v0.run[i_run].p;
+        raw_commands[i].run[i_run].pz = commands_[i].raw_v0.run[i_run].pz;
+        raw_commands[i].run[i_run].conv_stride = commands_[i].raw_v0.run[i_run].conv_stride;
+        raw_commands[i].run[i_run].conv_dilation = commands_[i].raw_v0.run[i_run].conv_dilation;
+        raw_commands[i].run[i_run].weight_fmt = commands_[i].raw_v0.run[i_run].weight_fmt;
+        raw_commands[i].run[i_run].pool_enable = commands_[i].raw_v0.run[i_run].pool_enable;
+        raw_commands[i].run[i_run].pool_avg_param = commands_[i].raw_v0.run[i_run].pool_avg_param;
+        raw_commands[i].run[i_run].pool_size = commands_[i].raw_v0.run[i_run].pool_size;
+        raw_commands[i].run[i_run].pool_stride = commands_[i].raw_v0.run[i_run].pool_stride;
+        raw_commands[i].run[i_run].actfunc = commands_[i].raw_v0.run[i_run].actfunc;
+        raw_commands[i].run[i_run].actfunc_param = commands_[i].raw_v0.run[i_run].actfunc_param;
+        raw_commands[i].run[i_run].rectifi_en = commands_[i].raw_v0.run[i_run].rectifi_en;
+        raw_commands[i].run[i_run].lrn = commands_[i].raw_v0.run[i_run].lrn;
+        raw_commands[i].run[i_run].rsvd = commands_[i].raw_v0.run[i_run].rsvd;
+      }
     }
 
     // Pass this chunk to kernel module
