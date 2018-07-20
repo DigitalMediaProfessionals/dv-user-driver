@@ -26,6 +26,7 @@
 #include "ion.h"
 
 #include "dmp_dv.h"
+#include "../../dv-kernel-driver/uapi/dmp-dv.h"
 
 
 #ifdef __cplusplus

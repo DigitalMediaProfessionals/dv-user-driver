@@ -24,6 +24,8 @@ class CDMPDVContext {
 
     fd_ion_ = -1;
     dma_heap_id_mask_ = 0;
+
+    fd_conv_ = -1;
   }
 
   virtual ~CDMPDVContext() {
@@ -31,6 +33,10 @@ class CDMPDVContext {
   }
 
   void Cleanup() {
+    if (fd_conv_ != -1) {
+      close(fd_conv_);
+      fd_conv_ = -1;
+    }
     if (fd_ion_ != -1) {
       close(fd_ion_);
       fd_ion_ = -1;
@@ -92,6 +98,12 @@ class CDMPDVContext {
       return false;
     }
 
+    fd_conv_ = open("/dev/dv_conv", O_RDONLY | O_CLOEXEC);
+    if (fd_conv_ < 0) {
+      SET_ERR("open() failed for /dev/dv_conv");
+      return false;
+    }
+
     info_ = std::string("DV700: UBUF=640Kb PATH=") + path_;
 
     return true;
@@ -105,6 +117,10 @@ class CDMPDVContext {
     return dma_heap_id_mask_;
   }
 
+  inline int get_fd_conv() const {
+    return fd_conv_;
+  }
+
   int Sync() {
     // TODO: implement.
     return 0;
@@ -112,6 +128,16 @@ class CDMPDVContext {
 
   const char *GetInfoString() {
     return info_.c_str();
+  }
+
+  int get_kick_count() {
+    int kick_count = -1;
+    int ret = ioctl(fd_conv_, DMP_DV_IOC_GET_KICK_COUNT, &kick_count);
+    if (ret < 0) {
+      SET_ERR("ioctrl(%s) failed for /dev/dv_conv", "DMP_DV_IOC_GET_KICK_COUNT");
+      return -1;
+    }
+    return kick_count;
   }
 
  private:
@@ -126,4 +152,7 @@ class CDMPDVContext {
 
   /// @brief ION heap selector.
   uint32_t dma_heap_id_mask_;
+
+  /// @brief File handle for CONV accelerator.
+  int fd_conv_;
 };

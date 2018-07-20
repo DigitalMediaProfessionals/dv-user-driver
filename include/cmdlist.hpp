@@ -15,6 +15,7 @@
 
 #include "mem.hpp"
 #include "dmp_dv_cmdraw_v0.h"
+#include "../../dv-kernel-driver/uapi/dmp_dv_cmdraw_v0.h"
 
 
 /// @brief Implementation of dmp_dv_cmdlist.
@@ -60,10 +61,43 @@ class CDMPDVCmdList {
     }
 
     // Allocate and fill memory chunk suitable for sharing with kernel module replacing dmp_dv_mem pointers with ION file descriptors
-    // TODO: implement.
+    dmp_dv_kcmdraw_v0 *raw_commands = (dmp_dv_kcmdraw_v0*)malloc(sizeof(dmp_dv_kcmdraw_v0) * n);
+    if (!raw_commands) {
+      SET_ERR("Failed to allocate %zu bytes of memory", sizeof(dmp_dv_kcmdraw_v0) * n);
+      return -1;
+    }
+
+    for (int i = 0; i < n; ++i) {
+      raw_commands[i].size = sizeof(dmp_dv_kcmdraw_v0);
+      raw_commands[i].version = 0;
+
+      raw_commands[i].input_buf.fd = CDMPDVMem::get_fd(commands_[i].raw_v0.input_buf.mem);
+      raw_commands[i].input_buf.rsvd = 0;
+      raw_commands[i].input_buf.offs = commands_[i].raw_v0.input_buf.offs;
+
+      raw_commands[i].output_buf.fd = CDMPDVMem::get_fd(commands_[i].raw_v0.output_buf.mem);
+      raw_commands[i].output_buf.rsvd = 0;
+      raw_commands[i].output_buf.offs = commands_[i].raw_v0.output_buf.offs;
+
+      raw_commands[i].eltwise_buf.fd = CDMPDVMem::get_fd(commands_[i].raw_v0.eltwise_buf.mem);
+      raw_commands[i].eltwise_buf.rsvd = 0;
+      raw_commands[i].eltwise_buf.offs = commands_[i].raw_v0.eltwise_buf.offs;
+
+      raw_commands[i].topo = commands_[i].raw_v0.topo;
+      raw_commands[i].w = commands_[i].raw_v0.w;
+      raw_commands[i].h = commands_[i].raw_v0.h;
+      raw_commands[i].z = commands_[i].raw_v0.z;
+      raw_commands[i].c = commands_[i].raw_v0.c;
+      raw_commands[i].input_circular_offset = commands_[i].raw_v0.input_circular_offset;
+      raw_commands[i].output_mode = commands_[i].raw_v0.output_mode;
+
+      // TODO: copy run structures.
+    }
 
     // Pass this chunk to kernel module
     // TODO: implement.
+
+    free(raw_commands);
 
     return 0;
   }

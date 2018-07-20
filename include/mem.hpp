@@ -143,6 +143,10 @@ class CDMPDVMem {
     return real_size_;
   }
 
+  static inline int get_fd(dmp_dv_mem *mem) {
+    return mem ? ((CDMPDVMem*)mem)->fd_mem_ : -1;
+  }
+
  private:
   /// @brief Pointer to dv context.
   CDMPDVContext *ctx_;
