@@ -106,6 +106,8 @@ class CDMPDVContext {
 
     info_ = std::string("DV700: UBUF=640Kb PATH=") + path_;
 
+    last_kick_count_ = get_kick_count();
+
     return true;
   }
 
@@ -121,8 +123,23 @@ class CDMPDVContext {
     return fd_conv_;
   }
 
+  int last_kick_count_;
   int Sync() {
-    // TODO: implement.
+    int kicks;
+    do {
+      kicks = get_kick_count();
+      usleep(10);
+    }
+    while (kicks == last_kick_count_);
+    last_kick_count_ = kicks;
+
+    // TODO: issue proper ioctl when it'll be ready.
+    /*int res = ioctl(fd_conv_, DMP_DV_IOC_WAIT, NULL);
+    if (res < 0) {
+      SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_WAIT");
+      return -1;
+    }*/
+
     return 0;
   }
 

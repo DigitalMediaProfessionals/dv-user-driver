@@ -369,6 +369,7 @@ int test_cmdlist(const conv_config& config) {
   }
   LOG("Scheduled command list for execution\n");
 
+  LOG("Waiting for completion\n");
   if (dmp_dv_sync(ctx)) {
     ERR("dmp_dv_sync() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;

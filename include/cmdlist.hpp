@@ -139,7 +139,14 @@ class CDMPDVCmdList {
 
   int Exec() {
     // Issue ioctl on the kernel module requesting this list execution
-    // TODO: implement.
+    int res = ioctl(ctx_->get_fd_conv(), DMP_DV_IOC_RUN, NULL);
+    if (res < 0) {
+      SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_RUN");
+      return -1;
+    }
+
+    // TODO: adjust when support for multiple lists will be implemented in kernel module.
+
     return 0;
   }
 
