@@ -19,6 +19,7 @@
 #include <vector>
 #include <cmath>
 #include <limits>
+#include <tuple>
 
 #include "dmp_dv.h"
 #include "dmp_dv_cmdraw_v0.h"
@@ -32,58 +33,8 @@ typedef struct conv_config_impl {
   int width, height, n_channels, kx, ky, n_kernels, pad, stride, activation;
 
   bool operator <(const struct conv_config_impl& pt) const {
-    if (width < pt.width) {
-      return true;
-    }
-    if (width > pt.height) {
-      return false;
-    }
-    if (height < pt.height) {
-      return true;
-    }
-    if (height > pt.height) {
-      return false;
-    }
-    if (n_channels < pt.n_channels) {
-      return true;
-    }
-    if (n_channels > pt.n_channels) {
-      return false;
-    }
-    if (kx < pt.kx) {
-      return true;
-    }
-    if (kx > pt.kx) {
-      return false;
-    }
-    if (ky < pt.ky) {
-      return true;
-    }
-    if (ky > pt.ky) {
-      return false;
-    }
-    if (n_kernels < pt.n_kernels) {
-      return true;
-    }
-    if (n_kernels > pt.n_kernels) {
-      return false;
-    }
-    if (pad < pt.pad) {
-      return true;
-    }
-    if (pad > pt.pad) {
-      return false;
-    }
-    if (stride < pt.stride) {
-      return true;
-    }
-    if (stride > pt.stride) {
-      return false;
-    }
-    if (activation < pt.activation) {
-      return true;
-    }
-    return false;
+    return std::make_tuple(width, height, n_channels, kx, ky, n_kernels, pad, stride, activation) <
+        std::make_tuple(pt.width, pt.height, pt.n_channels, pt.kx, pt.ky, pt.n_kernels, pt.pad, pt.stride, pt.activation);
   }
 } conv_config;
 
@@ -94,6 +45,7 @@ int get_conv_out_width(int width, int kx, int pad, int stride) {
 }
 
 
+/// @brief Tests convolutional configurations for correctness using data from folder "data".
 int test_cmdlist(const conv_config& config) {
   char prefix[256];
   snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_%dx%dx%d_%d_%d_%d",
@@ -224,9 +176,10 @@ int test_cmdlist(const conv_config& config) {
   int32_t cmdraw_max_version;
   uint8_t *weights;
   __fp16 *io;
-  float max_diff, max_diff_pt;
-  float caffe_a = std::numeric_limits<float>::max(), caffe_b = std::numeric_limits<float>::min();
-  float dv_a = std::numeric_limits<float>::max(), dv_b = std::numeric_limits<float>::min();
+  float max_diff = 0, max_diff_y = 0, max_diff_t = 0;
+  float failed_diff = 0, failed_diff_y = 0, failed_diff_t = 0;
+  float caffe_a = std::numeric_limits<float>::max(), caffe_b = std::numeric_limits<float>::lowest();
+  float dv_a = std::numeric_limits<float>::max(), dv_b = std::numeric_limits<float>::lowest();
 
   LOG("dmp_dv_get_version_string(): %s\n", dmp_dv_get_version_string());
 
@@ -262,7 +215,8 @@ int test_cmdlist(const conv_config& config) {
   cmd.topo = 1;
   cmd.run[0].m = config.n_kernels;
   cmd.run[0].conv_enable = 1;
-  cmd.run[0].p = config.kx;
+  cmd.run[0].p = (uint16_t)config.kx | (((uint16_t)config.ky) << 8);
+  cmd.run[0].pz = 1;
   {
     const uint32_t pad8 = config.pad;
     cmd.run[0].conv_pad = pad8 | (pad8 << 8) | (pad8 << 16) | (pad8 << 24);
@@ -287,7 +241,7 @@ int test_cmdlist(const conv_config& config) {
 
   weights_size = 0;
   if (dmp_dv_pack_conv_weights(
-        cmd.c, cmd.run[0].p, cmd.run[0].p, cmd.run[0].m,
+        config.n_channels, config.kx, config.ky, config.n_kernels,
         quant_map, NULL, NULL, NULL, &weights_size)) {
     ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
@@ -302,7 +256,7 @@ int test_cmdlist(const conv_config& config) {
 
   cmd.run[0].weight_buf.mem = weights_mem;
   cmd.run[0].weight_buf.offs = 0;
-  cmd.run[0].weight_fmt = 2;
+  cmd.run[0].weight_fmt = 3;
 
   weights = dmp_dv_mem_map(weights_mem);
   if (!weights) {
@@ -315,7 +269,7 @@ int test_cmdlist(const conv_config& config) {
   }
   // Fill weights
   if (dmp_dv_pack_conv_weights(
-        cmd.c, cmd.run[0].p, cmd.run[0].p, cmd.run[0].m,
+      config.n_channels, config.kx, config.ky, config.n_kernels,
         quant_map, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size)) {
     ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
@@ -385,8 +339,6 @@ int test_cmdlist(const conv_config& config) {
   }
   // Caffe's output is stored as channels, height, width
   // DV output is stored as chunks by max of 8 channels as width, height, channel
-  max_diff = 0;
-  max_diff_pt = 0;
   for (int chan_group = 0, o_offs = config.width * config.height * config.n_channels;
        chan_group < config.n_kernels; chan_group += 8) {
     const int last_chan = std::min(chan_group + 8, config.n_kernels);
@@ -401,11 +353,20 @@ int test_cmdlist(const conv_config& config) {
           dv_a = std::min(dv_a, y);
           dv_b = std::max(dv_b, y);
           const float diff = std::abs(y - t);
-          const float mx = std::max(std::abs(y), std::abs(t));
-          float diff_pt = std::abs((float)io[o_offs] - (float)vle);
-          diff_pt *= 100.0f / std::max(mx, 1.0e-8f);
-          max_diff = std::max(max_diff, diff);
-          max_diff_pt = std::max(max_diff_pt, diff_pt);
+          if (diff > max_diff) {
+            max_diff = diff;
+            max_diff_y = y;
+            max_diff_t = t;
+          }
+          const float ta = std::abs(t);
+          if (((ta < 0.1f) && (diff > 0.03f)) ||
+              ((ta >= 0.1f) && (diff > ta * 0.2f))) {
+            if (diff > failed_diff) {
+              failed_diff = diff;
+              failed_diff_y = y;
+              failed_diff_t = t;
+            }
+          }
         }
       }
     }
@@ -415,9 +376,9 @@ int test_cmdlist(const conv_config& config) {
     goto L_EXIT;
   }
   LOG("caffe: [%.6f, %.6f] dv: [%.6f, %.6f]\n", caffe_a, caffe_b, dv_a, dv_b);
-  LOG("max_diff=%.6f max_diff_pt=%.1f%%\n", max_diff, max_diff_pt);
-  if (max_diff_pt > 5.0f) {
-    ERR("Difference is too large: max_diff_pt=%.1f%%\n", max_diff_pt);
+  LOG("max_diff=%.6f on y=%.6f and t=%.6f\n", max_diff, max_diff_y, max_diff_t);
+  if (failed_diff > 0.0f) {
+    ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f\n", failed_diff, failed_diff_y, failed_diff_t);
     goto L_EXIT;
   }
 

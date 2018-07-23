@@ -96,7 +96,6 @@ class CDMPDVCmdList {
         raw_commands[i].run[i_run].weight_buf.fd = CDMPDVMem::get_fd(commands_[i].raw_v0.run[i_run].weight_buf.mem);
         raw_commands[i].run[i_run].weight_buf.rsvd = 0;
         raw_commands[i].run[i_run].weight_buf.offs = commands_[i].raw_v0.run[i_run].weight_buf.offs;
-
         raw_commands[i].run[i_run].conv_pad = commands_[i].raw_v0.run[i_run].conv_pad;
         raw_commands[i].run[i_run].pool_pad = commands_[i].raw_v0.run[i_run].pool_pad;
         raw_commands[i].run[i_run].m = commands_[i].raw_v0.run[i_run].m;

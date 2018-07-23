@@ -17,7 +17,12 @@ import caffe
 
 class Main(object):
     def __init__(self):
-        self.generate(64, 32, 3, 3, 3, 32, 1, 1, 5)
+        for kx in (1, 2, 3, 4, 5, 6, 7):
+            ky = kx
+            for act in (0, 1, 3, 5):  # none, tanh, sigmoid, elu
+                self.generate(1, 1, 1, kx, ky, 1, kx >> 1, 1, act)
+                self.generate(64, 32, 3, kx, ky, 32, kx >> 1, 1, act)
+                self.generate(64, 32, 15, kx, ky, 31, kx >> 1, 1, act)
 
     def get_ox(self, width, kx, pad, stride):
         return (pad + width + pad - kx) // stride + 1
@@ -98,7 +103,24 @@ layer {
   top: "conv1"
 }
 """)
-            # TODO: add more activations.
+            elif activation == 3:
+                fout.write("""
+layer {
+  name: "conv1/Sigmoid"
+  type: "Sigmoid"
+  bottom: "conv1"
+  top: "conv1"
+}
+""")
+            elif activation == 1:
+                fout.write("""
+layer {
+  name: "conv1/TanH"
+  type: "TanH"
+  bottom: "conv1"
+  top: "conv1"
+}
+""")
 
         net = caffe.Net("data/test.prototxt", caffe.TEST)
         net.params["conv1"][0].data[:] = weights.astype(
