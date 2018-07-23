@@ -20,7 +20,8 @@ class Main(object):
         for kx in (1, 2, 3, 4, 5, 6, 7):
             ky = kx
             for act in (0, 1, 3, 5):  # none, tanh, sigmoid, elu
-                self.generate(1, 1, 1, kx, ky, 1, kx >> 1, 1, act)
+                if kx % 2 == 1:
+                    self.generate(1, 1, 1, kx, ky, 1, kx >> 1, 1, act)
                 self.generate(64, 32, 3, kx, ky, 32, kx >> 1, 1, act)
                 self.generate(64, 32, 15, kx, ky, 31, kx >> 1, 1, act)
 
