@@ -125,6 +125,8 @@ class CDMPDVContext {
 
   int last_kick_count_;
   int Sync() {
+    fprintf(stdout, "kicks: %d\n", last_kick_count_);
+    fflush(stdout);
     int kicks;
     do {
       kicks = get_kick_count();
@@ -132,6 +134,8 @@ class CDMPDVContext {
     }
     while (kicks == last_kick_count_);
     last_kick_count_ = kicks;
+    fprintf(stdout, "kicks: %d\n", last_kick_count_);
+    fflush(stdout);
 
     // TODO: issue proper ioctl when it'll be ready.
     /*int res = ioctl(fd_conv_, DMP_DV_IOC_WAIT, NULL);

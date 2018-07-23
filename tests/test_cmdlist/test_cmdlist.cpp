@@ -18,6 +18,7 @@
 #include <set>
 #include <vector>
 #include <cmath>
+#include <limits>
 
 #include "dmp_dv.h"
 #include "dmp_dv_cmdraw_v0.h"
@@ -224,6 +225,8 @@ int test_cmdlist(const conv_config& config) {
   uint8_t *weights;
   __fp16 *io;
   float max_diff, max_diff_pt;
+  float caffe_a = std::numeric_limits<float>::max(), caffe_b = std::numeric_limits<float>::min();
+  float dv_a = std::numeric_limits<float>::max(), dv_b = std::numeric_limits<float>::min();
 
   LOG("dmp_dv_get_version_string(): %s\n", dmp_dv_get_version_string());
 
@@ -393,6 +396,10 @@ int test_cmdlist(const conv_config& config) {
           const int i_offs = k * out_width * out_height + j * out_width + i;
           const __fp16 vle = caffe_output[i_offs];
           const float y = (float)io[o_offs], t = (float)vle;
+          caffe_a = std::min(caffe_a, t);
+          caffe_b = std::max(caffe_b, t);
+          dv_a = std::min(dv_a, y);
+          dv_b = std::max(dv_b, y);
           const float diff = std::abs(y - t);
           const float mx = std::max(std::abs(y), std::abs(t));
           float diff_pt = std::abs((float)io[o_offs] - (float)vle);
@@ -407,6 +414,7 @@ int test_cmdlist(const conv_config& config) {
     ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
+  LOG("caffe: [%.6f, %.6f] dv: [%.6f, %.6f]\n", caffe_a, caffe_b, dv_a, dv_b);
   LOG("max_diff=%.6f max_diff_pt=%.1f%%\n", max_diff, max_diff_pt);
   if (max_diff_pt > 5.0f) {
     ERR("Difference is too large: max_diff_pt=%.1f%%\n", max_diff_pt);
