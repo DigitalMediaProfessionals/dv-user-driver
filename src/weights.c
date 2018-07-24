@@ -140,6 +140,7 @@ int dmp_dv_pack_conv_weights(
                     }
                   }
                   if (kx > 6) {
+                    // TODO: check correctness for the case kx=7, ky=6.
                     buf8[2][5] = w[offs2 + 0 * s2 + 6];  // y == 0
                     for (int y = 0; y < 3; ++y) {
                       buf8[y][3] = ky > y + 1 ? w[offs2 + (y + 1) * s2 + 6] : 0;  // y in (1, 2, 3)
@@ -159,6 +160,7 @@ int dmp_dv_pack_conv_weights(
                     }
                   }
                   if (kx > 6) {
+                    // TODO: check correctness for the case kx=7, ky=6.
                     buf16[2][5] = w[offs2 + 0 * s2 + 6];  // y == 0
                     for (int y = 0; y < 3; ++y) {
                       buf16[y][3] = ky > y + 1 ? w[offs2 + (y + 1) * s2 + 6] : 0;  // y in (1, 2, 3)
