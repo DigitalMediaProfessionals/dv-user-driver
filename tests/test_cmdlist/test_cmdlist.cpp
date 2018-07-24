@@ -29,6 +29,10 @@
 #define ERR(...) fprintf(stderr, __VA_ARGS__); fflush(stderr)
 
 
+/// @brief Number of file descriptors for the process.
+static int g_n_fd = -1;
+
+
 typedef struct conv_config_impl {
   int width, height, n_channels, kx, ky, n_kernels, pad, stride, activation;
 
@@ -45,19 +49,93 @@ int get_conv_out_width(int width, int kx, int pad, int stride) {
 }
 
 
+inline int divup(int a, int b) {
+  int n = a / b;
+  if (a % b) {
+    ++n;
+  }
+  return n;
+}
+
+
+/// @brief Computes number of tiles for fpga job.
+/// @returns > 0 on success, 0 when this configuration cannot be run on FPGA due to the lack of internal cache.
+int get_conv_fpga_tiles(int width, int height, int n_channels, int kx, int ky, int n_kernels, int pad, int stride) {
+  int t = 0;
+  const int c_blocks = (n_channels >> 3) + ((n_channels & 7) ? 1 : 0);
+  for (; t < width;) {
+    ++t;
+    const int tw = divup(width, t) + kx - 1;  // width of a tile
+    const int ow = get_conv_out_width(tw, kx, pad, stride);
+    const int oh = get_conv_out_width(height, ky, pad, stride);
+    const int os = ow * oh * std::min(8, n_kernels);  // output buffer size
+    const int ts_1c = tw * height;  // tile size for single channel
+    const int ts_blk16 = ts_1c * std::min(8, n_channels);
+    int ts_blk128 = (ts_blk16 >> 3) + ((ts_blk16 & 0x7) ? 1 : 0);
+    // Ensure size modulo 16 = 2, this to ensure 8 blocks can be read in parallel from 16 cuts in 1x1 mode
+    ts_blk128 += (2 - ts_blk128) & 0x0F;
+    int ts_128 = ts_blk128 * c_blocks;
+    // Ensure size modulo 16 = 0, this to ensure 8 blocks can be read in parallel from 16 cuts in 1x1 mode
+    ts_128 += ((0 - ts_128) & 0x0F);
+    const int ts = ts_128 << 3;  // input tile size in UBUF (in float16)
+    const int uu = ts + os;  // unified buffer utilization
+    if (uu * 2 <= 640 * 1024) {
+      return t;
+    }
+  }
+  return 0;
+}
+
+
+
 /// @brief Tests convolutional configurations for correctness using data from folder "data".
 int test_cmdlist(const conv_config& config) {
+  /*uint8_t *data = (uint8_t*)malloc(1024 * 1024);
+  if (!data) {
+    ERR("Failed to allocate %d bytes of memory\n", 1024 * 1024);
+    return -1;
+  }
+  FILE *fwin = fopen("/lib/firmware/dmp/dv_program.bin", "rb");
+  if (!fwin) {
+    ERR("fopen() failed for /lib/firmware/dmp/dv_program.bin\n");
+    free(data);
+    return -1;
+  }
+  int nnn = fread(data, 1, 1024 * 1024, fwin);
+  fclose(fwin);
+  if ((nnn <= 0) || (nnn >= 1024 * 1024)) {
+    ERR("fread() failed for /lib/firmware/dmp/dv_program.bin\n");
+    free(data);
+    return -1;
+  }
+  FILE *fwout = fopen("/sys/devices/platform/dmp_dv/firmware", "wb");
+  if (!fwout) {
+    ERR("fopen() failed for /sys/devices/platform/dmp_dv/firmware\n");
+    free(data);
+    return -1;
+  }
+  int nnnn = fwrite(data, 1, nnn, fwout);
+  fclose(fwout);
+  free(data);
+  if (nnnn != nnn) {
+    ERR("fwrite() failed for /sys/devices/platform/dmp_dv/firmware\n");
+    return -1;
+  }*/
+
   char prefix[256];
   snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_%dx%dx%d_%d_%d_%d",
            config.width, config.height, config.n_channels, config.kx, config.ky, config.n_kernels,
            config.pad, config.stride, config.activation);
 
-  LOG("ENTER: test_cmdlist: %s\n", prefix);
-
-  if (config.kx != config.ky) {
-    ERR("Only square kernels are supported, got %d x %d\n", config.kx, config.ky);
-    return -1;
+  const int tiles = get_conv_fpga_tiles(
+      config.width, config.height, config.n_channels, config.kx | 1, config.ky | 1, config.n_kernels,
+      config.pad + 1, 1);
+  if (tiles != 1) {
+    ERR("Unsupported tiles %d\n", tiles);
+    _exit(-1);  // TODO: remove it when tiles will be fixed inside kernel module.
   }
+
+  LOG("ENTER: test_cmdlist: %s\n", prefix);
 
   // Load quantization map
   char fnme[512];
@@ -178,6 +256,7 @@ int test_cmdlist(const conv_config& config) {
   __fp16 *io;
   float max_diff = 0, max_diff_y = 0, max_diff_t = 0;
   float failed_diff = 0, failed_diff_y = 0, failed_diff_t = 0;
+  int failed_x = -1, failed_y = -1, failed_c = -1;
   float caffe_a = std::numeric_limits<float>::max(), caffe_b = std::numeric_limits<float>::lowest();
   float dv_a = std::numeric_limits<float>::max(), dv_b = std::numeric_limits<float>::lowest();
 
@@ -263,7 +342,7 @@ int test_cmdlist(const conv_config& config) {
     ERR("dmp_dv_mem_map() failed for weights: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  if (dmp_dv_mem_sync_start(weights_mem, 0, 1)) {
+  if (dmp_dv_mem_sync_start(weights_mem, 1, 1)) {
     ERR("dmp_dv_mem_sync_start() failed for weights: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
@@ -365,6 +444,9 @@ int test_cmdlist(const conv_config& config) {
               failed_diff = diff;
               failed_diff_y = y;
               failed_diff_t = t;
+              failed_x = i;
+              failed_y = j;
+              failed_c = k;
             }
           }
         }
@@ -378,7 +460,8 @@ int test_cmdlist(const conv_config& config) {
   LOG("caffe: [%.6f, %.6f] dv: [%.6f, %.6f]\n", caffe_a, caffe_b, dv_a, dv_b);
   LOG("max_diff=%.6f on y=%.6f and t=%.6f\n", max_diff, max_diff_y, max_diff_t);
   if (failed_diff > 0.0f) {
-    ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f\n", failed_diff, failed_diff_y, failed_diff_t);
+    ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f xy=(%d, %d) chan=%d\n", failed_diff, failed_diff_y, failed_diff_t,
+        failed_x, failed_y, failed_c);
     goto L_EXIT;
   }
 
@@ -391,7 +474,39 @@ int test_cmdlist(const conv_config& config) {
   dmp_dv_mem_free(io_mem);
   dmp_dv_context_destroy(ctx);
 
-  LOG("EXIT: test_cmdlist: %s\n", prefix);
+  int n_fd = 0;
+  DIR *d;
+  struct dirent *dir;
+  d = opendir("/proc/self/fd");
+  if (!d) {
+    ERR("Could not open \"/proc/self/fd\" folder\n");
+    return -1;
+  }
+  while ((dir = readdir(d))) {
+    char *fnme = dir->d_name;
+    bool num = true;
+    for (; *fnme; ++fnme) {
+      if ((*fnme >= '0') && (*fnme <= '9')) {
+        continue;
+      }
+      num = false;
+      break;
+    }
+    if (num) {
+      ++n_fd;
+    }
+  }
+  closedir(d);
+
+  if (g_n_fd == -1) {
+    g_n_fd = n_fd;
+  }
+  if (n_fd != g_n_fd) {
+    ERR("Inconsistent file descriptor count detected, memory leak is probable");
+    result = -1;
+  }
+
+  LOG("EXIT: test_cmdlist: %s: FD count: %d\n", prefix, n_fd);
   return result;
 }
 
@@ -436,12 +551,14 @@ int main(int argc, char **argv) {
   closedir(d);
 
   for (auto it = configs.cbegin(); it != configs.cend(); ++it) {
-    res = test_cmdlist(*it);
-    if (res) {
-      ++n_err;
-    }
-    else {
-      ++n_ok;
+    for (int k = 0; k < 2; ++k) {
+      res = test_cmdlist(*it);
+      if (res) {
+        ++n_err;
+      }
+      else {
+        ++n_ok;
+      }
     }
   }
 

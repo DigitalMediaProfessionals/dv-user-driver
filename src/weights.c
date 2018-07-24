@@ -136,7 +136,7 @@ int dmp_dv_pack_conv_weights(
                   const uint8_t *w = (const uint8_t*)weights;
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < imin(6, kx); ++x) {
-                      buf8[5 + y][x] = w[offs2 + y * s2 + x];
+                      buf8[5 + y + (p - ky)][x] = w[offs2 + y * s2 + x];
                     }
                   }
                   if (kx > 6) {
@@ -155,7 +155,7 @@ int dmp_dv_pack_conv_weights(
                   const uint16_t *w = (const uint16_t*)weights;
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < imin(6, kx); ++x) {
-                      buf16[5 + y][x] = w[offs2 + y * s2 + x];
+                      buf16[5 + y + (p - ky)][x] = w[offs2 + y * s2 + x];
                     }
                   }
                   if (kx > 6) {
@@ -196,7 +196,7 @@ int dmp_dv_pack_conv_weights(
                 if (out_offs + sizeof(buf8) <= *output_size) {
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < kx; ++x) {
-                      buf8[7 - t * 6 + y][x] = w[offs2 + y * s2 + x];
+                      buf8[7 - t * 6 + y + (p - ky)][x] = w[offs2 + y * s2 + x];
                     }
                   }
                 }
@@ -219,7 +219,7 @@ int dmp_dv_pack_conv_weights(
                 if (out_offs + sizeof(buf16) <= *output_size) {
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < kx; ++x) {
-                      buf16[7 - t * 6 + y][x] = w[offs2 + y * s2 + x];
+                      buf16[7 - t * 6 + y + (p - ky)][x] = w[offs2 + y * s2 + x];
                     }
                   }
                 }
@@ -262,7 +262,7 @@ int dmp_dv_pack_conv_weights(
                   const int t = c & 7;
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < kx; ++x) {
-                      buf8[9 - (t >> 1) * 3 + y][(t & 1) * 3 + x] = w[offs2 + y * s2 + x];
+                      buf8[9 - (t >> 1) * 3 + y + (p - ky)][(t & 1) * 3 + x] = w[offs2 + y * s2 + x];
                     }
                   }
                 }
@@ -278,7 +278,7 @@ int dmp_dv_pack_conv_weights(
                   const int t = c & 7;
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < kx; ++x) {
-                      buf16[9 - (t >> 1) * 3 + y][(t & 1) * 3 + x] = w[offs2 + y * s2 + x];
+                      buf16[9 - (t >> 1) * 3 + y + (p - ky)][(t & 1) * 3 + x] = w[offs2 + y * s2 + x];
                     }
                   }
                 }
