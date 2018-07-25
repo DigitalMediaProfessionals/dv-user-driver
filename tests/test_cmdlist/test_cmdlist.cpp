@@ -25,8 +25,12 @@
 #include "dmp_dv_cmdraw_v0.h"
 
 
-#define LOG(...) fprintf(stdout, __VA_ARGS__); fflush(stdout)
-#define ERR(...) fprintf(stderr, __VA_ARGS__); fflush(stderr)
+/// @brief File which will store logs.
+static FILE *g_flog = NULL;
+
+
+#define LOG(...) fprintf(stdout, __VA_ARGS__); fflush(stdout); fprintf(g_flog, __VA_ARGS__); fflush(g_flog)
+#define ERR(...) fprintf(stderr, __VA_ARGS__); fflush(stderr); fprintf(g_flog, __VA_ARGS__); fflush(g_flog)
 
 
 /// @brief Number of file descriptors for the process.
@@ -34,22 +38,26 @@ static int g_n_fd = -1;
 
 
 typedef struct conv_config_impl {
-  int width, height, n_channels, kx, ky, n_kernels, pad, stride, activation;
+  int width, height, n_channels, kx, ky, n_kernels, pad_left, pad_top, pad_right, pad_bottom, stride_x, stride_y, activation;
 
   bool operator <(const struct conv_config_impl& pt) const {
-    return std::make_tuple(width, height, n_channels, kx, ky, n_kernels, pad, stride, activation) <
-        std::make_tuple(pt.width, pt.height, pt.n_channels, pt.kx, pt.ky, pt.n_kernels, pt.pad, pt.stride, pt.activation);
+    return std::make_tuple(width, height, n_channels, kx, ky, n_kernels,
+                           pad_left, pad_top, pad_right, pad_bottom,
+                           stride_x, stride_y, activation) <
+        std::make_tuple(pt.width, pt.height, pt.n_channels, pt.kx, pt.ky, pt.n_kernels,
+                        pt.pad_left, pt.pad_top, pt.pad_right, pt.pad_bottom,
+                        pt.stride_x, pt.stride_y, pt.activation);
   }
 } conv_config;
 
 
 /// @brief Returns width of the output based on kernel size, padding and stride.
-int get_conv_out_width(int width, int kx, int pad, int stride) {
-  return (pad + width + pad - kx) / stride + 1;
+int get_conv_out_width(int width, int kx, int pad_left, int pad_right, int stride) {
+  return (pad_left + width + pad_right - kx) / stride + 1;
 }
 
 
-inline int divup(int a, int b) {
+static inline int divup(int a, int b) {
   int n = a / b;
   if (a % b) {
     ++n;
@@ -60,14 +68,16 @@ inline int divup(int a, int b) {
 
 /// @brief Computes number of tiles for fpga job.
 /// @returns > 0 on success, 0 when this configuration cannot be run on FPGA due to the lack of internal cache.
-int get_conv_fpga_tiles(int width, int height, int n_channels, int kx, int ky, int n_kernels, int pad, int stride) {
+int get_conv_fpga_tiles(int width, int height, int n_channels, int kx, int ky, int n_kernels,
+                        int pad_left, int pad_top, int pad_right, int pad_bottom,
+                        int stride_x, int stride_y) {
   int t = 0;
   const int c_blocks = (n_channels >> 3) + ((n_channels & 7) ? 1 : 0);
   for (; t < width;) {
     ++t;
     const int tw = divup(width, t) + kx - 1;  // width of a tile
-    const int ow = get_conv_out_width(tw, kx, pad, stride);
-    const int oh = get_conv_out_width(height, ky, pad, stride);
+    const int ow = get_conv_out_width(tw, kx, pad_left, pad_right, stride_x);
+    const int oh = get_conv_out_width(height, ky, pad_top, pad_bottom, stride_y);
     const int os = ow * oh * std::min(8, n_kernels);  // output buffer size
     const int ts_1c = tw * height;  // tile size for single channel
     const int ts_blk16 = ts_1c * std::min(8, n_channels);
@@ -86,6 +96,23 @@ int get_conv_fpga_tiles(int width, int height, int n_channels, int kx, int ky, i
   return 0;
 }
 
+
+void print_cmd(dmp_dv_cmdraw_v0& cmd) {
+  LOG("topo = %u\nw = %u\nh = %u\nz = %u\nc = %u\ninput_circular_offset = %u\noutput_mode = %u\n",
+      (uint32_t)cmd.topo, (uint32_t)cmd.w, (uint32_t)cmd.h, (uint32_t)cmd.z, (uint32_t)cmd.c,
+      (uint32_t)cmd.input_circular_offset, (uint32_t)cmd.output_mode);
+  LOG("conv_pad = 0x%08x\npool_pad = 0x%08x\nm = %u\nconv_enable = %u\np = 0x%04x\n"
+      "pz = %u\nconv_stride = 0x%04x\nconv_dilation = %u\nweight_fmt = %u\n"
+      "pool_enable = %u\npool_avg_param = %u\npool_size = 0x%04x\npool_stride = 0x%04x\n"
+      "actfunc = %u\nactfunc_param = %u\nrectifi_en = %u\nlrn = %u\n",
+      (uint32_t)cmd.run[0].conv_pad, (uint32_t)cmd.run[0].pool_pad, (uint32_t)cmd.run[0].m,
+      (uint32_t)cmd.run[0].conv_enable, (uint32_t)cmd.run[0].p, (uint32_t)cmd.run[0].pz,
+      (uint32_t)cmd.run[0].conv_stride, (uint32_t)cmd.run[0].conv_dilation,
+      (uint32_t)cmd.run[0].weight_fmt, (uint32_t)cmd.run[0].pool_enable, (uint32_t)cmd.run[0].pool_avg_param,
+      (uint32_t)cmd.run[0].pool_size, (uint32_t)cmd.run[0].pool_stride,
+      (uint32_t)cmd.run[0].actfunc, (uint32_t)cmd.run[0].actfunc_param, (uint32_t)cmd.run[0].rectifi_en,
+      (uint32_t)cmd.run[0].lrn);
+}
 
 
 /// @brief Tests convolutional configurations for correctness using data from folder "data".
@@ -123,13 +150,21 @@ int test_cmdlist(const conv_config& config) {
   }*/
 
   char prefix[256];
-  snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_%dx%dx%d_%d_%d_%d",
+  snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
            config.width, config.height, config.n_channels, config.kx, config.ky, config.n_kernels,
-           config.pad, config.stride, config.activation);
+           config.pad_left, config.pad_top, config.pad_right, config.pad_bottom,
+           config.stride_x, config.stride_y, config.activation);
+
+  /*if (strcmp(prefix, "data/64x32x3_2x6x32_pad1x3x1x3_stride1x1_act0")) {
+    return 0;
+  }*/
+  /*if ((config.kx != config.ky) && ((!(config.kx & 1)) || (!(config.ky & 1)))) {  // skip non-square even sizes
+    return 0;
+  }*/
 
   const int tiles = get_conv_fpga_tiles(
       config.width, config.height, config.n_channels, config.kx | 1, config.ky | 1, config.n_kernels,
-      config.pad + 1, 1);
+      config.pad_left, config.pad_top, config.pad_right, config.pad_bottom, config.stride_x, config.stride_y);
   if (tiles != 1) {
     ERR("Unsupported tiles %d\n", tiles);
     _exit(-1);  // TODO: remove it when tiles will be fixed inside kernel module.
@@ -229,8 +264,8 @@ int test_cmdlist(const conv_config& config) {
     ERR("fopen() failed for %s\n", fnme);
     return -1;
   }
-  const int out_width = get_conv_out_width(config.width, config.kx, config.pad, config.stride);
-  const int out_height = get_conv_out_width(config.height, config.ky, config.pad, config.stride);
+  const int out_width = get_conv_out_width(config.width, config.kx, config.pad_left, config.pad_right, config.stride_x);
+  const int out_height = get_conv_out_width(config.height, config.ky, config.pad_top, config.pad_bottom, config.stride_y);
   std::vector<__fp16> caffe_output;
   caffe_output.resize(out_width * out_height * config.n_kernels);
   n = fread(caffe_output.data(), sizeof(caffe_output[0]), caffe_output.size(), fin);
@@ -296,14 +331,9 @@ int test_cmdlist(const conv_config& config) {
   cmd.run[0].conv_enable = 1;
   cmd.run[0].p = (uint16_t)config.kx | (((uint16_t)config.ky) << 8);
   cmd.run[0].pz = 1;
-  {
-    const uint32_t pad8 = config.pad;
-    cmd.run[0].conv_pad = pad8 | (pad8 << 8) | (pad8 << 16) | (pad8 << 24);
-  }
-  {
-    const uint16_t stride8 = config.stride;
-    cmd.run[0].conv_stride = stride8 | (stride8 << 8);
-  }
+  cmd.run[0].conv_pad = (uint32_t)config.pad_left | ((uint32_t)config.pad_right << 8) |
+                        ((uint32_t)config.pad_top << 16) | ((uint32_t)config.pad_bottom << 24);
+  cmd.run[0].conv_stride = (uint16_t)config.stride_x | ((uint16_t)config.stride_y << 8);
   cmd.run[0].actfunc = config.activation;
 
   io_size = (config.width * config.height * config.n_channels + out_width * out_height * config.n_kernels) * sizeof(__fp16);
@@ -399,6 +429,8 @@ int test_cmdlist(const conv_config& config) {
   }
   LOG("Ended the command list\n");
 
+  //print_cmd(cmd);
+
   if (dmp_dv_cmdlist_exec(cmdlist)) {
     ERR("dmp_dv_cmdlist_exec() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
@@ -460,8 +492,8 @@ int test_cmdlist(const conv_config& config) {
   LOG("caffe: [%.6f, %.6f] dv: [%.6f, %.6f]\n", caffe_a, caffe_b, dv_a, dv_b);
   LOG("max_diff=%.6f on y=%.6f and t=%.6f\n", max_diff, max_diff_y, max_diff_t);
   if (failed_diff > 0.0f) {
-    ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f xy=(%d, %d) chan=%d\n", failed_diff, failed_diff_y, failed_diff_t,
-        failed_x, failed_y, failed_c);
+    ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f xy=(%d, %d) chan=%d %s\n", failed_diff, failed_diff_y, failed_diff_t,
+        failed_x, failed_y, failed_c, prefix);
     goto L_EXIT;
   }
 
@@ -512,6 +544,13 @@ int test_cmdlist(const conv_config& config) {
 
 
 int main(int argc, char **argv) {
+  g_flog = fopen(argc > 1 ? argv[1] : "/dev/null", "w");
+  if (!g_flog) {
+    fprintf(stderr, "fopen() failed for %s\n", argv[1]);
+    fflush(stderr);
+    return -1;
+  }
+
   int n_ok = 0;
   int n_err = 0;
   int res = 0;
@@ -540,9 +579,10 @@ int main(int argc, char **argv) {
       }
     }
 
-    if (sscanf(fnme, "%d%d%d%d%d%d%d%d%d",
+    if (sscanf(fnme, "%d%d%d%d%d%d%d%d%d%d%d%d%d",
                &config.width, &config.height, &config.n_channels, &config.kx, &config.ky, &config.n_kernels,
-               &config.pad, &config.stride, &config.activation) != 9) {
+               &config.pad_left, &config.pad_top, &config.pad_right, &config.pad_bottom,
+               &config.stride_x, &config.stride_y, &config.activation) != 13) {
       continue;
     }
 
@@ -564,5 +604,8 @@ int main(int argc, char **argv) {
 
   LOG("Tests succeeded: %d\n", n_ok);
   LOG("Tests failed: %d\n", n_err);
+
+  fclose(g_flog);
+
   return n_err;
 }

@@ -17,26 +17,51 @@ import caffe
 
 class Main(object):
     def __init__(self):
-        for kx in (1, 2, 3, 4, 5, 6, 7):
-            ky = kx
-            for act in (0, 1, 3, 5):  # none, tanh, sigmoid, elu
-                self.generate(1, 1, 1, kx, ky, 1, kx >> 1, 1, act)
-                self.generate(64, 32, 3, kx, ky, 32, kx >> 1, 1, act)
-                self.generate(64, 32, 15, kx, ky, 31, kx >> 1, 1, act)
+        for kx in range(1, 8, 1):
+            for ky in range(1, 8, 1):
+                pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
+                stride = (1, 1)
+                for act in (0, 1, 3, 5):  # none, tanh, sigmoid, elu
+                    self.generate(1, 1, 1, kx, ky, 1, pad, stride, act)
+                    self.generate(64, 32, 3, kx, ky, 32, pad, stride, act)
+                    self.generate(64, 32, 15, kx, ky, 31, pad, stride, act)
 
-    def get_ox(self, width, kx, pad, stride):
-        return (pad + width + pad - kx) // stride + 1
+    def get_ox(self, width, kx, pad_left, pad_right, stride):
+        return (pad_left + width + pad_right - kx) // stride + 1
 
     def generate(self, width, height, n_channels, kx, ky, n_kernels,
-                 pad, stride, activation):
+                 pad_ltrb, stride_xy, activation):
+        """Generates test data for convolutional layer and invokes caffe
+        to generate gold output.
+
+        Parameters:
+            width: input width.
+            height: input height.
+            n_channels: number of channels in input.
+            kx: kernel width.
+            ky: kernel height.
+            n_kernels: number of convolutional kernels
+                       (aka number of channels in output).
+            pad_ltrb: padding (left, top, right, bottom).
+            stride_xy: stride (x, y).
+            activation: activation function (0 - none, 1 - tanh,
+                        3 - sigmoid, 5 - elu).
+        """
+        if pad_ltrb[0] != pad_ltrb[2] or pad_ltrb[1] != pad_ltrb[3]:
+            raise ValueError("Caffe doesn't support padding "
+                             "(left, top, right, bottom): %s" % pad_ltrb)
+
         try:
             os.mkdir("data")
         except OSError:
             pass
 
-        prefix = ("data/%dx%dx%d_%dx%dx%d_%d_%d_%d" %
+        s_pad = "%dx%dx%dx%d" % pad_ltrb
+        s_stride = "%dx%d" % stride_xy
+
+        prefix = ("data/%dx%dx%d_%dx%dx%d_pad%s_stride%s_act%d" %
                   (width, height, n_channels, kx, ky, n_kernels,
-                   pad, stride, activation))
+                   s_pad, s_stride, activation))
 
         numpy.random.seed(12345)
 
@@ -64,6 +89,15 @@ class Main(object):
 
         caffe.set_mode_cpu()
 
+        s_kern = ("kernel_size: %d" % kx if kx == ky
+                  else "kernel_w: %d\n    kernel_h: %d" % (kx, ky))
+
+        s_pad = ("pad: %d" % pad_ltrb[0] if pad_ltrb[0] == pad_ltrb[1] else
+                 "pad_w: %d\n    pad_h: %d" % (pad_ltrb[0], pad_ltrb[1]))
+
+        s_stride = ("stride: %d" % stride_xy[0] if stride_xy[0] == stride_xy[1]
+                    else "stride_w: %d\n    stride_h: %d" % stride_xy)
+
         with open("data/test.prototxt", "w") as fout:
             fout.write("""name: "Test"
 state {
@@ -90,12 +124,12 @@ layer {
   top: "conv1"
   convolution_param {
     num_output: %d
-    pad: %d
-    kernel_size: %d
-    stride: %d
+    %s
+    %s
+    %s
   }
 }
-""" % (n_channels, height, width, n_kernels, pad, kx, stride))
+""" % (n_channels, height, width, n_kernels, s_pad, s_kern, s_stride))
             if activation == 5:
                 fout.write("""
 layer {
@@ -138,14 +172,19 @@ layer {
         results = net.forward()
         output = results["conv1"].copy()
 
-        ox = self.get_ox(width, kx, pad, stride)
-        oy = self.get_ox(height, ky, pad, stride)
+        ox = self.get_ox(width, kx, pad_ltrb[0], pad_ltrb[2], stride_xy[0])
+        oy = self.get_ox(height, ky, pad_ltrb[1], pad_ltrb[3], stride_xy[1])
         assert output.shape == (1, n_kernels, oy, ox)
 
         output.astype(numpy.float16).tofile("%s.o.bin" % prefix)
 
         print("Successfully generated test input/weights/output for %s" %
               prefix)
+
+        try:
+            os.unlink("data/test.prototxt")
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":
