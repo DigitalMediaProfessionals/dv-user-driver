@@ -140,11 +140,12 @@ int dmp_dv_pack_conv_weights(
                     }
                   }
                   if (kx > 6) {
-                    // TODO: check correctness for the case kx=7, ky=6.
-                    buf8[2][5] = w[offs2 + 0 * s2 + 6];  // y == 0
-                    for (int y = 0; y < 3; ++y) {
-                      buf8[y][3] = ky > y + 1 ? w[offs2 + (y + 1) * s2 + 6] : 0;  // y in (1, 2, 3)
-                      buf8[y][0] = ky > y + 4 ? w[offs2 + (y + 4) * s2 + 6] : 0;  // y in (4, 5, 6)
+                    static const int remap[7] = {
+                        2 * 6 + 5, 0 * 6 + 3, 1 * 6 + 3, 2 * 6 + 3, 0 * 6 + 0, 1 * 6 + 0, 2 * 6 + 0
+                    };
+                    uint8_t *buf8p = &buf8[0][0];
+                    for (int y = 0; y < ky; ++y) {
+                      buf8p[remap[y + (p - ky)]] = w[offs2 + y * s2 + 6];
                     }
                   }
                   memcpy(output + out_offs, &buf8[0][0], sizeof(buf8));
@@ -160,11 +161,12 @@ int dmp_dv_pack_conv_weights(
                     }
                   }
                   if (kx > 6) {
-                    // TODO: check correctness for the case kx=7, ky=6.
-                    buf16[2][5] = w[offs2 + 0 * s2 + 6];  // y == 0
-                    for (int y = 0; y < 3; ++y) {
-                      buf16[y][3] = ky > y + 1 ? w[offs2 + (y + 1) * s2 + 6] : 0;  // y in (1, 2, 3)
-                      buf16[y][0] = ky > y + 4 ? w[offs2 + (y + 4) * s2 + 6] : 0;  // y in (4, 5, 6)
+                    static const int remap[7] = {
+                        2 * 6 + 5, 0 * 6 + 3, 1 * 6 + 3, 2 * 6 + 3, 0 * 6 + 0, 1 * 6 + 0, 2 * 6 + 0
+                    };
+                    uint16_t *buf16p = &buf16[0][0];
+                    for (int y = 0; y < ky; ++y) {
+                      buf16p[remap[y + (p - ky)]] = w[offs2 + y * s2 + 6];
                     }
                   }
                   memcpy(output + out_offs, &buf16[0][0], sizeof(buf16));
