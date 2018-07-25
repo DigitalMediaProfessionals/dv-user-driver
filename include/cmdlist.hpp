@@ -217,6 +217,21 @@ class CDMPDVCmdList {
         SET_ERR("Invalid argument: cmd->run[%d].weight_buf.mem is NULL", i);
         return -1;
       }
+      if (cmd->run[i].conv_enable == 1) {
+        const int kx = cmd->run[i].p & 0xFF;
+        const int ky = cmd->run[i].p >> 8;
+        if ((kx < 1) || (kx > 7) || (ky < 1) || (ky > 7)) {
+          SET_ERR("Unsupported convolutional kernel size %dx%d, only sizes from {1, 2, 3, 4, 5, 6, 7} are supported", kx, ky);
+          return -1;
+        }
+        const int sx = cmd->run[i].conv_stride & 0xFF;
+        const int sy = cmd->run[i].conv_stride >> 8;
+        if ((sx < 1) || (sy < 1)) {
+          SET_ERR("Stride of convolution must be greater than 0, got %dx%d", sx, sy);
+          return -1;
+        }
+      }
+      // TODO: add more checks.
     }
 
     // TODO: increase reference counters on provided mem pointers.
