@@ -21,7 +21,7 @@ typedef struct dmp_dv_cmdraw_v0_conv_run_impl {
   uint32_t conv_pad;        // Bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
   uint32_t pool_pad;        // Bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
   uint16_t m;               // Number of Output Channels
-  uint16_t conv_enable;     // 1 = Enabled, 0 = Disabled, 3 = LRN
+  uint16_t conv_enable;     // 1 = Enabled, 0 = Disabled, 3 = Depthwise
   uint16_t p;               // Filter Size (bits[7:0] = width, bits[15:8] = height)
   uint16_t pz;              // Filter Depth (1 in case of 2D convolution)
   uint16_t conv_stride;     // Bits [7:0] = X stride, bits [15:8] = Y stride
