@@ -37,8 +37,10 @@ static FILE *g_flog = NULL;
 static int g_n_fd = -1;
 
 
+/// @brief Configuration description to be tested.
 typedef struct conv_config_impl {
-  int width, height, n_channels, kx, ky, n_kernels, pad_left, pad_top, pad_right, pad_bottom, stride_x, stride_y, activation;
+  int width, height, n_channels, kx, ky, n_kernels,
+      pad_left, pad_top, pad_right, pad_bottom, stride_x, stride_y, activation;
 
   bool operator <(const struct conv_config_impl& pt) const {
     return std::make_tuple(width, height, n_channels, kx, ky, n_kernels,
@@ -57,46 +59,7 @@ int get_conv_out_width(int width, int kx, int pad_left, int pad_right, int strid
 }
 
 
-static inline int divup(int a, int b) {
-  int n = a / b;
-  if (a % b) {
-    ++n;
-  }
-  return n;
-}
-
-
-/// @brief Computes number of tiles for fpga job.
-/// @returns > 0 on success, 0 when this configuration cannot be run on FPGA due to the lack of internal cache.
-int get_conv_fpga_tiles(int width, int height, int n_channels, int kx, int ky, int n_kernels,
-                        int pad_left, int pad_top, int pad_right, int pad_bottom,
-                        int stride_x, int stride_y) {
-  int t = 0;
-  const int c_blocks = (n_channels >> 3) + ((n_channels & 7) ? 1 : 0);
-  for (; t < width;) {
-    ++t;
-    const int tw = divup(width, t) + kx - 1;  // width of a tile
-    const int ow = get_conv_out_width(tw, kx, pad_left, pad_right, stride_x);
-    const int oh = get_conv_out_width(height, ky, pad_top, pad_bottom, stride_y);
-    const int os = ow * oh * std::min(8, n_kernels);  // output buffer size
-    const int ts_1c = tw * height;  // tile size for single channel
-    const int ts_blk16 = ts_1c * std::min(8, n_channels);
-    int ts_blk128 = (ts_blk16 >> 3) + ((ts_blk16 & 0x7) ? 1 : 0);
-    // Ensure size modulo 16 = 2, this to ensure 8 blocks can be read in parallel from 16 cuts in 1x1 mode
-    ts_blk128 += (2 - ts_blk128) & 0x0F;
-    int ts_128 = ts_blk128 * c_blocks;
-    // Ensure size modulo 16 = 0, this to ensure 8 blocks can be read in parallel from 16 cuts in 1x1 mode
-    ts_128 += ((0 - ts_128) & 0x0F);
-    const int ts = ts_128 << 3;  // input tile size in UBUF (in float16)
-    const int uu = ts + os;  // unified buffer utilization
-    if (uu * 2 <= 640 * 1024) {
-      return t;
-    }
-  }
-  return 0;
-}
-
-
+/// @brief Prints command content for debugging.
 void print_cmd(dmp_dv_cmdraw_v0& cmd) {
   LOG("topo = %u\nw = %u\nh = %u\nz = %u\nc = %u\ninput_circular_offset = %u\noutput_mode = %u\n",
       (uint32_t)cmd.topo, (uint32_t)cmd.w, (uint32_t)cmd.h, (uint32_t)cmd.z, (uint32_t)cmd.c,
@@ -154,21 +117,6 @@ int test_cmdlist(const conv_config& config) {
            config.width, config.height, config.n_channels, config.kx, config.ky, config.n_kernels,
            config.pad_left, config.pad_top, config.pad_right, config.pad_bottom,
            config.stride_x, config.stride_y, config.activation);
-
-  /*if (strcmp(prefix, "data/64x32x3_2x6x32_pad1x3x1x3_stride1x1_act0")) {
-    return 0;
-  }*/
-  /*if ((config.kx != config.ky) && ((!(config.kx & 1)) || (!(config.ky & 1)))) {  // skip non-square even sizes
-    return 0;
-  }*/
-
-  const int tiles = get_conv_fpga_tiles(
-      config.width, config.height, config.n_channels, config.kx | 1, config.ky | 1, config.n_kernels,
-      config.pad_left, config.pad_top, config.pad_right, config.pad_bottom, config.stride_x, config.stride_y);
-  if (tiles != 1) {
-    ERR("Unsupported tiles %d\n", tiles);
-    _exit(-1);  // TODO: remove it when tiles will be fixed inside kernel module.
-  }
 
   LOG("ENTER: test_cmdlist: %s\n", prefix);
 
