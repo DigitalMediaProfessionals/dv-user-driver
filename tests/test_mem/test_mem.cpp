@@ -46,7 +46,7 @@ int test_mem(size_t size) {
   dmp_dv_mem *mem = dmp_dv_mem_alloc(ctx, size);
   if (!mem) {
     ERR("dmp_dv_mem_alloc() failed: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_context_destroy(ctx);
+    dmp_dv_context_release(ctx);
     return -1;
   }
   LOG("Successfully allocated %zu bytes of memory\n", size);
@@ -54,30 +54,30 @@ int test_mem(size_t size) {
   uint8_t *arr = dmp_dv_mem_map(mem);
   if (!arr) {
     ERR("dmp_dv_mem_map() failed: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_mem_free(mem);
-    dmp_dv_context_destroy(ctx);
+    dmp_dv_mem_release(mem);
+    dmp_dv_context_release(ctx);
     return -1;
   }
   LOG("Successfully mapped to user space %zu bytes of memory, address is %zu\n", size, (size_t)arr);
   if (dmp_dv_mem_sync_start(mem, 0, 1)) {
     ERR("dmp_dv_mem_sync_start() failed for writing: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_mem_free(mem);
-    dmp_dv_context_destroy(ctx);
+    dmp_dv_mem_release(mem);
+    dmp_dv_context_release(ctx);
     return -1;
   }
   memset(arr, 0, size);
   if (dmp_dv_mem_sync_end(mem)) {
     ERR("dmp_dv_mem_sync_end() failed: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_mem_free(mem);
-    dmp_dv_context_destroy(ctx);
+    dmp_dv_mem_release(mem);
+    dmp_dv_context_release(ctx);
     return -1;
   }
 
   // Start Read-Write memory transaction
   if (dmp_dv_mem_sync_start(mem, 1, 1)) {
     ERR("dmp_dv_mem_sync_start() failed for writing: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_mem_free(mem);
-    dmp_dv_context_destroy(ctx);
+    dmp_dv_mem_release(mem);
+    dmp_dv_context_release(ctx);
     return -1;
   }
   const int n = size >> 2;
@@ -96,15 +96,15 @@ int test_mem(size_t size) {
     uint32_t gold = xorshift32(state);
     if (buf[i] != gold) {
       ERR("Cache incoherence detected at first stage: %u != %u at %d\n", buf[i], gold, i);
-      dmp_dv_mem_free(mem);
-      dmp_dv_context_destroy(ctx);
+      dmp_dv_mem_release(mem);
+      dmp_dv_context_release(ctx);
       return -1;
     }
   }
   if (dmp_dv_mem_sync_end(mem)) {
     ERR("dmp_dv_mem_sync_end() failed: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_mem_free(mem);
-    dmp_dv_context_destroy(ctx);
+    dmp_dv_mem_release(mem);
+    dmp_dv_context_release(ctx);
     return -1;
   }
   LOG("Successfully filled the buffer and synced with physical memory\n");
@@ -116,8 +116,8 @@ int test_mem(size_t size) {
   void *ptr = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (!ptr) {
     ERR("mmap() failed at the previous address\n");
-    dmp_dv_mem_free(mem);
-    dmp_dv_context_destroy(ctx);
+    dmp_dv_mem_release(mem);
+    dmp_dv_context_release(ctx);
     return -1;
   }
   memset(ptr, 0, 4096);
@@ -127,8 +127,8 @@ int test_mem(size_t size) {
   uint8_t *big = big_ptr.get();
   if (!big) {
     ERR("malloc() failed for 64Mb\n");
-    dmp_dv_mem_free(mem);
-    dmp_dv_context_destroy(ctx);
+    dmp_dv_mem_release(mem);
+    dmp_dv_context_release(ctx);
     return -1;
   }
   memset(big, 0xFF, sz_big);
@@ -137,8 +137,8 @@ int test_mem(size_t size) {
   if (!arr) {
     ERR("dmp_dv_mem_map() failed: %s\n", dmp_dv_get_last_error_message());
     munmap(ptr, 4096);
-    dmp_dv_mem_free(mem);
-    dmp_dv_context_destroy(ctx);
+    dmp_dv_mem_release(mem);
+    dmp_dv_context_release(ctx);
     return -1;
   }
   LOG("Successfully mapped to user space %zu bytes of memory, address is %zu\n", size, (size_t)arr);
@@ -149,8 +149,8 @@ int test_mem(size_t size) {
   size_t a_map = (size_t)arr;
   if (!((a_map + size <= a_start) || (a_map >= a_end))) {
     ERR("Memory allocator returned bad address: [%zu, %zu] map=%zu\n", a_start, a_end, a_map);
-    dmp_dv_mem_free(mem);
-    dmp_dv_context_destroy(ctx);
+    dmp_dv_mem_release(mem);
+    dmp_dv_context_release(ctx);
     return -1;
   }
   const uint32_t *big32 = (uint32_t*)big;
@@ -165,8 +165,8 @@ int test_mem(size_t size) {
   // Start Read-Only memory transaction
   if (dmp_dv_mem_sync_start(mem, 1, 0)) {
     ERR("dmp_dv_mem_sync_start() failed for reading: %s", dmp_dv_get_last_error_message());
-    dmp_dv_mem_free(mem);
-    dmp_dv_context_destroy(ctx);
+    dmp_dv_mem_release(mem);
+    dmp_dv_context_release(ctx);
   }
 
   buf = (uint32_t*)arr;
@@ -175,14 +175,14 @@ int test_mem(size_t size) {
     uint32_t gold = xorshift32(state);
     if (buf[i] != gold) {
       ERR("%u != %u at %d\n", buf[i], gold, i);
-      dmp_dv_mem_free(mem);
-      dmp_dv_context_destroy(ctx);
+      dmp_dv_mem_release(mem);
+      dmp_dv_context_release(ctx);
       return -1;
     }
   }
 
-  dmp_dv_mem_free(mem);
-  dmp_dv_context_destroy(ctx);
+  dmp_dv_mem_release(mem);
+  dmp_dv_context_release(ctx);
 
   LOG("EXIT: test_api(%zu)\n", size);
   return 0;

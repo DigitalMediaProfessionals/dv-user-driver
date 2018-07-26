@@ -23,19 +23,31 @@ class CDMPDVCmdList {
  public:
   CDMPDVCmdList() {
     ctx_ = NULL;
+    fd_conv_ = -1;
   }
 
   virtual ~CDMPDVCmdList() {
     Cleanup();
   }
 
+  void Release() {
+    // TODO: adjust when reference counter will be implemented.
+    delete this;
+  }
+
   bool Initialize(CDMPDVContext *ctx) {
     Cleanup();
     if (!ctx) {
       SET_ERR("Invalid argument: ctx is NULL");
-      return NULL;
+      return false;
     }
     ctx_ = ctx;
+
+    fd_conv_ = open("/dev/dv_conv", O_RDONLY | O_CLOEXEC);
+    if (fd_conv_ == -1) {
+      SET_ERR("open() failed for /dev/dv_conv: %s", strerror(errno));
+      return false;
+    }
 
     // TODO: increase reference counter on context.
 
@@ -44,7 +56,15 @@ class CDMPDVCmdList {
 
   void Cleanup() {
     commands_.clear();
+    if (fd_conv_ != -1) {
+      close(fd_conv_);
+      fd_conv_ = -1;
+    }
     ctx_ = NULL;
+  }
+
+  inline int get_fd_conv() const {
+    return fd_conv_;
   }
 
   int End() {
@@ -121,7 +141,7 @@ class CDMPDVCmdList {
     dmp_dv_kcmd dv_cmd;
     dv_cmd.cmd_num = n;
     dv_cmd.cmd_pointer = (__u64)raw_commands;
-    int res = ioctl(ctx_->get_fd_conv(), DMP_DV_IOC_APPEND_CMD, &dv_cmd);
+    int res = ioctl(fd_conv_, DMP_DV_IOC_APPEND_CMD, &dv_cmd);
     if (res < 0) {
       SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_APPEND_CMD");
       res = -1;
@@ -136,16 +156,29 @@ class CDMPDVCmdList {
     return res;
   }
 
-  int Exec() {
+  int64_t Exec() {
     // Issue ioctl on the kernel module requesting this list execution
-    int res = ioctl(ctx_->get_fd_conv(), DMP_DV_IOC_RUN, NULL);
+    int res = ioctl(fd_conv_, DMP_DV_IOC_RUN, NULL);
     if (res < 0) {
       SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_RUN");
       return -1;
     }
 
-    // TODO: adjust when support for multiple lists will be implemented in kernel module.
+    // TODO: adjust when support for execution id will be implemented in kernel module.
 
+    // TODO: add proper critical section.
+    ctx_->SetLastExecutedCmdList((dmp_dv_cmdlist*)this);
+
+    return 0;
+  }
+
+  int Wait(int64_t exec_id) {
+    // TODO: adjust when support for execution id will be implemented in kernel module.
+    int res = ioctl(fd_conv_, DMP_DV_IOC_WAIT, NULL);
+    if (res < 0) {
+      SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_WAIT");
+      return -1;
+    }
     return 0;
   }
 
@@ -249,6 +282,9 @@ class CDMPDVCmdList {
  private:
   /// @brief Reference to device context.
   CDMPDVContext *ctx_;
+
+  /// @brief File handle for CONV accelerator.
+  int fd_conv_;
 
   /// @brief List of commands this list contains.
   std::vector<Command> commands_;

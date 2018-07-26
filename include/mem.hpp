@@ -30,6 +30,11 @@ class CDMPDVMem {
     Cleanup();
   }
 
+  void Release() {
+    // TODO: adjust when reference counter will be implemented.
+    delete this;
+  }
+
   bool Initialize(CDMPDVContext *ctx, size_t size) {
     Cleanup();
     if (!ctx) {

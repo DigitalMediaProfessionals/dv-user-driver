@@ -25,18 +25,20 @@ class CDMPDVContext {
     fd_ion_ = -1;
     dma_heap_id_mask_ = 0;
 
-    fd_conv_ = -1;
+    last_executed_cmdlist_ = NULL;
   }
 
   virtual ~CDMPDVContext() {
     Cleanup();
   }
 
+  void Release() {
+    // TODO: adjust when reference counter will be implemented.
+    delete this;
+  }
+
   void Cleanup() {
-    if (fd_conv_ != -1) {
-      close(fd_conv_);
-      fd_conv_ = -1;
-    }
+    last_executed_cmdlist_ = NULL;
     if (fd_ion_ != -1) {
       close(fd_ion_);
       fd_ion_ = -1;
@@ -98,14 +100,6 @@ class CDMPDVContext {
       return false;
     }
 
-    fd_conv_ = open("/dev/dv_conv", O_RDONLY | O_CLOEXEC);
-    if (fd_conv_ == -1) {
-      SET_ERR("open() failed for /dev/dv_conv: %s", strerror(errno));
-      return false;
-    }
-
-    info_ = std::string("DV700: UBUF=640Kb PATH=") + path_;
-
     return true;
   }
 
@@ -117,20 +111,24 @@ class CDMPDVContext {
     return dma_heap_id_mask_;
   }
 
-  inline int get_fd_conv() const {
-    return fd_conv_;
+  void SetLastExecutedCmdList(dmp_dv_cmdlist *cmdlist) {
+    last_executed_cmdlist_ = cmdlist;
+    // TODO: add proper critical section.
   }
 
-  int Sync() {
-    int res = ioctl(fd_conv_, DMP_DV_IOC_WAIT, NULL);
-    if (res < 0) {
-      SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_WAIT");
-      return -1;
+  int WaitAll() {
+    if (last_executed_cmdlist_) {
+      dmp_dv_cmdlist_wait(last_executed_cmdlist_, -1);
+      last_executed_cmdlist_ = NULL;
+      // TODO: decrease reference counter and add proper critical section.
     }
     return 0;
   }
 
   const char *GetInfoString() {
+    if (!info_.length()) {
+      info_ = std::string("DV700: UBUF=640Kb PATH=") + path_;
+    }
     return info_.c_str();
   }
 
@@ -147,6 +145,6 @@ class CDMPDVContext {
   /// @brief ION heap selector.
   uint32_t dma_heap_id_mask_;
 
-  /// @brief File handle for CONV accelerator.
-  int fd_conv_;
+  /// @brief Last executed command list.
+  dmp_dv_cmdlist *last_executed_cmdlist_;
 };

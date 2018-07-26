@@ -56,11 +56,11 @@ const char *dmp_dv_context_get_info_string(dmp_dv_context* ctx) {
 }
 
 
-void dmp_dv_context_destroy(dmp_dv_context *ctx) {
+void dmp_dv_context_release(dmp_dv_context *ctx) {
   if (!ctx) {
     return;
   }
-  delete (CDMPDVContext*)ctx;
+  ((CDMPDVContext*)ctx)->Release();
 }
 
 
@@ -71,7 +71,7 @@ dmp_dv_mem* dmp_dv_mem_alloc(dmp_dv_context *ctx, size_t size) {
     return NULL;
   }
   if (!mem->Initialize((CDMPDVContext*)ctx, size)) {
-    delete mem;
+    mem->Release();
     return NULL;
   }
 
@@ -79,11 +79,11 @@ dmp_dv_mem* dmp_dv_mem_alloc(dmp_dv_context *ctx, size_t size) {
 }
 
 
-void dmp_dv_mem_free(dmp_dv_mem *mem) {
+void dmp_dv_mem_release(dmp_dv_mem *mem) {
   if (!mem) {
     return;
   }
-  delete (CDMPDVMem*)mem;
+  ((CDMPDVMem*)mem)->Release();
 }
 
 
@@ -132,12 +132,12 @@ size_t dmp_dv_mem_get_size(dmp_dv_mem *mem) {
 }
 
 
-int dmp_dv_sync(dmp_dv_context *ctx) {
+int dmp_dv_wait_all(dmp_dv_context *ctx) {
   if (!ctx) {
     SET_ERR("Invalid argument: ctx is NULL");
     return -1;
   }
-  return ((CDMPDVContext*)ctx)->Sync();
+  return ((CDMPDVContext*)ctx)->WaitAll();
 }
 
 
@@ -148,18 +148,18 @@ dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx) {
     return NULL;
   }
   if (!cmdlist->Initialize((CDMPDVContext*)ctx)) {
-    delete cmdlist;
+    cmdlist->Release();
     return NULL;
   }
   return (dmp_dv_cmdlist*)cmdlist;
 }
 
 
-void dmp_dv_cmdlist_destroy(dmp_dv_cmdlist *cmdlist) {
+void dmp_dv_cmdlist_release(dmp_dv_cmdlist *cmdlist) {
   if (!cmdlist) {
     return;
   }
-  delete (CDMPDVCmdList*)cmdlist;
+  ((CDMPDVCmdList*)cmdlist)->Release();
 }
 
 
@@ -172,12 +172,21 @@ int dmp_dv_cmdlist_end(dmp_dv_cmdlist *cmdlist) {
 }
 
 
-int dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist) {
+int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return -1;
   }
   return ((CDMPDVCmdList*)cmdlist)->Exec();
+}
+
+
+int dmp_dv_cmdlist_wait(dmp_dv_cmdlist *cmdlist, int64_t exec_id) {
+  if (!cmdlist) {
+    SET_ERR("Invalid argument: cmdlist is NULL");
+    return -1;
+  }
+  return ((CDMPDVCmdList*)cmdlist)->Wait(exec_id);
 }
 
 

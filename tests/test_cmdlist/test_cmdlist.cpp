@@ -379,14 +379,14 @@ int test_cmdlist(const conv_config& config) {
 
   //print_cmd(cmd);
 
-  if (dmp_dv_cmdlist_exec(cmdlist)) {
+  if (dmp_dv_cmdlist_exec(cmdlist) < 0) {
     ERR("dmp_dv_cmdlist_exec() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   LOG("Scheduled command list for execution\n");
 
   LOG("Waiting for completion\n");
-  if (dmp_dv_sync(ctx)) {
+  if (dmp_dv_wait_all(ctx)) {
     ERR("dmp_dv_sync() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
@@ -449,10 +449,10 @@ int test_cmdlist(const conv_config& config) {
   LOG("SUCCESS: test_cmdlist\n");
 
   L_EXIT:
-  dmp_dv_cmdlist_destroy(cmdlist);
-  dmp_dv_mem_free(weights_mem);
-  dmp_dv_mem_free(io_mem);
-  dmp_dv_context_destroy(ctx);
+  dmp_dv_cmdlist_release(cmdlist);
+  dmp_dv_mem_release(weights_mem);
+  dmp_dv_mem_release(io_mem);
+  dmp_dv_context_release(ctx);
 
   int n_fd = 0;
   DIR *d;
