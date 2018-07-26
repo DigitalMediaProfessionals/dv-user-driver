@@ -513,7 +513,6 @@ int main(int argc, char **argv) {
     return -1;
   }
   while ((dir = readdir(d))) {
-    // 64x32x3_3x3x32_1_1_5.q.bin
     conv_config config;
 
     char fnme[512];
