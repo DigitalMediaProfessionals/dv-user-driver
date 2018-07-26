@@ -134,16 +134,6 @@ class CDMPDVContext {
     return info_.c_str();
   }
 
-  int get_kick_count() {
-    int kick_count = -1;
-    int res = ioctl(fd_conv_, DMP_DV_IOC_GET_KICK_COUNT, &kick_count);
-    if (res < 0) {
-      SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_GET_KICK_COUNT");
-      return -1;
-    }
-    return kick_count;
-  }
-
  private:
   /// @brief Path to the device.
   std::string path_;
