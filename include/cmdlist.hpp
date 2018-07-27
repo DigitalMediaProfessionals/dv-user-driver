@@ -18,12 +18,18 @@
 #include "../../dv-kernel-driver/uapi/dmp_dv_cmdraw_v0.h"
 
 
+#ifndef ERESTARTSYS
+#define ERESTARTSYS 512
+#endif
+
+
 /// @brief Implementation of dmp_dv_cmdlist.
 class CDMPDVCmdList {
  public:
   CDMPDVCmdList() {
     ctx_ = NULL;
     fd_conv_ = -1;
+    last_exec_id_ = -1;
   }
 
   virtual ~CDMPDVCmdList() {
@@ -61,6 +67,7 @@ class CDMPDVCmdList {
       fd_conv_ = -1;
     }
     ctx_ = NULL;
+    last_exec_id_ = -1;
   }
 
   inline int get_fd_conv() const {
@@ -158,26 +165,47 @@ class CDMPDVCmdList {
 
   int64_t Exec() {
     // Issue ioctl on the kernel module requesting this list execution
-    int res = ioctl(fd_conv_, DMP_DV_IOC_RUN, NULL);
+    int64_t exec_id = -1;
+    int res = ioctl(fd_conv_, DMP_DV_IOC_RUN, &exec_id);
     if (res < 0) {
       SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_RUN");
       return -1;
     }
-
-    // TODO: adjust when support for execution id will be implemented in kernel module.
+    if (exec_id < 0) {
+      SET_ERR("ioctl(%s) on %s hasn't returned unexpected/hasn't updated exec_id=%lld",
+              "DMP_DV_IOC_RUN", "/dev/dv_conv", (long long)exec_id);
+      return -1;
+    }
 
     // TODO: add proper critical section.
+    last_exec_id_ = exec_id;
     ctx_->SetLastExecutedCmdList((dmp_dv_cmdlist*)this);
 
-    return 0;
+    return exec_id;
   }
 
   int Wait(int64_t exec_id) {
-    // TODO: adjust when support for execution id will be implemented in kernel module.
-    int res = ioctl(fd_conv_, DMP_DV_IOC_WAIT, NULL);
-    if (res < 0) {
-      SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_WAIT");
-      return -1;
+    if (exec_id < 0) {
+      // TODO: add proper critical section.
+      exec_id = last_exec_id_;
+    }
+    if (exec_id < 0) {
+      return 0;
+    }
+    for (;;) {
+      int res = ioctl(fd_conv_, DMP_DV_IOC_WAIT, &exec_id);
+      if (!res) {
+        break;
+      }
+      switch (res) {
+        case -EBUSY:       // timeout of 2 seconds reached
+        case ERESTARTSYS:  // signal has interrupted the wait
+          continue;  // repeat ioctl
+
+        default:
+          SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_WAIT");
+          return res;
+      }
     }
     return 0;
   }
@@ -288,4 +316,7 @@ class CDMPDVCmdList {
 
   /// @brief List of commands this list contains.
   std::vector<Command> commands_;
+
+  /// @brief Last execution id.
+  int64_t last_exec_id_;
 };
