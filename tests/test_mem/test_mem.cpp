@@ -49,7 +49,7 @@ int test_mem(size_t size) {
     dmp_dv_context_release(ctx);
     return -1;
   }
-  LOG("Successfully allocated %zu bytes of memory\n", size);
+  LOG("Successfully allocated %zu bytes of memory (%zu requested)\n", dmp_dv_mem_get_size(mem), size);
 
   uint8_t *arr = dmp_dv_mem_map(mem);
   if (!arr) {
