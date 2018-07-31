@@ -64,6 +64,14 @@ void dmp_dv_context_release(dmp_dv_context *ctx) {
 }
 
 
+void dmp_dv_context_retain(dmp_dv_context *ctx) {
+  if (!ctx) {
+    return;
+  }
+  ((CDMPDVContext*)ctx)->Retain();
+}
+
+
 dmp_dv_mem* dmp_dv_mem_alloc(dmp_dv_context *ctx, size_t size) {
   CDMPDVMem *mem = new CDMPDVMem();
   if (!mem) {
@@ -132,12 +140,12 @@ size_t dmp_dv_mem_get_size(dmp_dv_mem *mem) {
 }
 
 
-int dmp_dv_wait_all(dmp_dv_context *ctx) {
+int dmp_dv_wait(dmp_dv_context *ctx, int64_t exec_id) {
   if (!ctx) {
     SET_ERR("Invalid argument: ctx is NULL");
     return -1;
   }
-  return ((CDMPDVContext*)ctx)->WaitAll();
+  return ((CDMPDVContext*)ctx)->Wait(exec_id);
 }
 
 
@@ -163,6 +171,14 @@ void dmp_dv_cmdlist_release(dmp_dv_cmdlist *cmdlist) {
 }
 
 
+void dmp_dv_cmdlist_retain(dmp_dv_cmdlist *cmdlist) {
+  if (!cmdlist) {
+    return;
+  }
+  ((CDMPDVCmdList*)cmdlist)->Retain();
+}
+
+
 int dmp_dv_cmdlist_end(dmp_dv_cmdlist *cmdlist) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
@@ -178,15 +194,6 @@ int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist) {
     return -1;
   }
   return ((CDMPDVCmdList*)cmdlist)->Exec();
-}
-
-
-int dmp_dv_cmdlist_wait(dmp_dv_cmdlist *cmdlist, int64_t exec_id) {
-  if (!cmdlist) {
-    SET_ERR("Invalid argument: cmdlist is NULL");
-    return -1;
-  }
-  return ((CDMPDVCmdList*)cmdlist)->Wait(exec_id);
 }
 
 

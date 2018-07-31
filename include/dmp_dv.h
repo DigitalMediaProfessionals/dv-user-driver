@@ -58,10 +58,15 @@ dmp_dv_context* dmp_dv_context_create(const char *path);
 const char *dmp_dv_context_get_info_string(dmp_dv_context* ctx);
 
 
-/// @brief Releases context for working with DV accelerator.
-/// @param ctx Context for working with DV accelerator, when NULL the error is returned.
+/// @brief Releases context for working with DV accelerator (decreases reference counter).
+/// @param ctx Context for working with DV accelerator, when NULL it is ignored.
 /// @details Call this when "ctx" is no longer needed.
 void dmp_dv_context_release(dmp_dv_context *ctx);
+
+
+/// @brief Retains context for working with DV accelerator (increases reference counter).
+/// @param ctx Context for working with DV accelerator, when NULL it is ignored.
+void dmp_dv_context_retain(dmp_dv_context *ctx);
 
 
 /// @brief Allocates physically continuous chunk of memory.
@@ -115,10 +120,15 @@ size_t dmp_dv_mem_get_size(dmp_dv_mem *mem);
 dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx);
 
 
-/// @brief Releases the command list.
+/// @brief Releases the command list (decreases reference counter).
 /// @param cmdlist Handle to command list, when NULL it is ignored.
 /// @details Call this when "cmdlist" is no longer needed.
 void dmp_dv_cmdlist_release(dmp_dv_cmdlist *cmdlist);
+
+
+/// @brief Retains the command list (increases reference counter).
+/// @param cmdlist Handle to command list, when NULL it is ignored.
+void dmp_dv_cmdlist_retain(dmp_dv_cmdlist *cmdlist);
 
 
 /// @brief Ends the command list, preparing device-specific structures for further execution.
@@ -135,16 +145,10 @@ int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist);
 
 
 /// @brief Waits for the specific scheduled command to be completed.
-/// @param cmdlist Handle to command list, when NULL the error is returned.
+/// @param ctx Context for working with DV accelerator, when NULL the error is returned.
 /// @param exec_id Id of the scheduled command to wait for completion, if set to -1 will wait for the last scheduled command.
 /// @return 0 on success, non-zero otherwise.
-int dmp_dv_cmdlist_wait(dmp_dv_cmdlist *cmdlist, int64_t exec_id);
-
-
-/// @brief Waits for all scheduled up to this moment commands to be completed.
-/// @param ctx Context for working with DV accelerator, when NULL the error is returned.
-/// @return 0 on success, non-zero otherwise.
-int dmp_dv_wait_all(dmp_dv_context *ctx);
+int dmp_dv_wait(dmp_dv_context *ctx, int64_t exec_id);
 
 
 /// @brief Memory buffer specification.

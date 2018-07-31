@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <time.h>
+#include <dirent.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -184,8 +185,42 @@ int test_mem(size_t size) {
   dmp_dv_mem_release(mem);
   dmp_dv_context_release(ctx);
 
-  LOG("EXIT: test_api(%zu)\n", size);
-  return 0;
+  static int s_n_fd = -1;
+  int result = 0;
+  int n_fd = 0;
+  DIR *d;
+  struct dirent *dir;
+  d = opendir("/proc/self/fd");
+  if (!d) {
+    ERR("Could not open \"/proc/self/fd\" folder\n");
+    return -1;
+  }
+  while ((dir = readdir(d))) {
+    char *fnme = dir->d_name;
+    bool num = true;
+    for (; *fnme; ++fnme) {
+      if ((*fnme >= '0') && (*fnme <= '9')) {
+        continue;
+      }
+      num = false;
+      break;
+    }
+    if (num) {
+      ++n_fd;
+    }
+  }
+  closedir(d);
+
+  if (s_n_fd == -1) {
+    s_n_fd = n_fd;
+  }
+  if (n_fd != s_n_fd) {
+    ERR("Inconsistent file descriptor count detected, memory leak is probable\n");
+    result = -1;
+  }
+
+  LOG("EXIT: test_api(%zu): %d FDs\n", size, n_fd);
+  return result;
 }
 
 

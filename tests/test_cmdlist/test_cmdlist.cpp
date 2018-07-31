@@ -20,6 +20,9 @@
 #include <cmath>
 #include <limits>
 #include <tuple>
+#include <algorithm>
+#include <random>
+#include <chrono>
 
 #include "dmp_dv.h"
 #include "dmp_dv_cmdraw_v0.h"
@@ -314,6 +317,7 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
       ERR("dmp_dv_mem_sync_start() failed for weights: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
+    memset(weights, 0, dmp_dv_mem_get_size(weights_mem));  // TODO: remove it.
     // Fill weights
     if (dmp_dv_pack_conv_weights(
           it->n_channels, it->kx, it->ky, it->n_kernels,
@@ -337,6 +341,7 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
       ERR("dmp_dv_mem_sync_start() failed for input/output: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
+    memset(io_ptr, 0, dmp_dv_mem_get_size(io_mem));  // TODO: remove it.
     // Caffe's input is stored as channel, height, width
     // DV input should be stored as chunks by max of 8 channels as width, height, channel
     for (int chan_group = 0, o_offs = 0; chan_group < it->n_channels; chan_group += 8) {
@@ -357,7 +362,7 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
       goto L_EXIT;
     }
 
-    //print_cmd(cmd);
+    print_cmd(cmd);
 
     if (dmp_dv_cmdlist_add_raw(cmdlist, (dmp_dv_cmdraw*)&cmd)) {
       ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
@@ -378,7 +383,7 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
   LOG("Scheduled command list for execution\n");
 
   LOG("Waiting for completion\n");
-  if (dmp_dv_wait_all(ctx)) {
+  if (dmp_dv_wait(ctx, -1)) {
     ERR("dmp_dv_sync() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
@@ -483,7 +488,7 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
     g_n_fd = n_fd;
   }
   if (n_fd != g_n_fd) {
-    ERR("Inconsistent file descriptor count detected, memory leak is probable");
+    ERR("Inconsistent file descriptor count detected, memory leak is probable\n");
     result = -1;
   }
 
@@ -513,7 +518,7 @@ int main(int argc, char **argv) {
   int n_err = 0;
   int res = 0;
 
-  std::set<conv_config> configs;
+  std::set<conv_config> config_set;
 
   DIR *d;
   struct dirent *dir;
@@ -543,10 +548,28 @@ int main(int argc, char **argv) {
       continue;
     }
 
-    configs.emplace(std::move(config));
+    char prefix[256];
+    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
+             config.width, config.height, config.n_channels, config.kx, config.ky, config.n_kernels,
+             config.pad_left, config.pad_top, config.pad_right, config.pad_bottom,
+             config.stride_x, config.stride_y, config.activation);
+    if (strcmp(prefix, "data/64x32x15_3x5x31_pad1x2x1x2_stride1x1_act0") &&
+        strcmp(prefix, "data/64x32x15_3x3x31_pad1x1x1x1_stride1x1_act0")) {
+      continue;
+    }
+
+    config_set.emplace(std::move(config));
   }
   closedir(d);
 
+  // Randomize configrations order
+  std::vector<conv_config> configs;
+  for (auto it = config_set.cbegin(); it != config_set.cend(); ++it) {
+    configs.push_back(*it);
+  }
+  /*std::shuffle(configs.begin(), configs.end(), std::default_random_engine(std::chrono::system_clock::now().time_since_epoch().count()));
+
+  // Execute configurations in different chunks
   const int n_configs = (int)configs.size();
   const size_t pack_sizes[4] = {1, 2, 20, 200};
   for (int i_pack = 0; i_pack < 4; ++i_pack) {
@@ -566,6 +589,55 @@ int main(int argc, char **argv) {
       }
       confs.clear();
     }
+  }*/
+
+  std::vector<conv_config> confs;
+  confs.resize(1);
+
+  confs[0] = configs[0];
+  test_cmdlists(confs);  // first time to reset
+  res = test_cmdlists(confs);
+  if (res) {
+    ++n_err;
+  }
+  else {
+    ++n_ok;
+  }
+
+  confs[0] = configs[0];
+  res = test_cmdlists(confs);
+  if (res) {
+    ++n_err;
+  }
+  else {
+    ++n_ok;
+  }
+
+  confs[0] = configs[1];
+  res = test_cmdlists(confs);
+  if (res) {
+    ++n_err;
+  }
+  else {
+    ++n_ok;
+  }
+
+  confs[0] = configs[1];
+  res = test_cmdlists(confs);
+  if (res) {
+    ++n_err;
+  }
+  else {
+    ++n_ok;
+  }
+
+  confs[0] = configs[0];
+  res = test_cmdlists(confs);
+  if (res) {
+    ++n_err;
+  }
+  else {
+    ++n_ok;
   }
 
   LOG("Tests succeeded: %d\n", n_ok);

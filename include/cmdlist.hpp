@@ -18,15 +18,10 @@
 #include "../../dv-kernel-driver/uapi/dmp_dv_cmdraw_v0.h"
 
 
-#ifndef ERESTARTSYS
-#define ERESTARTSYS 512
-#endif
-
-
 /// @brief Implementation of dmp_dv_cmdlist.
-class CDMPDVCmdList {
+class CDMPDVCmdList : public virtual CDMPDVBase {
  public:
-  CDMPDVCmdList() {
+  CDMPDVCmdList() : CDMPDVBase() {
     ctx_ = NULL;
     fd_conv_ = -1;
     last_exec_id_ = -1;
@@ -36,18 +31,12 @@ class CDMPDVCmdList {
     Cleanup();
   }
 
-  void Release() {
-    // TODO: adjust when reference counter will be implemented.
-    delete this;
-  }
-
   bool Initialize(CDMPDVContext *ctx) {
     Cleanup();
     if (!ctx) {
       SET_ERR("Invalid argument: ctx is NULL");
       return false;
     }
-    ctx_ = ctx;
 
     fd_conv_ = open("/dev/dv_conv", O_RDONLY | O_CLOEXEC);
     if (fd_conv_ == -1) {
@@ -55,19 +44,36 @@ class CDMPDVCmdList {
       return false;
     }
 
-    // TODO: increase reference counter on context.
+    ctx->Retain();
+    ctx_ = ctx;
 
     return true;
   }
 
-  void Cleanup() {
+  virtual void Cleanup() {
+    if (last_exec_id_ != -1) {
+      if (!ctx_) {
+        fprintf(stderr, "WARNING: dmp_dv_context is not attached to dmp_dv_cmdlist\n");
+        fflush(stderr);
+      }
+      else {
+        ctx_->Wait(last_exec_id_);
+      }
+      last_exec_id_ = -1;
+    }
     commands_.clear();
     if (fd_conv_ != -1) {
       close(fd_conv_);
       fd_conv_ = -1;
     }
-    ctx_ = NULL;
-    last_exec_id_ = -1;
+    if (ctx_) {
+      ctx_->Release();
+      ctx_ = NULL;
+    }
+  }
+
+  virtual void fill_debug_info(char *info, int length) {
+    snprintf(info, length, "dmp_dv_cmdlist (addr=%zu, n_ref=%d)", (size_t)this, n_ref_);
   }
 
   inline int get_fd_conv() const {
@@ -148,6 +154,7 @@ class CDMPDVCmdList {
     dmp_dv_kcmd dv_cmd;
     dv_cmd.cmd_num = n;
     dv_cmd.cmd_pointer = (__u64)raw_commands;
+
     int res = ioctl(fd_conv_, DMP_DV_IOC_APPEND_CMD, &dv_cmd);
     if (res < 0) {
       SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_APPEND_CMD");
@@ -177,37 +184,12 @@ class CDMPDVCmdList {
       return -1;
     }
 
-    // TODO: add proper critical section.
+    ctx_->last_exec_id_lock();
     last_exec_id_ = exec_id;
-    ctx_->SetLastExecutedCmdList((dmp_dv_cmdlist*)this);
+    ctx_->set_last_exec_id(exec_id);
+    ctx_->last_exec_id_unlock();
 
     return exec_id;
-  }
-
-  int Wait(int64_t exec_id) {
-    if (exec_id < 0) {
-      // TODO: add proper critical section.
-      exec_id = last_exec_id_;
-    }
-    if (exec_id < 0) {
-      return 0;
-    }
-    for (;;) {
-      int res = ioctl(fd_conv_, DMP_DV_IOC_WAIT, &exec_id);
-      if (!res) {
-        break;
-      }
-      switch (res) {
-        case -EBUSY:       // timeout of 2 seconds reached
-        case ERESTARTSYS:  // signal has interrupted the wait
-          continue;  // repeat ioctl
-
-        default:
-          SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_WAIT");
-          return res;
-      }
-    }
-    return 0;
   }
 
   int AddRaw(dmp_dv_cmdraw *cmd) {
