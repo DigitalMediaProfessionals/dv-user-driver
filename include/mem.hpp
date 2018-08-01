@@ -15,7 +15,7 @@
 
 
 /// @brief Implementation of dmp_dv_mem.
-class CDMPDVMem {
+class CDMPDVMem : public CDMPDVBase {
  public:
   CDMPDVMem() {
     ctx_ = NULL;
@@ -30,18 +30,12 @@ class CDMPDVMem {
     Cleanup();
   }
 
-  void Release() {
-    // TODO: adjust when reference counter will be implemented.
-    delete this;
-  }
-
   bool Initialize(CDMPDVContext *ctx, size_t size) {
     Cleanup();
     if (!ctx) {
       SET_ERR("Invalid argument: ctx is NULL");
       return NULL;
     }
-    ctx_ = ctx;
 
     // Try to allocate a buffer
     struct ion_allocation_data alloc_param;
@@ -67,7 +61,8 @@ class CDMPDVMem {
     }
     real_size_ = buf_size;
 
-    // TODO: increase reference counter on context.
+    ctx->Retain();
+    ctx_ = ctx;
 
     return true;
   }
@@ -80,7 +75,10 @@ class CDMPDVMem {
     }
     requested_size_ = 0;
     real_size_ = 0;
-    ctx_ = NULL;
+    if (ctx_) {
+      ctx_->Release();
+      ctx_ = NULL;
+    }
   }
 
   uint8_t* Map() {

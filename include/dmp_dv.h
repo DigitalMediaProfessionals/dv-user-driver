@@ -54,8 +54,35 @@ const char* dmp_dv_get_last_error_message();
 dmp_dv_context* dmp_dv_context_create(const char *path);
 
 
-/// @brief Returns some information about context.
+/// @brief Returns information about context as human-readable string.
 const char *dmp_dv_context_get_info_string(dmp_dv_context* ctx);
+
+
+/// @brief Structure with information about the context.
+typedef struct dmp_dv_info_impl {
+  uint32_t size;            // size of this structure
+  uint32_t version;         // version of this structure
+} dmp_dv_info;
+
+
+/// @brief Structure with information about the context (version 0).
+typedef struct dmp_dv_info_v0_impl {
+  uint32_t size;            // size of this structure
+  uint32_t version;         // version of this structure (set to 0)
+  int32_t ub_size;          // unified buffer size
+  int32_t max_kernel_size;  // maximum supported convolutional kernel size
+  int32_t conv_freq;        // convolutional block frequency in MHz
+  int32_t fc_freq;          // fully connected block frequency in MHz
+} dmp_dv_info_v0;
+
+
+/// @brief Fills structure with information about the context.
+/// @param ctx Context for working with DV accelerator, when NULL it is ignored.
+/// @param info Structure to be filled, fields size and version must be set.
+/// @return 0 on success, non-zero otherwise.
+/// @details On return, the version field will be set to maximum supported version less or equal to the requested,
+///          the fields of the corresponding structure will be set only if the size is enough.
+int dmp_dv_context_get_info(dmp_dv_context* ctx, dmp_dv_info *info);
 
 
 /// @brief Releases context for working with DV accelerator (decreases reference counter).
@@ -77,10 +104,15 @@ void dmp_dv_context_retain(dmp_dv_context *ctx);
 dmp_dv_mem* dmp_dv_mem_alloc(dmp_dv_context *ctx, size_t size);
 
 
-/// @brief Releases allocated memory.
-/// @param mem Handle for the allocated memory, when NULL the error is returned.
+/// @brief Releases allocated memory (decreses reference counter).
+/// @param mem Handle for the allocated memory, when NULL it is ignored.
 /// @details Call this when "mem" is no longer needed.
 void dmp_dv_mem_release(dmp_dv_mem *mem);
+
+
+/// @brief Retains allocated memory (increases reference counter).
+/// @param mem Handle for the allocated memory, when NULL it is ignored.
+void dmp_dv_mem_retain(dmp_dv_mem *mem);
 
 
 /// @brief Maps previously allocated memory to the user address space.

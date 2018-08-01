@@ -56,6 +56,15 @@ const char *dmp_dv_context_get_info_string(dmp_dv_context* ctx) {
 }
 
 
+int dmp_dv_context_get_info(dmp_dv_context* ctx, dmp_dv_info *info) {
+  if (!ctx) {
+    SET_ERR("Invalid argument: ctx is NULL");
+    return -1;
+  }
+  return ((CDMPDVContext*)ctx)->GetInfo(info);
+}
+
+
 void dmp_dv_context_release(dmp_dv_context *ctx) {
   if (!ctx) {
     return;
@@ -92,6 +101,14 @@ void dmp_dv_mem_release(dmp_dv_mem *mem) {
     return;
   }
   ((CDMPDVMem*)mem)->Release();
+}
+
+
+void dmp_dv_mem_retain(dmp_dv_mem *mem) {
+  if (!mem) {
+    return;
+  }
+  ((CDMPDVMem*)mem)->Retain();
 }
 
 

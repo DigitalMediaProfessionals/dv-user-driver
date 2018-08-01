@@ -124,8 +124,6 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
   int i_conf;
   int64_t exec_id;
 
-  LOG("dmp_dv_get_version_string(): %s\n", dmp_dv_get_version_string());
-
   ctx  = dmp_dv_context_create(NULL);
   if (!ctx) {
     ERR("dmp_dv_context_create() failed: %s\n", dmp_dv_get_last_error_message());

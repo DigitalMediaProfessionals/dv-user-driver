@@ -34,8 +34,7 @@ inline uint32_t xorshift32(uint32_t state[1]) {
 
 
 int test_mem(size_t size) {
-  LOG("ENTER: test_api(%zu)\n", size);
-  LOG("dmp_dv_get_version_string(): %s\n", dmp_dv_get_version_string());
+  LOG("ENTER: test_mem(%zu)\n", size);
 
   dmp_dv_context *ctx = dmp_dv_context_create(NULL);
   if (!ctx) {
@@ -219,7 +218,7 @@ int test_mem(size_t size) {
     result = -1;
   }
 
-  LOG("EXIT: test_api(%zu): %d FDs\n", size, n_fd);
+  LOG("EXIT: test_mem(%zu): %d FDs\n", size, n_fd);
   return result;
 }
 

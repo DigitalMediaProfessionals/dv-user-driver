@@ -50,11 +50,40 @@ class CDMPDVCmdList : public CDMPDVBase {
   }
 
   void Cleanup() {
+    // Decrease reference counters on the used memory pointers
+    const int n_commands = commands_.size();
+    for (int i = n_commands - 1; i >= 0; --i) {
+      switch (commands_[i].type) {
+        case kCommandTypeRaw_v0:
+        {
+          dmp_dv_cmdraw_v0 *cmd = &commands_[i].raw_v0;
+          int n_runs = 0;
+          for (int topo = cmd->topo; topo; topo >>= 1) {
+            ++n_runs;
+          }
+          for (int i_run = n_runs - 1; i_run >= 0; --i_run) {
+            dmp_dv_mem_release(cmd->run[i_run].weight_buf.mem);
+          }
+          dmp_dv_mem_release(cmd->output_buf.mem);
+          dmp_dv_mem_release(cmd->input_buf.mem);
+          break;
+        }
+        default:
+        {
+          // Empty by design
+          break;
+        }
+      }
+    }
     commands_.clear();
+
+    // Close opened files
     if (fd_conv_ != -1) {
       close(fd_conv_);
       fd_conv_ = -1;
     }
+
+    // Release the context
     if (ctx_) {
       ctx_->Release();
       ctx_ = NULL;
@@ -262,8 +291,10 @@ class CDMPDVCmdList : public CDMPDVBase {
       if (cmd->run[i].conv_enable == 1) {
         const int kx = cmd->run[i].p & 0xFF;
         const int ky = cmd->run[i].p >> 8;
-        if ((kx < 1) || (kx > 7) || (ky < 1) || (ky > 7)) {
-          SET_ERR("Unsupported convolutional kernel size %dx%d, only sizes from {1, 2, 3, 4, 5, 6, 7} are supported", kx, ky);
+        const int max_kernel_size = ctx_->get_max_kernel_size();
+        if ((kx < 1) || (kx > max_kernel_size) || (ky < 1) || (ky > max_kernel_size)) {
+          SET_ERR("Unsupported convolutional kernel size %dx%d, only sizes from 1 to %d are supported",
+                  kx, ky, max_kernel_size);
           return -1;
         }
         const int sx = cmd->run[i].conv_stride & 0xFF;
@@ -276,8 +307,14 @@ class CDMPDVCmdList : public CDMPDVBase {
       // TODO: add more checks.
     }
 
-    // TODO: increase reference counters on provided mem pointers.
+    // Increase reference counters on the provided memory pointers
+    dmp_dv_mem_retain(cmd->input_buf.mem);
+    dmp_dv_mem_retain(cmd->output_buf.mem);
+    for (int topo = cmd->topo, i = 0; topo; topo >>= 1, ++i) {
+      dmp_dv_mem_retain(cmd->run[i].weight_buf.mem);
+    }
 
+    // Copy provided command to the end of the command list
     const int n = (int)commands_.size();
     commands_.resize(n + 1);
     Command *command = &commands_[n];
