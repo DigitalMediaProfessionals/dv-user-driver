@@ -17,7 +17,8 @@
 /// @brief Implementation of dmp_dv_mem.
 class CDMPDVMem : public CDMPDVBase {
  public:
-  CDMPDVMem() {
+  /// @brief Constructor.
+  CDMPDVMem() : CDMPDVBase() {
     ctx_ = NULL;
     fd_mem_ = -1;
     requested_size_ = 0;
@@ -26,10 +27,12 @@ class CDMPDVMem : public CDMPDVBase {
     sync_flags_ = 0;
   }
 
+  /// @brief Destructor.
   virtual ~CDMPDVMem() {
     Cleanup();
   }
 
+  /// @brief Allocates memory accessible by device associated with the provided context.
   bool Initialize(CDMPDVContext *ctx, size_t size) {
     Cleanup();
     if (!ctx) {
@@ -67,6 +70,7 @@ class CDMPDVMem : public CDMPDVBase {
     return true;
   }
 
+  /// @brief Releases held resources.
   void Cleanup() {
     Unmap();
     if (fd_mem_ != -1) {
@@ -81,6 +85,7 @@ class CDMPDVMem : public CDMPDVBase {
     }
   }
 
+  /// @brief Maps allocated memory to user address space with READ and WRITE permissions.
   uint8_t* Map() {
     if (map_ptr_) {
       return map_ptr_;
@@ -93,6 +98,7 @@ class CDMPDVMem : public CDMPDVBase {
     return map_ptr_;
   }
 
+  /// @brief Unmaps allocated memory from user address space.
   void Unmap() {
     SyncEnd();
     if (!map_ptr_) {
@@ -102,6 +108,7 @@ class CDMPDVMem : public CDMPDVBase {
     map_ptr_ = NULL;
   }
 
+  /// @brief Starts CPU <-> Device memory syncronization.
   int SyncStart(int rd, int wr) {
     int res = SyncEnd();
     if (res) {
@@ -126,6 +133,7 @@ class CDMPDVMem : public CDMPDVBase {
     return 0;
   }
 
+  /// @brief Ends CPU <-> Device memory syncronization.
   int SyncEnd() {
     if (!sync_flags_) {
       return 0;
@@ -142,10 +150,12 @@ class CDMPDVMem : public CDMPDVBase {
     return 0;
   }
 
+  /// @brief Returns real size of the allocated memory which can be greater than requested.
   inline size_t get_size() const {
     return real_size_;
   }
 
+  /// @brief Returns file descriptor from memory handle or -1 when memory handle is NULL.
   static inline int get_fd(dmp_dv_mem *mem) {
     return mem ? ((CDMPDVMem*)mem)->fd_mem_ : -1;
   }
