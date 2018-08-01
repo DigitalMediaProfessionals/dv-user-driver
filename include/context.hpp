@@ -22,16 +22,12 @@
 
 
 /// @brief Implementation of dmp_dv_context.
-class CDMPDVContext : public virtual CDMPDVBase {
+class CDMPDVContext : public CDMPDVBase {
  public:
   /// @brief Constructor.
   CDMPDVContext() : CDMPDVBase() {
-    pthread_mutex_init(&mt_last_exec_id_, NULL);
     fd_ion_ = -1;
     dma_heap_id_mask_ = 0;
-    last_exec_id_ = -1;
-    last_wait_id_ = -1;
-    fd_conv_ = -1;
     ub_size_ = 0;
     max_kernel_size_ = 3;
     conv_freq_ = 0;
@@ -41,26 +37,15 @@ class CDMPDVContext : public virtual CDMPDVBase {
   /// @brief Called when the object is about to be destroyed.
   virtual ~CDMPDVContext() {
     Cleanup();
-    pthread_mutex_destroy(&mt_last_exec_id_);
   }
 
   /// @brief Releases held resources.
-  virtual void Cleanup() {
-    if (fd_conv_ != -1) {
-      close(fd_conv_);
-      fd_conv_ = -1;
-    }
+  void Cleanup() {
     if (fd_ion_ != -1) {
       close(fd_ion_);
       fd_ion_ = -1;
     }
     dma_heap_id_mask_ = 0;
-    last_exec_id_ = -1;
-  }
-
-  /// @brief Fills info string for debugging purposes.
-  virtual void fill_debug_info(char *info, int length) {
-    snprintf(info, length, "dmp_dv_context: addr=%zu, n_ref=%d", (size_t)this, n_ref_);
   }
 
   /// @brief Initializes the DV device.
@@ -119,12 +104,6 @@ class CDMPDVContext : public virtual CDMPDVBase {
       return false;
     }
 
-    fd_conv_ = open("/dev/dv_conv", O_RDONLY | O_CLOEXEC);
-    if (fd_conv_ == -1) {
-      SET_ERR("open() failed for /dev/dv_conv: %s", strerror(errno));
-      return false;
-    }
-
     ub_size_ = sysfs_read_int("/sys/devices/platform/dmp_dv/ub_size", 0);
     max_kernel_size_ = sysfs_read_int("/sys/devices/platform/dmp_dv/max_kernel_size", 3);
     conv_freq_ = sysfs_read_int("/sys/devices/platform/dmp_dv/conv_freq", 0);
@@ -155,54 +134,6 @@ class CDMPDVContext : public virtual CDMPDVBase {
   /// @brief Returns ION DMA heap id mask.
   inline uint32_t get_dma_heap_id_mask() const {
     return dma_heap_id_mask_;
-  }
-
-  /// @brief Acquires lock for working with last execution id.
-  inline void last_exec_id_lock() {
-    pthread_mutex_lock(&mt_last_exec_id_);
-  }
-
-  /// @brief Assigns last execution id.
-  /// @details Must be called inside last_exec_id_lock(), last_exec_id_unlock().
-  inline void set_last_exec_id(int64_t exec_id) {
-    last_exec_id_ = exec_id;
-  }
-
-  /// @brief Releases lock for working with last execution id.
-  inline void last_exec_id_unlock() {
-    pthread_mutex_unlock(&mt_last_exec_id_);
-  }
-
-  /// @brief Waits for the specific execution id to be completed.
-  int Wait(int64_t exec_id) {
-    last_exec_id_lock();
-    int last_wait_id = last_wait_id_;
-    if (exec_id < 0) {
-      exec_id = last_exec_id_;
-    }
-    last_exec_id_unlock();
-    if ((exec_id < 0) || (exec_id <= last_wait_id)) {
-      return 0;
-    }
-    for (;;) {
-      int res = ioctl(fd_conv_, DMP_DV_IOC_WAIT, &exec_id);
-      if (!res) {
-        break;
-      }
-      switch (res) {
-        case -EBUSY:       // timeout of 2 seconds reached
-        case ERESTARTSYS:  // signal has interrupted the wait
-          continue;  // repeat ioctl
-
-        default:
-          SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_WAIT");
-          return res;
-      }
-    }
-    last_exec_id_lock();
-    last_wait_id_ = std::max(last_wait_id_, exec_id);
-    last_exec_id_unlock();
-    return 0;
   }
 
   /// @brief Returns device information string.
@@ -250,13 +181,4 @@ class CDMPDVContext : public virtual CDMPDVBase {
 
   /// @brief ION heap selector.
   uint32_t dma_heap_id_mask_;
-
-  /// @brief Handle to the DV accelerator.
-  int fd_conv_;
-
-  /// @brief Id of the last executed command.
-  int64_t last_exec_id_;
-
-  /// @brief Id of the last succeeded waited command.
-  int64_t last_wait_id_;
 };

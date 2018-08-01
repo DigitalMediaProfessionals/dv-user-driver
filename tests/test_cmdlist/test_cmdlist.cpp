@@ -122,6 +122,7 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
   int out_width, out_height;
   bool fend;
   int i_conf;
+  int64_t exec_id;
 
   LOG("dmp_dv_get_version_string(): %s\n", dmp_dv_get_version_string());
 
@@ -376,14 +377,15 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
   }
   LOG("Ended the command list\n");
 
-  if (dmp_dv_cmdlist_exec(cmdlist) < 0) {
+  exec_id = dmp_dv_cmdlist_exec(cmdlist);
+  if (exec_id < 0) {
     ERR("dmp_dv_cmdlist_exec() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   LOG("Scheduled command list for execution\n");
 
   LOG("Waiting for completion\n");
-  if (dmp_dv_wait(ctx, -1)) {
+  if (dmp_dv_cmdlist_wait(cmdlist, exec_id)) {
     ERR("dmp_dv_sync() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }

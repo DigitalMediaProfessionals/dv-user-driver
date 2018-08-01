@@ -39,20 +39,16 @@ class CDMPDVBase {
     // Empty by design
   }
 
-  /// @brief Releases all held resources.
-  virtual void Cleanup() = 0;
-
   /// @brief Decrements reference counter, when reference counter reaches zero, destroys an object.
   /// @return Reference counter value after decrement.
-  virtual int Release() {
+  int Release() {
     int n = __sync_sub_and_fetch(&n_ref_, 1);
     if (n > 0) {
       return n;
     }
     if (n < 0) {
-      char s[256];
-      fill_debug_info(s, sizeof(s));
-      fprintf(stderr, "WARNING: negative reference counter detected on %s\n", s);
+      fprintf(stderr, "WARNING: CDMPDVBase::Release(): Negative reference counter detected (addr=%zu), this should not happen\n",
+              (size_t)this);
       fflush(stderr);
       return n;
     }
@@ -62,12 +58,9 @@ class CDMPDVBase {
 
   /// @brief Increments reference counter.
   /// @return Reference counter value after increment.
-  virtual int Retain() {
+  inline int Retain() {
     return __sync_add_and_fetch(&n_ref_, 1);
   }
-
-  /// @brief Fills debug information for an object.
-  virtual void fill_debug_info(char *info, int length) = 0;
 
  protected:
   /// @brief Reference counter.

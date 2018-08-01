@@ -145,10 +145,10 @@ int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist);
 
 
 /// @brief Waits for the specific scheduled command to be completed.
-/// @param ctx Context for working with DV accelerator, when NULL the error is returned.
-/// @param exec_id Id of the scheduled command to wait for completion, if set to -1 will wait for the last scheduled command.
+/// @param cmdlist Handle to command list, when NULL the error is returned.
+/// @param exec_id Id of the scheduled command to wait for completion.
 /// @return 0 on success, non-zero otherwise.
-int dmp_dv_wait(dmp_dv_context *ctx, int64_t exec_id);
+int dmp_dv_cmdlist_wait(dmp_dv_cmdlist *cmdlist, int64_t exec_id);
 
 
 /// @brief Memory buffer specification.

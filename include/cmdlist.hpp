@@ -19,12 +19,11 @@
 
 
 /// @brief Implementation of dmp_dv_cmdlist.
-class CDMPDVCmdList : public virtual CDMPDVBase {
+class CDMPDVCmdList : public CDMPDVBase {
  public:
   CDMPDVCmdList() : CDMPDVBase() {
     ctx_ = NULL;
     fd_conv_ = -1;
-    last_exec_id_ = -1;
   }
 
   virtual ~CDMPDVCmdList() {
@@ -50,17 +49,7 @@ class CDMPDVCmdList : public virtual CDMPDVBase {
     return true;
   }
 
-  virtual void Cleanup() {
-    if (last_exec_id_ != -1) {
-      if (!ctx_) {
-        fprintf(stderr, "WARNING: dmp_dv_context is not attached to dmp_dv_cmdlist\n");
-        fflush(stderr);
-      }
-      else {
-        ctx_->Wait(last_exec_id_);
-      }
-      last_exec_id_ = -1;
-    }
+  void Cleanup() {
     commands_.clear();
     if (fd_conv_ != -1) {
       close(fd_conv_);
@@ -70,10 +59,6 @@ class CDMPDVCmdList : public virtual CDMPDVBase {
       ctx_->Release();
       ctx_ = NULL;
     }
-  }
-
-  virtual void fill_debug_info(char *info, int length) {
-    snprintf(info, length, "dmp_dv_cmdlist (addr=%zu, n_ref=%d)", (size_t)this, n_ref_);
   }
 
   inline int get_fd_conv() const {
@@ -183,13 +168,27 @@ class CDMPDVCmdList : public virtual CDMPDVBase {
               "DMP_DV_IOC_RUN", "/dev/dv_conv", (long long)exec_id);
       return -1;
     }
-
-    ctx_->last_exec_id_lock();
-    last_exec_id_ = exec_id;
-    ctx_->set_last_exec_id(exec_id);
-    ctx_->last_exec_id_unlock();
-
     return exec_id;
+  }
+
+  /// @brief Waits for the specific execution id to be completed.
+  int Wait(int64_t exec_id) {
+    for (;;) {
+      int res = ioctl(fd_conv_, DMP_DV_IOC_WAIT, &exec_id);
+      if (!res) {
+        break;
+      }
+      switch (res) {
+        case -EBUSY:       // timeout of 2 seconds reached
+        case ERESTARTSYS:  // signal has interrupted the wait
+          continue;  // repeat ioctl
+
+        default:
+          SET_IOCTL_ERR("/dev/dv_conv", "DMP_DV_IOC_WAIT");
+          return res;
+      }
+    }
+    return 0;
   }
 
   int AddRaw(dmp_dv_cmdraw *cmd) {
@@ -298,7 +297,4 @@ class CDMPDVCmdList : public virtual CDMPDVBase {
 
   /// @brief List of commands this list contains.
   std::vector<Command> commands_;
-
-  /// @brief Last execution id.
-  int64_t last_exec_id_;
 };
