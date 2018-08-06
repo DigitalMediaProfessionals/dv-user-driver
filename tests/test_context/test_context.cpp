@@ -16,6 +16,7 @@
 
 #include "dmp_dv.h"
 #include "dmp_dv_cmdraw_v0.h"
+#include "../../dv-kernel-driver/uapi/dmp_dv_cmdraw_v0.h"
 
 
 #define LOG(...) fprintf(stdout, __VA_ARGS__); fflush(stdout)
@@ -30,6 +31,13 @@ int test_context() {
       (sizeof(dmp_dv_cmdraw_conv_v0_run) & 7) || (sizeof(dmp_dv_cmdraw_conv_v0) & 7) ||
       (sizeof(dmp_dv_cmdraw_fc_v0) & 7)) {
     ERR("Detected structure with size not multiple of 8\n");
+    return -1;
+  }
+
+  if ((sizeof(dmp_dv_kbuf) & 7) ||
+      (sizeof(dmp_dv_kcmdraw_v0) & 7) || (sizeof(dmp_dv_kcmdraw_v0_conv_run) & 7) ||
+      (sizeof(dmp_dv_kcmdraw_fc_v0) & 7)) {
+    ERR("Detected structure for communication with kernel module with size not multiple of 8\n");
     return -1;
   }
 
