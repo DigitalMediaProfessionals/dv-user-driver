@@ -37,7 +37,7 @@ class CDMPDVCmdList : public CDMPDVBase {
       return false;
     }
 
-    fd_conv_ = open("/dev/dv_conv", O_RDONLY | O_CLOEXEC);
+    fd_conv_ = open("/dev/dv_conv", O_RDONLY | O_CLOEXEC);  // TODO: move file open to the End() function.
     if (fd_conv_ == -1) {
       SET_ERR("open() failed for /dev/dv_conv: %s", strerror(errno));
       return false;

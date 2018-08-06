@@ -109,6 +109,18 @@ class CDMPDVContext : public CDMPDVBase {
     conv_freq_ = sysfs_read_int("/sys/devices/platform/dmp_dv/conv_freq", 0);
     fc_freq_ = sysfs_read_int("/sys/devices/platform/dmp_dv/fc_freq", 0);
 
+    char s_path[256];
+    if (path_.length()) {
+      snprintf(s_path, sizeof(s_path), " (%s)", path_.c_str());
+    }
+    else {
+      s_path[0] = 0;
+    }
+    char s[256];
+    snprintf(s, sizeof(s), "DMP DV%s: ub_size=%d max_kernel_size=%d conv_freq=%d fc_freq=%d",
+             s_path, ub_size_, max_kernel_size_, conv_freq_, fc_freq_);
+    info_ = s;
+
     return true;
   }
 
@@ -137,20 +149,7 @@ class CDMPDVContext : public CDMPDVBase {
   }
 
   /// @brief Returns device information string.
-  const char *GetInfoString() {
-    if (!info_.length()) {
-      char s_path[256];
-      if (path_.length()) {
-        snprintf(s_path, sizeof(s_path), " (%s)", path_.c_str());
-      }
-      else {
-        s_path[0] = 0;
-      }
-      char s[256];
-      snprintf(s, sizeof(s), "DMP DV%s: ub_size=%d max_kernel_size=%d conv_freq=%d fc_freq=%d",
-               s_path, ub_size_, max_kernel_size_, conv_freq_, fc_freq_);
-      info_ = s;
-    }
+  inline const char *GetInfoString() const {
     return info_.c_str();
   }
 

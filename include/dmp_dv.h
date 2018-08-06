@@ -35,26 +35,32 @@ typedef struct dmp_dv_context_impl dmp_dv_context;
 typedef struct dmp_dv_mem_impl dmp_dv_mem;
 
 /// @brief Command list for execution.
-/// @details Contains prepacked in device specific format commands for execution, thus reducing argument packing overhead.
+/// @details Contains prepacked in device specific format commands for execution,
+///          thus reducing argument packing overhead.
 typedef struct dmp_dv_cmdlist_impl dmp_dv_cmdlist;
 
 
 /// @brief Returns version string of the driver interface.
 /// @details Starts with MAJOR.MINOR.SUB for example "0.1.0 Initial release."
+///          It is thread-safe.
 const char* dmp_dv_get_version_string();
 
 
 /// @brief Returns last error message.
+/// @details It might return garbage if several functions will fail from multiple threads
+///          simultaneously during this function call.
 const char* dmp_dv_get_last_error_message();
 
 
 /// @brief Creates context for working with DV accelerator.
 /// @param path Path to the device, use NULL or empty string to select default device.
 /// @return Non-NULL on success, NULL on error.
+/// @details It is thread-safe.
 dmp_dv_context* dmp_dv_context_create(const char *path);
 
 
 /// @brief Returns information about context as human-readable string.
+/// @details It is thread-safe.
 const char *dmp_dv_context_get_info_string(dmp_dv_context* ctx);
 
 
@@ -82,17 +88,20 @@ typedef struct dmp_dv_info_v0_impl {
 /// @return 0 on success, non-zero otherwise.
 /// @details On return, the version field will be set to maximum supported version less or equal to the requested,
 ///          the fields of the corresponding structure will be set only if the size is enough.
+///          It is thread-safe.
 int dmp_dv_context_get_info(dmp_dv_context* ctx, dmp_dv_info *info);
 
 
 /// @brief Releases context for working with DV accelerator (decreases reference counter).
 /// @param ctx Context for working with DV accelerator, when NULL it is ignored.
 /// @details Call this when "ctx" is no longer needed.
+///          It is thread-safe.
 void dmp_dv_context_release(dmp_dv_context *ctx);
 
 
 /// @brief Retains context for working with DV accelerator (increases reference counter).
 /// @param ctx Context for working with DV accelerator, when NULL it is ignored.
+/// @details It is thread-safe.
 void dmp_dv_context_retain(dmp_dv_context *ctx);
 
 
@@ -101,17 +110,20 @@ void dmp_dv_context_retain(dmp_dv_context *ctx);
 /// @param size Memory size in bytes.
 /// @return Handle for the allocated memory or NULL on error.
 /// @details Memory is allocated using ION with CMA and is not yet mapped to user or kernel address space.
+///          It is thread-safe.
 dmp_dv_mem* dmp_dv_mem_alloc(dmp_dv_context *ctx, size_t size);
 
 
 /// @brief Releases allocated memory (decreses reference counter).
 /// @param mem Handle for the allocated memory, when NULL it is ignored.
 /// @details Call this when "mem" is no longer needed.
+///          It is thread-safe.
 void dmp_dv_mem_release(dmp_dv_mem *mem);
 
 
 /// @brief Retains allocated memory (increases reference counter).
 /// @param mem Handle for the allocated memory, when NULL it is ignored.
+/// @details It is thread-safe.
 void dmp_dv_mem_retain(dmp_dv_mem *mem);
 
 
@@ -120,12 +132,14 @@ void dmp_dv_mem_retain(dmp_dv_mem *mem);
 /// @return Pointer to memory region in user address space or NULL on error.
 /// @details Retuned memory can be read or written, executable flag is not set.
 ///          If the memory was already mapped, the same pointer will be returned.
+///          It is thread-safe only on different memory handles.
 uint8_t *dmp_dv_mem_map(dmp_dv_mem *mem);
 
 
 /// @brief Unmaps previously allocated and mapped memory from the user address space.
 /// @param mem Handle to the allocated memory, when NULL the error is returned.
-/// @detail Function can be called repeatedly.
+/// @details Function can be called repeatedly.
+///          It is thread-safe only on different memory handles.
 void dmp_dv_mem_unmap(dmp_dv_mem *mem);
 
 
@@ -134,38 +148,45 @@ void dmp_dv_mem_unmap(dmp_dv_mem *mem);
 /// @param rd If non-zero, the Device -> CPU synchronization will occure.
 /// @param wr If non-zero, the CPU -> Device synchronization will occure on dmp_dv_mem_sync_end().
 /// @return 0 on success, non-zero otherwise.
+/// @details It is thread-safe only on different memory handles.
 int dmp_dv_mem_sync_start(dmp_dv_mem *mem, int rd, int wr);
 
 
 /// @brief Finishes the last started Device <-> CPU synchronization.
 /// @return 0 on success, non-zero otherwise.
+/// @details It is thread-safe only on different memory handles.
 int dmp_dv_mem_sync_end(dmp_dv_mem *mem);
 
 
 /// @brief Returns allocated size in bytes for provided memory handle.
+/// @details It is thread-safe.
 size_t dmp_dv_mem_get_size(dmp_dv_mem *mem);
 
 
 /// @brief Creates command list.
 /// @param ctx Context for working with DV accelerator, when NULL the error is returned.
 /// @return Handle to command list or NULL on error.
+/// @details It is thread-safe.
 dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx);
 
 
 /// @brief Releases the command list (decreases reference counter).
 /// @param cmdlist Handle to command list, when NULL it is ignored.
 /// @details Call this when "cmdlist" is no longer needed.
+///          It is thread-safe.
 void dmp_dv_cmdlist_release(dmp_dv_cmdlist *cmdlist);
 
 
 /// @brief Retains the command list (increases reference counter).
 /// @param cmdlist Handle to command list, when NULL it is ignored.
+/// @details It is thread-safe.
 void dmp_dv_cmdlist_retain(dmp_dv_cmdlist *cmdlist);
 
 
 /// @brief Ends the command list, preparing device-specific structures for further execution.
 /// @param cmdlist Handle to command list, when NULL the error is returned.
 /// @return 0 on success, non-zero otherwise.
+/// @details It is thread-safe only on different command lists.
 int dmp_dv_cmdlist_end(dmp_dv_cmdlist *cmdlist);
 
 
@@ -173,6 +194,7 @@ int dmp_dv_cmdlist_end(dmp_dv_cmdlist *cmdlist);
 /// @param cmdlist Handle to command list, when NULL the error is returned.
 /// @return exec_id >= 0 for this execution on success, < 0 on error.
 /// @details Each context is associated with a single execution queue.
+///          It is thread-safe.
 int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist);
 
 
@@ -180,6 +202,7 @@ int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist);
 /// @param cmdlist Handle to command list, when NULL the error is returned.
 /// @param exec_id Id of the scheduled command to wait for completion.
 /// @return 0 on success, non-zero otherwise.
+/// @details It is thread-safe.
 int dmp_dv_cmdlist_wait(dmp_dv_cmdlist *cmdlist, int64_t exec_id);
 
 
@@ -204,6 +227,7 @@ typedef struct dmp_dmp_dv_cmdraw_impl {
 /// @return 0 on success, non-zero otherwise, known error codes:
 ///         EINVAL - invalid argument such as structure size,
 ///         ENOTSUP - raw command version is not supported.
+/// @details It is thread-safe only on different command lists.
 int dmp_dv_cmdlist_add_raw_conv(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
 
 
@@ -211,6 +235,7 @@ int dmp_dv_cmdlist_add_raw_conv(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
 /// @return 0 on success, non-zero otherwise, known error codes:
 ///         EINVAL - invalid argument such as structure size,
 ///         ENOTSUP - raw command version is not supported.
+/// @details It is thread-safe only on different command lists.
 int dmp_dv_cmdlist_add_raw_fc(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
 
 
@@ -225,6 +250,7 @@ int dmp_dv_cmdlist_add_raw_fc(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
 /// @param output Output buffer for packed weights information (can be NULL if output_size is 0).
 /// @param output_size On input, contains the size of the output buffer in bytes (can be 0, in such case it will be filled with the required output size), on output will contain the required output size.
 /// @return 0 on success, non-zero otherwise.
+/// @details It is thread-safe.
 int dmp_dv_pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],
