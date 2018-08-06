@@ -24,8 +24,17 @@
 #include <random>
 #include <chrono>
 
+#include <openssl/sha.h>
+
 #include "dmp_dv.h"
 #include "dmp_dv_cmdraw_v0.h"
+
+
+/// @brief Rounds up "a" to be the multiple of "n".
+static inline int roundup(int a, int n) {
+  int d = a % n;
+  return d ? a + (n - d) : a;
+}
 
 
 /// @brief File which will store logs.
@@ -38,12 +47,24 @@ static FILE *g_flog = NULL;
 
 /// @brief Number of file descriptors for the process.
 static int g_n_fd = -1;
+#define N_T 6
+static const float g_max_diff_bounds[N_T] = {0.1f, 0.5f, 1.0f, 5.0f, 10.0f, 1000000.0f};
+static float g_max_diff[N_T] = {0, 0, 0, 0, 0, 0};
+static float g_max_diff_y[N_T] = {0, 0, 0, 0, 0, 0};
+static float g_max_diff_t[N_T] = {0, 0, 0, 0, 0, 0};
 
 
 /// @brief Configuration description to be tested.
 typedef struct conv_config_impl {
   int width, height, n_channels, kx, ky, n_kernels,
       pad_left, pad_top, pad_right, pad_bottom, stride_x, stride_y, activation;
+  bool hash_set;
+  bool failed;
+  uint8_t hash[32];
+  dmp_dv_mem *io_mem, *weights_mem;
+  size_t io_size;
+  __fp16 *io_ptr;
+  __fp16 *caffe_output;
 
   bool operator <(const struct conv_config_impl& pt) const {
     return std::make_tuple(width, height, n_channels, kx, ky, n_kernels,
@@ -81,15 +102,43 @@ void print_cmd(dmp_dv_cmdraw_v0& cmd) {
 }
 
 
+/// @brief Checks if error is acceptable.
+/// @param y Output to check.
+/// @param t Target.
+/// @param conf Executed convolutional configuration.
+/// @return 0 if error is acceptable, non-zero otherwise.
+int check_err(float y, float t, conv_config *conf) {
+  const int p = std::max(conf->kx, conf->ky) | 1;
+  const int n_adds = p * p * conf->n_channels;
+
+  const float ta = std::abs(t);
+  const float diff = std::abs(y - t);
+
+  float dmax;
+  if (ta < 0.09f) {
+    dmax = 0.03f;
+  }
+  else {
+    dmax = ta * 0.33f;
+  }
+  if (n_adds >= 5 * 5 * 64) {
+    dmax *= std::sqrt((float)n_adds / (5 * 5 * 64)) * 1.4f;
+  }
+
+  return diff < dmax ? 0 : -1;
+}
+
+
 /// @brief Tests convolutional configurations for correctness using data from folder "data".
-int test_cmdlists(const std::vector<conv_config>& confs) {
+int test_cmdlists(const std::vector<conv_config*>& confs) {
   char prefix[256];
   LOG("ENTER: test_cmdlists: %d commands:", (int)confs.size());
-  for (auto it = confs.cbegin(); it != confs.cend(); ++it) {
+  for (auto it = confs.begin(); it != confs.end(); ++it) {
+    conv_config *conf = *it;
     snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
-             it->width, it->height, it->n_channels, it->kx, it->ky, it->n_kernels,
-             it->pad_left, it->pad_top, it->pad_right, it->pad_bottom,
-             it->stride_x, it->stride_y, it->activation);
+             conf->width, conf->height, conf->n_channels, conf->kx, conf->ky, conf->n_kernels,
+             conf->pad_left, conf->pad_top, conf->pad_right, conf->pad_bottom,
+             conf->stride_x, conf->stride_y, conf->activation);
     LOG(" %s", prefix);
   }
   LOG("\n");
@@ -97,14 +146,9 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
   int result = -1;
   dmp_dv_context *ctx = NULL;
   dmp_dv_cmdlist *cmdlist = NULL;
-  std::vector<dmp_dv_mem*> io_mems, weights_mems;
-  dmp_dv_mem *io_mem, *weights_mem;
-  size_t io_size, weights_size;
-  int32_t cmdraw_max_version;
   uint8_t *weights;
-  std::vector<__fp16*> io_ptrs;
-  __fp16 *io_ptr;
-  float max_diff = 0, max_diff_y = 0, max_diff_t = 0;
+  size_t weights_size;
+  int32_t cmdraw_max_version;
   float failed_diff = 0, failed_diff_y = 0, failed_diff_t = 0;
   int failed_x = -1, failed_y = -1, failed_c = -1;
   float caffe_a = std::numeric_limits<float>::max(), caffe_b = std::numeric_limits<float>::lowest();
@@ -116,12 +160,10 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
   std::vector<__fp16> caffe_input;
   std::vector<uint8_t> caffe_weights;
   std::vector<__fp16> caffe_bias;
-  std::vector<std::vector<__fp16> > caffe_outputs;
   int n;
   char c;
   int out_width, out_height;
   bool fend;
-  int i_conf;
   int64_t exec_id;
 
   ctx  = dmp_dv_context_create(NULL);
@@ -146,11 +188,12 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
   LOG("Maximum supported version for raw command is %d\n", (int)cmdraw_max_version);
 
   // Outer loop by configurations to be packed in the single command list
-  for (auto it = confs.cbegin(); it != confs.cend(); ++it) {
-    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
-             it->width, it->height, it->n_channels, it->kx, it->ky, it->n_kernels,
-             it->pad_left, it->pad_top, it->pad_right, it->pad_bottom,
-             it->stride_x, it->stride_y, it->activation);
+  for (auto it = confs.begin(); it != confs.end(); ++it) {
+    conv_config *conf = *it;
+    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
+             conf->width, conf->height, conf->n_channels, conf->kx, conf->ky, conf->n_kernels,
+             conf->pad_left, conf->pad_top, conf->pad_right, conf->pad_bottom,
+             conf->stride_x, conf->stride_y, conf->activation);
 
     // Load quantization map
     snprintf(fnme, sizeof(fnme), "%s.q.bin", prefix);
@@ -178,12 +221,12 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
       ERR("fopen() failed for %s\n", fnme);
       goto L_EXIT;
     }
-    caffe_input.resize(it->n_channels * it->height * it->width);
+    caffe_input.resize(conf->n_channels * conf->height * conf->width);
     n = fread(caffe_input.data(), sizeof(caffe_input[0]), caffe_input.size(), fin);
     fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
     fclose(fin);
-    if (n != it->n_channels * it->height * it->width) {
-      ERR("fread() returned %d while expecting %d for %s\n", n, it->n_channels * it->height * it->width, fnme);
+    if (n != conf->n_channels * conf->height * conf->width) {
+      ERR("fread() returned %d while expecting %d for %s\n", n, conf->n_channels * conf->height * conf->width, fnme);
       goto L_EXIT;
     }
     if (!fend) {
@@ -198,13 +241,13 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
       ERR("fopen() failed for %s\n", fnme);
       goto L_EXIT;
     }
-    caffe_weights.resize(it->n_kernels * it->n_channels * it->kx * it->ky);
+    caffe_weights.resize(conf->n_kernels * conf->n_channels * conf->kx * conf->ky);
     n = fread(caffe_weights.data(), sizeof(caffe_weights[0]), caffe_weights.size(), fin);
     fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
     fclose(fin);
-    if (n != it->n_kernels * it->n_channels * it->kx * it->ky) {
+    if (n != conf->n_kernels * conf->n_channels * conf->kx * conf->ky) {
       ERR("fread() returned %d while expecting %d for %s\n",
-          n, it->n_kernels * it->n_channels * it->kx * it->ky, fnme);
+          n, conf->n_kernels * conf->n_channels * conf->kx * conf->ky, fnme);
       goto L_EXIT;
     }
     if (!fend) {
@@ -219,12 +262,12 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
       ERR("fopen() failed for %s\n", fnme);
       goto L_EXIT;
     }
-    caffe_bias.resize(it->n_kernels);
+    caffe_bias.resize(conf->n_kernels);
     n = fread(caffe_bias.data(), sizeof(caffe_bias[0]), caffe_bias.size(), fin);
     fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
     fclose(fin);
-    if (n != it->n_kernels) {
-      ERR("fread() returned %d while expecting %d for %s\n", n, it->n_kernels, fnme);
+    if (n != conf->n_kernels) {
+      ERR("fread() returned %d while expecting %d for %s\n", n, conf->n_kernels, fnme);
       goto L_EXIT;
     }
     if (!fend) {
@@ -233,130 +276,125 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
     }
 
     // Load output
-    {
-      std::vector<__fp16> caffe_output;
+    out_width = get_conv_out_width(conf->width, conf->kx, conf->pad_left, conf->pad_right, conf->stride_x);
+    out_height = get_conv_out_width(conf->height, conf->ky, conf->pad_top, conf->pad_bottom, conf->stride_y);
+    if (!conf->hash_set) {
       snprintf(fnme, sizeof(fnme), "%s.o.bin", prefix);
       fin = fopen(fnme, "rb");
       if (!fin) {
         ERR("fopen() failed for %s\n", fnme);
         goto L_EXIT;
       }
-      out_width = get_conv_out_width(it->width, it->kx, it->pad_left, it->pad_right, it->stride_x);
-      out_height = get_conv_out_width(it->height, it->ky, it->pad_top, it->pad_bottom, it->stride_y);
-      caffe_output.resize(out_width * out_height * it->n_kernels);
-      n = fread(caffe_output.data(), sizeof(caffe_output[0]), caffe_output.size(), fin);
+      conf->caffe_output = (__fp16*)malloc(out_width * out_height * conf->n_kernels * sizeof(__fp16));
+      n = fread(conf->caffe_output, sizeof(__fp16), out_width * out_height * conf->n_kernels, fin);
       fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
       fclose(fin);
-      if (n != out_width * out_height * it->n_kernels) {
-        ERR("fread() returned %d while expecting %d for %s\n", n, out_width * out_height * it->n_kernels, fnme);
+      if (n != out_width * out_height * conf->n_kernels) {
+        ERR("fread() returned %d while expecting %d for %s\n", n, out_width * out_height * conf->n_kernels, fnme);
         goto L_EXIT;
       }
       if (!fend) {
         ERR("File is bigger than expected: %s\n", fnme);
         goto L_EXIT;
       }
-      caffe_outputs.push_back(std::move(caffe_output));
     }
 
     memset(&cmd, 0, sizeof(cmd));
     cmd.size = sizeof(cmd);
     cmd.version = 0;
-    cmd.w = it->width;
-    cmd.h = it->height;
-    cmd.c = it->n_channels;
+    cmd.w = conf->width;
+    cmd.h = conf->height;
+    cmd.c = conf->n_channels;
     cmd.z = 1;
     cmd.topo = 1;
-    cmd.run[0].m = it->n_kernels;
+    cmd.run[0].m = conf->n_kernels;
     cmd.run[0].conv_enable = 1;
-    cmd.run[0].p = (uint16_t)it->kx | (((uint16_t)it->ky) << 8);
+    cmd.run[0].p = (uint16_t)conf->kx | (((uint16_t)conf->ky) << 8);
     cmd.run[0].pz = 1;
-    cmd.run[0].conv_pad = (uint32_t)it->pad_left | ((uint32_t)it->pad_right << 8) |
-                          ((uint32_t)it->pad_top << 16) | ((uint32_t)it->pad_bottom << 24);
-    cmd.run[0].conv_stride = (uint16_t)it->stride_x | ((uint16_t)it->stride_y << 8);
-    cmd.run[0].actfunc = it->activation;
+    cmd.run[0].conv_pad = (uint32_t)conf->pad_left | ((uint32_t)conf->pad_right << 8) |
+                          ((uint32_t)conf->pad_top << 16) | ((uint32_t)conf->pad_bottom << 24);
+    cmd.run[0].conv_stride = (uint16_t)conf->stride_x | ((uint16_t)conf->stride_y << 8);
+    cmd.run[0].actfunc = conf->activation;
 
-    io_size = (it->width * it->height * it->n_channels + out_width * out_height * it->n_kernels) * sizeof(__fp16);
-    io_mem = dmp_dv_mem_alloc(ctx, io_size);
-    if (!io_mem) {
-      ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", io_size, dmp_dv_get_last_error_message());
+    conf->io_size = (roundup(conf->width * conf->height * conf->n_channels, 4) + roundup(out_width * out_height * conf->n_kernels, 4)) * sizeof(__fp16);
+    conf->io_mem = dmp_dv_mem_alloc(ctx, conf->io_size);
+    if (!conf->io_mem) {
+      ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", conf->io_size, dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    io_mems.push_back(io_mem);
-    LOG("Allocated %zu (%zu requested) bytes for input/output\n", dmp_dv_mem_get_size(io_mem), io_size);
-    cmd.input_buf.mem = io_mem;
+    LOG("Allocated %zu (%zu requested) bytes for input/output\n", dmp_dv_mem_get_size(conf->io_mem), conf->io_size);
+    cmd.input_buf.mem = conf->io_mem;
     cmd.input_buf.offs = 0;
-    cmd.output_buf.mem = io_mem;
-    cmd.output_buf.offs = it->width * it->height * it->n_channels * sizeof(__fp16);
+    cmd.output_buf.mem = conf->io_mem;
+    cmd.output_buf.offs = roundup(conf->width * conf->height * conf->n_channels, 4) * sizeof(__fp16);
 
     weights_size = 0;
     if (dmp_dv_pack_conv_weights(
-            it->n_channels, it->kx, it->ky, it->n_kernels,
+            conf->n_channels, conf->kx, conf->ky, conf->n_kernels,
             quant_map, NULL, NULL, NULL, &weights_size)) {
       ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
 
-    weights_mem = dmp_dv_mem_alloc(ctx, weights_size);
-    if (!weights_mem) {
+    conf->weights_mem = dmp_dv_mem_alloc(ctx, weights_size);
+    if (!conf->weights_mem) {
       ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", weights_size, dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    weights_mems.push_back(weights_mem);
-    LOG("Allocated %zu (%zu requested) bytes for weights\n", dmp_dv_mem_get_size(weights_mem), weights_size);
-    cmd.run[0].weight_buf.mem = weights_mem;
+    LOG("Allocated %zu (%zu requested) bytes for weights\n", dmp_dv_mem_get_size(conf->weights_mem), weights_size);
+    cmd.run[0].weight_buf.mem = conf->weights_mem;
     cmd.run[0].weight_buf.offs = 0;
     cmd.run[0].weight_fmt = 3;
 
-    weights = dmp_dv_mem_map(weights_mem);
+    weights = dmp_dv_mem_map(conf->weights_mem);
     if (!weights) {
       ERR("dmp_dv_mem_map() failed for weights: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    if (dmp_dv_mem_sync_start(weights_mem, 0, 1)) {
+    if (dmp_dv_mem_sync_start(conf->weights_mem, 0, 1)) {
       ERR("dmp_dv_mem_sync_start() failed for weights: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
 
     // Fill weights
     if (dmp_dv_pack_conv_weights(
-          it->n_channels, it->kx, it->ky, it->n_kernels,
+          conf->n_channels, conf->kx, conf->ky, conf->n_kernels,
           quant_map, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size)) {
       ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    if (dmp_dv_mem_sync_end(weights_mem)) {
+    if (dmp_dv_mem_sync_end(conf->weights_mem)) {
       ERR("dmp_dv_mem_sync_end() failed for weights: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    dmp_dv_mem_unmap(weights_mem);
+    dmp_dv_mem_unmap(conf->weights_mem);
 
-    io_ptr = (__fp16*)dmp_dv_mem_map(io_mem);
-    if (!io_ptr) {
+    conf->io_ptr = (__fp16*)dmp_dv_mem_map(conf->io_mem);
+    if (!conf->io_ptr) {
       ERR("dmp_dv_mem_map() failed for input/output: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    io_ptrs.push_back(io_ptr);
-    if (dmp_dv_mem_sync_start(io_mem, 0, 1)) {
+    if (dmp_dv_mem_sync_start(conf->io_mem, 0, 1)) {
       ERR("dmp_dv_mem_sync_start() failed for input/output: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
+    memset(conf->io_ptr, 0, conf->io_size);
 
     // Caffe's input is stored as channel, height, width
     // DV input should be stored as chunks by max of 8 channels as width, height, channel
-    for (int chan_group = 0, o_offs = 0; chan_group < it->n_channels; chan_group += 8) {
-      const int last_chan = std::min(chan_group + 8, it->n_channels);
-      for (int i = 0; i < it->width; ++i) {
-        for (int j = 0; j < it->height; ++j) {
+    for (int chan_group = 0, o_offs = 0; chan_group < conf->n_channels; chan_group += 8) {
+      const int last_chan = std::min(chan_group + 8, conf->n_channels);
+      for (int i = 0; i < conf->width; ++i) {
+        for (int j = 0; j < conf->height; ++j) {
           for (int k = chan_group; k < last_chan; ++k, ++o_offs) {
-            const int i_offs = k * it->width * it->height + j * it->width + i;
+            const int i_offs = k * conf->width * conf->height + j * conf->width + i;
             const __fp16 vle = caffe_input[i_offs];
-            io_ptr[o_offs] = vle;
+            conf->io_ptr[o_offs] = vle;
           }
         }
       }
     }
-    memset(io_ptr + it->width * it->height * it->n_channels, 0, out_width * out_height * it->n_kernels * sizeof(__fp16));
-    if (dmp_dv_mem_sync_end(io_mem)) {
+    if (dmp_dv_mem_sync_end(conf->io_mem)) {
       ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
@@ -389,61 +427,108 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
   }
   LOG("Execution has completed\n");
 
-  i_conf = 0;
-  for (auto it = confs.cbegin(); it != confs.cend(); ++it, ++i_conf) {
-    if (dmp_dv_mem_sync_start(io_mems[i_conf], 1, 0)) {
+  for (auto it = confs.begin(); it != confs.end(); ++it) {
+    conv_config *conf = *it;
+
+    if (dmp_dv_mem_sync_start(conf->io_mem, 1, 0)) {
       ERR("dmp_dv_mem_sync_start() failed for input/output: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    // Caffe's output is stored as channels, height, width
-    // DV output is stored as chunks by max of 8 channels as width, height, channel
-    out_width = get_conv_out_width(it->width, it->kx, it->pad_left, it->pad_right, it->stride_x);
-    out_height = get_conv_out_width(it->height, it->ky, it->pad_top, it->pad_bottom, it->stride_y);
-    io_ptr = io_ptrs[i_conf];
-    for (int chan_group = 0, o_offs = it->width * it->height * it->n_channels;
-         chan_group < it->n_kernels; chan_group += 8) {
-      const int last_chan = std::min(chan_group + 8, it->n_kernels);
-      for (int i = 0; i < out_width; ++i) {
-        for (int j = 0; j < out_height; ++j) {
-          for (int k = chan_group; k < last_chan; ++k, ++o_offs) {
-            const int i_offs = k * out_width * out_height + j * out_width + i;
-            const __fp16 vle = caffe_outputs[i_conf][i_offs];
-            const float y = (float)io_ptr[o_offs], t = (float)vle;
-            caffe_a = std::min(caffe_a, t);
-            caffe_b = std::max(caffe_b, t);
-            dv_a = std::min(dv_a, y);
-            dv_b = std::max(dv_b, y);
-            const float diff = std::abs(y - t);
-            if (diff > max_diff) {
-              max_diff = diff;
-              max_diff_y = y;
-              max_diff_t = t;
-            }
-            const float ta = std::abs(t);
-            if (((ta < 0.1f) && (diff > 0.03f)) ||
-                ((ta >= 0.1f) && (diff > ta * 0.2f))) {
-              if (diff > failed_diff) {
-                failed_diff = diff;
-                failed_diff_y = y;
-                failed_diff_t = t;
-                failed_x = i;
-                failed_y = j;
-                failed_c = k;
+
+    // Compare output with the gold one
+    out_width = get_conv_out_width(conf->width, conf->kx, conf->pad_left, conf->pad_right, conf->stride_x);
+    out_height = get_conv_out_width(conf->height, conf->ky, conf->pad_top, conf->pad_bottom, conf->stride_y);
+    const int o_offs = roundup(conf->width * conf->height * conf->n_channels, 4);
+    if (conf->hash_set) {  // check hash
+      uint8_t hash[32];
+      SHA256_CTX sha256;
+      SHA256_Init(&sha256);
+      SHA256_Update(&sha256, conf->io_ptr + o_offs, out_height * out_width * conf->n_kernels * sizeof(__fp16));
+      SHA256_Final(hash, &sha256);
+      if (memcmp(conf->hash, hash, 32)) {
+        ERR("Hash differs\n");
+        goto L_EXIT;
+      }
+    }
+    else {  // approximately compare output
+      // Caffe's output is stored as channels, height, width
+      // DV output is stored as chunks by max of 8 channels as width, height, channel
+      float max_diff[N_T], max_diff_y[N_T], max_diff_t[N_T];
+      memset(max_diff, 0, sizeof(max_diff));
+      int oo_offs = o_offs;
+      for (int chan_group = 0; chan_group < conf->n_kernels; chan_group += 8) {
+        const int last_chan = std::min(chan_group + 8, conf->n_kernels);
+        for (int i = 0; i < out_width; ++i) {
+          for (int j = 0; j < out_height; ++j) {
+            for (int k = chan_group; k < last_chan; ++k, ++oo_offs) {
+              const int i_offs = k * out_width * out_height + j * out_width + i;
+              const __fp16 vle = conf->caffe_output[i_offs];
+              const float y = (float)conf->io_ptr[oo_offs], t = (float)vle;
+              caffe_a = std::min(caffe_a, t);
+              caffe_b = std::max(caffe_b, t);
+              dv_a = std::min(dv_a, y);
+              dv_b = std::max(dv_b, y);
+              const float diff = std::abs(y - t);
+              if (check_err(y, t, conf)) {
+                conf->failed = true;
+                if (diff > failed_diff) {
+                  failed_diff = diff;
+                  failed_diff_y = y;
+                  failed_diff_t = t;
+                  failed_x = i;
+                  failed_y = j;
+                  failed_c = k;
+                }
+              }
+              else {
+                for (int ii = 0; ii < N_T; ++ii) {
+                  if (std::abs(t) > g_max_diff_bounds[ii]) {
+                    continue;
+                  }
+                  if (diff > max_diff[ii]) {
+                    max_diff[ii] = diff;
+                    max_diff_y[ii] = y;
+                    max_diff_t[ii] = t;
+                  }
+                  break;
+                }
               }
             }
           }
         }
+        LOG("caffe: [%.6f, %.6f] dv: [%.6f, %.6f]\n", caffe_a, caffe_b, dv_a, dv_b);
+        for (int i = 0; i < N_T; ++i) {
+          LOG("t <= %.1f: max_diff=%.6f on y=%.6f and t=%.6f\n",
+              g_max_diff_bounds[i], max_diff[i], max_diff_y[i], max_diff_t[i]);
+        }
+        for (int i = 0; i < N_T; ++i) {
+          if (max_diff[i] > g_max_diff[i]) {
+            g_max_diff[i] = max_diff[i];
+            g_max_diff_y[i] = max_diff_y[i];
+            g_max_diff_t[i] = max_diff_t[i];
+          }
+        }
+        if (failed_diff > 0.0f) {
+          ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f xy=(%d, %d) chan=%d %s\n", failed_diff, failed_diff_y, failed_diff_t,
+              failed_x, failed_y, failed_c, prefix);
+          goto L_EXIT;
+        }
+      }
+      if (!conf->failed) {  // compute hash
+        const int output_size = out_height * out_width * conf->n_kernels * sizeof(__fp16);
+        if (o_offs * sizeof(__fp16) + output_size > conf->io_size) {
+          ERR("Incorrect allocation size for input/output");
+          _exit(-1);
+        }
+        SHA256_CTX sha256;
+        SHA256_Init(&sha256);
+        SHA256_Update(&sha256, conf->io_ptr + o_offs, output_size);
+        SHA256_Final(&conf->hash[0], &sha256);
+        conf->hash_set = true;
       }
     }
-    if (dmp_dv_mem_sync_end(io_mem)) {
+    if (dmp_dv_mem_sync_end(conf->io_mem)) {
       ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
-      goto L_EXIT;
-    }
-    LOG("caffe: [%.6f, %.6f] dv: [%.6f, %.6f]\n", caffe_a, caffe_b, dv_a, dv_b);
-    LOG("max_diff=%.6f on y=%.6f and t=%.6f\n", max_diff, max_diff_y, max_diff_t);
-    if (failed_diff > 0.0f) {
-      ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f xy=(%d, %d) chan=%d %s\n", failed_diff, failed_diff_y, failed_diff_t,
-          failed_x, failed_y, failed_c, prefix);
       goto L_EXIT;
     }
   }
@@ -453,10 +538,18 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
 
   L_EXIT:
   dmp_dv_cmdlist_release(cmdlist);
-  const int n_confs = (int)confs.size();
-  for (int i = n_confs - 1; i >= 0; --i) {
-    dmp_dv_mem_release(io_mems[i]);
-    dmp_dv_mem_release(weights_mems[i]);
+  for (auto it = confs.rbegin(); it != confs.rend(); ++it) {
+    conv_config *conf = *it;
+    if (conf->caffe_output) {
+      free(conf->caffe_output);
+      conf->caffe_output = NULL;
+    }
+    dmp_dv_mem_release(conf->io_mem);
+    conf->io_mem = NULL;
+    conf->io_ptr = NULL;
+    conf->io_size = 0;
+    dmp_dv_mem_release(conf->weights_mem);
+    conf->weights_mem = NULL;
   }
   dmp_dv_context_release(ctx);
 
@@ -493,11 +586,12 @@ int test_cmdlists(const std::vector<conv_config>& confs) {
   }
 
   LOG("EXIT: test_cmdlists: %d commands, %d FDs:", (int)confs.size(), n_fd);
-  for (auto it = confs.cbegin(); it != confs.cend(); ++it) {
+  for (auto it = confs.begin(); it != confs.end(); ++it) {
+    conv_config *conf = *it;
     snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
-             it->width, it->height, it->n_channels, it->kx, it->ky, it->n_kernels,
-             it->pad_left, it->pad_top, it->pad_right, it->pad_bottom,
-             it->stride_x, it->stride_y, it->activation);
+             conf->width, conf->height, conf->n_channels, conf->kx, conf->ky, conf->n_kernels,
+             conf->pad_left, conf->pad_top, conf->pad_right, conf->pad_bottom,
+             conf->stride_x, conf->stride_y, conf->activation);
     LOG(" %s", prefix);
   }
   LOG("\n");
@@ -518,10 +612,10 @@ int main(int argc, char **argv) {
   int n_err = 0;
   int res = 0;
 
-  std::set<conv_config> config_set;
+  std::shared_ptr<std::set<conv_config> > config_set = std::make_shared<std::set<conv_config> >();
 
-  DIR *d;
-  struct dirent *dir;
+  DIR *d, *subd;
+  struct dirent *dir, *subdir;
   d = opendir("data");
   if (!d) {
     ERR("Could not open \"data\" folder\n");
@@ -529,6 +623,7 @@ int main(int argc, char **argv) {
   }
   while ((dir = readdir(d))) {
     conv_config config;
+    memset(&config, 0, sizeof(config));
 
     char fnme[512];
     for (int i = 0; ; ) {
@@ -540,49 +635,119 @@ int main(int argc, char **argv) {
         break;
       }
     }
-
-    if (sscanf(fnme, "%d%d%d%d%d%d%d%d%d%d%d%d%d",
-               &config.width, &config.height, &config.n_channels, &config.kx, &config.ky, &config.n_kernels,
-               &config.pad_left, &config.pad_top, &config.pad_right, &config.pad_bottom,
-               &config.stride_x, &config.stride_y, &config.activation) != 13) {
+    if (sscanf(fnme, "%d%d%d", &config.width, &config.height, &config.n_channels) != 3) {
+      continue;
+    }
+    snprintf(fnme, sizeof(fnme), "data/%s", dir->d_name);
+    subd = opendir(fnme);
+    if (!subd) {
       continue;
     }
 
-    config_set.emplace(std::move(config));
-  }
-  closedir(d);
+    while ((subdir = readdir(subd))) {
+      for (int i = 0; ; ) {
+        char c = subdir->d_name[i];
+        fnme[i] = ((c >= '0') && (c <= '9')) ? c : ' ';
+        ++i;
+        if (!subdir->d_name[i]) {
+          fnme[i] = 0;
+          break;
+        }
+      }
 
-  // Randomize configrations order
-  std::vector<conv_config> configs;
-  for (auto it = config_set.cbegin(); it != config_set.cend(); ++it) {
-    configs.push_back(*it);
-  }
-  std::shuffle(configs.begin(), configs.end(), std::default_random_engine(std::chrono::system_clock::now().time_since_epoch().count()));
-
-  // Execute configurations in different chunks
-  const int n_configs = (int)configs.size();
-  const size_t pack_sizes[4] = {1, 2, 20, 200};
-  for (int i_pack = 0; i_pack < 4; ++i_pack) {
-    std::vector<conv_config> confs;
-    int i_config = 0;
-    for (auto it = configs.cbegin(); it != configs.cend(); ++it, ++i_config) {
-      confs.push_back(*it);
-      if ((confs.size() < pack_sizes[i_pack]) && (i_config < n_configs - 1)) {
+      if (sscanf(fnme, "%d%d%d%d%d%d%d%d%d%d",
+                 &config.kx, &config.ky, &config.n_kernels,
+                 &config.pad_left, &config.pad_top, &config.pad_right, &config.pad_bottom,
+                 &config.stride_x, &config.stride_y, &config.activation) != 10) {
         continue;
       }
-      res = test_cmdlists(confs);
-      if (res) {
-        ++n_err;
+
+      char prefix[256];
+      snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
+               config.width, config.height, config.n_channels, config.kx, config.ky, config.n_kernels,
+               config.pad_left, config.pad_top, config.pad_right, config.pad_bottom,
+               config.stride_x, config.stride_y, config.activation);
+      /*if (strcmp(prefix, "data/11x16x65/1x1x64_pad0x0x0x0_stride1x1_act0")) {
+        continue;
+      }*/
+
+      const int prev_size = (int)config_set->size();
+      config_set->emplace(config);
+      const int this_size = (int)config_set->size();
+
+      if ((this_size != prev_size) && (!(this_size % 1000))) {
+        LOG("Loaded %zu configurations\n", this_size);
       }
-      else {
-        ++n_ok;
-      }
-      confs.clear();
     }
+    closedir(subd);
+  }
+  closedir(d);
+  LOG("Loaded %zu configurations\n", config_set->size());
+
+  // Copy configurations from the set to obtain fixed memory pointers to elements
+  std::vector<conv_config> config_data;
+  for (auto it = config_set->cbegin(); it != config_set->cend(); ++it) {
+    config_data.push_back(*it);
+  }
+  config_set->clear();
+  config_set.reset();  // delete the set
+
+  const int n_configs = (int)config_data.size();
+  std::vector<conv_config*> configs;
+  configs.resize(n_configs);
+  for (int i = 0; i < n_configs; ++i) {
+    configs[i] = config_data.data() + i;
+  }
+
+  const int n_passes = 2;
+  for (int i_pass = 0; i_pass < n_passes; ++i_pass) {
+    // Randomize configrations order
+    std::shuffle(configs.begin(), configs.end(), std::default_random_engine(std::chrono::system_clock::now().time_since_epoch().count()));
+
+    // Execute configurations in different chunk sizes
+    const size_t pack_sizes[2] = {1, 50};
+    const int n_packs = 2;
+    for (int i_pack = 0; i_pack < n_packs; ++i_pack) {
+      std::vector<conv_config*> confs;
+      int i_config = 0;
+      for (auto it = configs.begin(); it != configs.end(); ++it, ++i_config) {
+        conv_config *conf = *it;
+        if (conf->failed) {
+          continue;
+        }
+        confs.push_back(conf);
+        if (confs.size() < pack_sizes[i_pack]) {
+          continue;
+        }
+        res = test_cmdlists(confs);
+        if (res) {
+          ++n_err;
+        }
+        else {
+          ++n_ok;
+        }
+        confs.clear();
+      }
+      if (confs.size()) {
+        res = test_cmdlists(confs);
+        if (res) {
+          ++n_err;
+        }
+        else {
+          ++n_ok;
+        }
+      }
+    }
+  }
+
+  for (int i = 0; i < N_T; ++i) {
+    LOG("t <= %.1f: g_max_diff=%.6f on y=%.6f and t=%.6f\n",
+        g_max_diff_bounds[i], g_max_diff[i], g_max_diff_y[i], g_max_diff_t[i]);
   }
 
   LOG("Tests succeeded: %d\n", n_ok);
   LOG("Tests failed: %d\n", n_err);
+  LOG("Number of configurations tested: %d\n", (int)configs.size());
 
   fclose(g_flog);
 

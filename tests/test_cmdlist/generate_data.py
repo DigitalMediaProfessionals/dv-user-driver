@@ -17,14 +17,31 @@ import caffe
 
 class Main(object):
     def __init__(self):
+        # Generate tests without activation function
         for kx in range(1, 8, 1):
             for ky in range(1, 8, 1):
                 pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
-                stride = (1, 1)
-                for act in (0, 1, 3, 5):  # none, tanh, sigmoid, elu
-                    self.generate(1, 1, 1, kx, ky, 1, pad, stride, act)
-                    self.generate(64, 32, 3, kx, ky, 32, pad, stride, act)
-                    self.generate(64, 32, 15, kx, ky, 31, pad, stride, act)
+                for stride in ((1, 1), (2, 2)):
+                    for act in (0,):  # 1, 3, 5):  # none, tanh, sigmoid, elu
+                        for x in (1, 3, 5, 8, 17, 128):
+                            for y in (1, 3, 5, 8, 17, 128):
+                                for c in (1, 3, 9, 16, 65):
+                                    for m in (1, 3, 9, 16, 65):
+                                        self.generate(x, y, c, kx, ky, m,
+                                                      pad, stride, act)
+
+        # Generate tests with activation function
+        for kx in range(1, 8, 1):
+            for ky in range(1, 8, 1):
+                pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
+                for stride in ((1, 1), (2, 2)):
+                    for act in (1, 3, 5):  # tanh, sigmoid, elu
+                        for x in (11, 128):
+                            for y in (11, 128):
+                                for c in (1, 3, 9, 32):
+                                    for m in (1, 3, 9, 32):
+                                        self.generate(x, y, c, kx, ky, m,
+                                                      pad, stride, act)
 
     def get_ox(self, width, kx, pad_left, pad_right, stride):
         return (pad_left + width + pad_right - kx) // stride + 1
@@ -55,13 +72,17 @@ class Main(object):
             os.mkdir("data")
         except OSError:
             pass
+        s_dir = "data/%dx%dx%d" % (width, height, n_channels)
+        try:
+            os.mkdir(s_dir)
+        except OSError:
+            pass
 
         s_pad = "%dx%dx%dx%d" % pad_ltrb
         s_stride = "%dx%d" % stride_xy
 
-        prefix = ("data/%dx%dx%d_%dx%dx%d_pad%s_stride%s_act%d" %
-                  (width, height, n_channels, kx, ky, n_kernels,
-                   s_pad, s_stride, activation))
+        prefix = ("%s/%dx%dx%d_pad%s_stride%s_act%d" %
+                  (s_dir, kx, ky, n_kernels, s_pad, s_stride, activation))
 
         numpy.random.seed(12345)
 
