@@ -9,6 +9,7 @@
 
 Generates weights, input and computes output.
 """
+import argparse
 import numpy
 import os
 
@@ -17,12 +18,36 @@ import caffe
 
 class Main(object):
     def __init__(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-f", "--full", action="store_true",
+                            help="Generate full configuration")
+        args = parser.parse_args()
+
+        if args.full:
+            self.generate_full()
+        else:
+            self.generate_small()
+
+    def generate_small(self):
+        for kx in range(1, 8, 1):
+            for ky in range(1, 8, 1):
+                pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
+                for stride in ((1, 1),):
+                    for act in (0, 5):  # 0, 1, 3, 5: none, tanh, sigmoid, elu
+                        for x in (3, 17):
+                            for y in (3, 17):
+                                for c in (3, 65):
+                                    for m in (3, 65):
+                                        self.generate(x, y, c, kx, ky, m,
+                                                      pad, stride, act)
+
+    def generate_full(self):
         # Generate tests without activation function
         for kx in range(1, 8, 1):
             for ky in range(1, 8, 1):
                 pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
                 for stride in ((1, 1), (2, 2)):
-                    for act in (0,):  # 1, 3, 5):  # none, tanh, sigmoid, elu
+                    for act in (0,):  # 0, 1, 3, 5: none, tanh, sigmoid, elu
                         for x in (1, 3, 5, 8, 17, 128):
                             for y in (1, 3, 5, 8, 17, 128):
                                 for c in (1, 3, 9, 16, 65):
@@ -35,7 +60,7 @@ class Main(object):
             for ky in range(1, 8, 1):
                 pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
                 for stride in ((1, 1), (2, 2)):
-                    for act in (1, 3, 5):  # tanh, sigmoid, elu
+                    for act in (1, 3, 5):  # 0, 1, 3, 5: none, tanh, sigmoid, elu
                         for x in (11, 128):
                             for y in (11, 128):
                                 for c in (1, 3, 9, 32):

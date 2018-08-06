@@ -200,12 +200,18 @@ typedef struct dmp_dmp_dv_cmdraw_impl {
 } dmp_dv_cmdraw;
 
 
-/// @brief Adds raw command to the command list.
-int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
+/// @brief Adds raw command for convolutional block to the command list.
+/// @return 0 on success, non-zero otherwise, known error codes:
+///         EINVAL - invalid argument such as structure size,
+///         ENOTSUP - raw command version is not supported.
+int dmp_dv_cmdlist_add_raw_conv(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
 
 
-/// @brief Returns maximum supported version of dmp_dv_cmdraw structure.
-int32_t dmp_dv_get_cmdraw_max_version();
+/// @brief Adds raw command for fully connected block to the command list.
+/// @return 0 on success, non-zero otherwise, known error codes:
+///         EINVAL - invalid argument such as structure size,
+///         ENOTSUP - raw command version is not supported.
+int dmp_dv_cmdlist_add_raw_fc(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
 
 
 /// @brief Packs convolution layer weights and biases into output array.

@@ -59,7 +59,7 @@ const char *dmp_dv_context_get_info_string(dmp_dv_context* ctx) {
 int dmp_dv_context_get_info(dmp_dv_context* ctx, dmp_dv_info *info) {
   if (!ctx) {
     SET_ERR("Invalid argument: ctx is NULL");
-    return -1;
+    return EINVAL;
   }
   return ((CDMPDVContext*)ctx)->GetInfo(info);
 }
@@ -133,7 +133,7 @@ void dmp_dv_mem_unmap(dmp_dv_mem *mem) {
 int dmp_dv_mem_sync_start(dmp_dv_mem *mem, int rd, int wr) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
-    return -1;
+    return EINVAL;
   }
   return ((CDMPDVMem*)mem)->SyncStart(rd, wr);
 }
@@ -142,7 +142,7 @@ int dmp_dv_mem_sync_start(dmp_dv_mem *mem, int rd, int wr) {
 int dmp_dv_mem_sync_end(dmp_dv_mem *mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
-    return -1;
+    return EINVAL;
   }
   return ((CDMPDVMem*)mem)->SyncEnd();
 }
@@ -151,7 +151,7 @@ int dmp_dv_mem_sync_end(dmp_dv_mem *mem) {
 size_t dmp_dv_mem_get_size(dmp_dv_mem *mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
-    return -1;
+    return EINVAL;
   }
   return ((CDMPDVMem*)mem)->get_size();
 }
@@ -190,7 +190,7 @@ void dmp_dv_cmdlist_retain(dmp_dv_cmdlist *cmdlist) {
 int dmp_dv_cmdlist_end(dmp_dv_cmdlist *cmdlist) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
-    return -1;
+    return EINVAL;
   }
   return ((CDMPDVCmdList*)cmdlist)->End();
 }
@@ -199,7 +199,7 @@ int dmp_dv_cmdlist_end(dmp_dv_cmdlist *cmdlist) {
 int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
-    return -1;
+    return EINVAL;
   }
   return ((CDMPDVCmdList*)cmdlist)->Exec();
 }
@@ -208,23 +208,27 @@ int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist) {
 int dmp_dv_cmdlist_wait(dmp_dv_cmdlist *cmdlist, int64_t exec_id) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
-    return -1;
+    return EINVAL;
   }
   return ((CDMPDVCmdList*)cmdlist)->Wait(exec_id);
 }
 
 
-int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd) {
+int dmp_dv_cmdlist_add_raw_conv(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
-    return -1;
+    return EINVAL;
   }
-  return ((CDMPDVCmdList*)cmdlist)->AddRaw(cmd);
+  return ((CDMPDVCmdList*)cmdlist)->AddRawConv(cmd);
 }
 
 
-int32_t dmp_dv_get_cmdraw_max_version() {
-  return CDMPDVCmdList::get_cmdraw_max_version();
+int dmp_dv_cmdlist_add_raw_fc(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd) {
+  if (!cmdlist) {
+    SET_ERR("Invalid argument: cmdlist is NULL");
+    return EINVAL;
+  }
+  return ((CDMPDVCmdList*)cmdlist)->AddRawFC(cmd);
 }
 
 

@@ -84,7 +84,7 @@ int get_conv_out_width(int width, int kx, int pad_left, int pad_right, int strid
 
 
 /// @brief Prints command content for debugging.
-void print_cmd(dmp_dv_cmdraw_v0& cmd) {
+void print_cmd(dmp_dv_cmdraw_conv_v0& cmd) {
   LOG("topo = %u\nw = %u\nh = %u\nz = %u\nc = %u\ninput_circular_offset = %u\noutput_mode = %u\n",
       (uint32_t)cmd.topo, (uint32_t)cmd.w, (uint32_t)cmd.h, (uint32_t)cmd.z, (uint32_t)cmd.c,
       (uint32_t)cmd.input_circular_offset, (uint32_t)cmd.output_mode);
@@ -148,12 +148,11 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
   dmp_dv_cmdlist *cmdlist = NULL;
   uint8_t *weights;
   size_t weights_size;
-  int32_t cmdraw_max_version;
   float failed_diff = 0, failed_diff_y = 0, failed_diff_t = 0;
   int failed_x = -1, failed_y = -1, failed_c = -1;
   float caffe_a = std::numeric_limits<float>::max(), caffe_b = std::numeric_limits<float>::lowest();
   float dv_a = std::numeric_limits<float>::max(), dv_b = std::numeric_limits<float>::lowest();
-  dmp_dv_cmdraw_v0 cmd;
+  dmp_dv_cmdraw_conv_v0 cmd;
   char fnme[512];
   uint16_t quant_map[256];
   FILE *fin;
@@ -179,13 +178,6 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
     goto L_EXIT;
   }
   LOG("Created command list\n");
-
-  cmdraw_max_version = dmp_dv_get_cmdraw_max_version();
-  if (cmdraw_max_version < 0) {
-    ERR("dmp_dv_get_cmdraw_max_version() returned %d\n", (int)cmdraw_max_version);
-    goto L_EXIT;
-  }
-  LOG("Maximum supported version for raw command is %d\n", (int)cmdraw_max_version);
 
   // Outer loop by configurations to be packed in the single command list
   for (auto it = confs.begin(); it != confs.end(); ++it) {
@@ -401,7 +393,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
 
     //print_cmd(cmd);
 
-    if (dmp_dv_cmdlist_add_raw(cmdlist, (dmp_dv_cmdraw*)&cmd)) {
+    if (dmp_dv_cmdlist_add_raw_conv(cmdlist, (dmp_dv_cmdraw*)&cmd)) {
       ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }

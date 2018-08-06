@@ -27,7 +27,8 @@ int test_context() {
   LOG("dmp_dv_get_version_string(): %s\n", dmp_dv_get_version_string());
 
   if ((sizeof(dmp_dv_info_v0) & 7) || (sizeof(dmp_dv_buf) & 7) || (sizeof(dmp_dv_cmdraw) & 7) ||
-      (sizeof(dmp_dv_cmdraw_v0_conv_run) & 7) || (sizeof(dmp_dv_cmdraw_v0) & 7)) {
+      (sizeof(dmp_dv_cmdraw_conv_v0_run) & 7) || (sizeof(dmp_dv_cmdraw_conv_v0) & 7) ||
+      (sizeof(dmp_dv_cmdraw_fc_v0) & 7)) {
     ERR("Detected structure with size not multiple of 8\n");
     return -1;
   }
