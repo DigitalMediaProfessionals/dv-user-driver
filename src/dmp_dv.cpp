@@ -187,12 +187,12 @@ void dmp_dv_cmdlist_retain(dmp_dv_cmdlist *cmdlist) {
 }
 
 
-int dmp_dv_cmdlist_end(dmp_dv_cmdlist *cmdlist) {
+int dmp_dv_cmdlist_commit(dmp_dv_cmdlist *cmdlist) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return EINVAL;
   }
-  return ((CDMPDVCmdList*)cmdlist)->End();
+  return ((CDMPDVCmdList*)cmdlist)->Commit();
 }
 
 

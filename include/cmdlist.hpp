@@ -21,25 +21,24 @@
 /// @brief Implementation of dmp_dv_cmdlist.
 class CDMPDVCmdList : public CDMPDVBase {
  public:
+  /// @brief Constructor.
   CDMPDVCmdList() : CDMPDVBase() {
     ctx_ = NULL;
     fd_conv_ = -1;
+    fd_fc_ = -1;
+    commited_ = false;
   }
 
+  /// @brief Destructor.
   virtual ~CDMPDVCmdList() {
     Cleanup();
   }
 
+  /// @brief Initializes command list by assigning context to it.
   bool Initialize(CDMPDVContext *ctx) {
     Cleanup();
     if (!ctx) {
       SET_ERR("Invalid argument: ctx is NULL");
-      return false;
-    }
-
-    fd_conv_ = open("/dev/dv_conv", O_RDONLY | O_CLOEXEC);  // TODO: move file open to the End() function.
-    if (fd_conv_ == -1) {
-      SET_ERR("open() failed for /dev/dv_conv: %s", strerror(errno));
       return false;
     }
 
@@ -49,6 +48,7 @@ class CDMPDVCmdList : public CDMPDVBase {
     return true;
   }
 
+  /// @brief Releases held resources.
   void Cleanup() {
     // Decrease reference counters on the used memory pointers
     const int n_commands = commands_.size();
@@ -86,6 +86,10 @@ class CDMPDVCmdList : public CDMPDVBase {
     commands_.clear();
 
     // Close opened files
+    if (fd_fc_ != -1) {
+      close(fd_fc_);
+      fd_fc_ = -1;
+    }
     if (fd_conv_ != -1) {
       close(fd_conv_);
       fd_conv_ = -1;
@@ -96,22 +100,55 @@ class CDMPDVCmdList : public CDMPDVBase {
       ctx_->Release();
       ctx_ = NULL;
     }
+
+    // Reset other vars
+    commited_ = false;
   }
 
+  /// @brief Returns file descriptor for CONV accelerator.
   inline int get_fd_conv() const {
     return fd_conv_;
   }
 
-  int End() {
+  /// @brief Returns file descriptor for FC accelerator.
+  inline int get_fd_fc() const {
+    return fd_fc_;
+  }
+
+  int Commit() {
+    if (commited_) {
+      SET_ERR("Command list is already in commited state\n");
+      return -1;
+    }
+
     // Check list content
+    bool has_conv = false, has_fc = false;
     const int n = (int)commands_.size();
     for (int i = 0; i < n; ++i) {
       switch (commands_[i].type) {
         case kCommandTypeRawConv_v0:  // TODO: add support for case kCommandTypeRawFC_v0.
+          has_conv = true;
+          break;
+        case kCommandTypeRawFC_v0:
+          has_fc = true;
           break;
         default:
           SET_ERR("Invalid command type %d detected at command list at position %d", commands_[i].type, i);
           return -1;
+      }
+    }
+    if (has_conv) {
+      fd_conv_ = open("/dev/dv_conv", O_RDONLY | O_CLOEXEC);
+      if (fd_conv_ == -1) {
+        SET_ERR("open() failed for /dev/dv_conv: %s", strerror(errno));
+        return false;
+      }
+    }
+    if (has_fc) {
+      fd_fc_ = open("/dev/dv_fc", O_RDONLY | O_CLOEXEC);
+      if (fd_fc_ == -1) {
+        SET_ERR("open() failed for /dev/dv_fc: %s", strerror(errno));
+        return false;
       }
     }
 
@@ -185,6 +222,7 @@ class CDMPDVCmdList : public CDMPDVBase {
     }
     else {
       res = 0;
+      commited_ = true;
     }
 
     // Free temporary buffer
@@ -230,6 +268,10 @@ class CDMPDVCmdList : public CDMPDVBase {
   }
 
   int AddRawConv(dmp_dv_cmdraw *cmd) {
+    if (commited_) {
+      SET_ERR("Command list is already in commited state\n");
+      return -1;
+    }
     if (cmd->size < 8) {
       SET_ERR("Invalid argument: cmd->size %d is too small", (int)cmd->size);
       return EINVAL;
@@ -247,6 +289,10 @@ class CDMPDVCmdList : public CDMPDVBase {
   }
 
   int AddRawFC(dmp_dv_cmdraw *cmd) {
+    if (commited_) {
+      SET_ERR("Command list is already in commited state\n");
+      return -1;
+    }
     if (cmd->size < 8) {
       SET_ERR("Invalid argument: cmd->size %d is too small", (int)cmd->size);
       return EINVAL;
@@ -395,6 +441,12 @@ class CDMPDVCmdList : public CDMPDVBase {
   /// @brief File handle for CONV accelerator.
   int fd_conv_;
 
+  /// @brief File handle for FC accelerator.
+  int fd_fc_;
+
   /// @brief List of commands this list contains.
   std::vector<Command> commands_;
+
+  /// @brief If Commit() was called.
+  bool commited_;
 };

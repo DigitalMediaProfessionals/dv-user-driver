@@ -183,11 +183,11 @@ void dmp_dv_cmdlist_release(dmp_dv_cmdlist *cmdlist);
 void dmp_dv_cmdlist_retain(dmp_dv_cmdlist *cmdlist);
 
 
-/// @brief Ends the command list, preparing device-specific structures for further execution.
+/// @brief Commits the command list, preparing device-specific structures for further execution.
 /// @param cmdlist Handle to command list, when NULL the error is returned.
 /// @return 0 on success, non-zero otherwise.
 /// @details It is thread-safe only on different command lists.
-int dmp_dv_cmdlist_end(dmp_dv_cmdlist *cmdlist);
+int dmp_dv_cmdlist_commit(dmp_dv_cmdlist *cmdlist);
 
 
 /// @brief Schedules command list for execution.

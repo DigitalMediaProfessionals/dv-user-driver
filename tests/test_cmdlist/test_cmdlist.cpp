@@ -399,11 +399,11 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
     }
   }
 
-  if (dmp_dv_cmdlist_end(cmdlist)) {
-    ERR("dmp_dv_cmdlist_end() failed: %s\n", dmp_dv_get_last_error_message());
+  if (dmp_dv_cmdlist_commit(cmdlist)) {
+    ERR("dmp_dv_cmdlist_commit() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  LOG("Ended the command list\n");
+  LOG("Commited the command list\n");
 
   exec_id = dmp_dv_cmdlist_exec(cmdlist);
   if (exec_id < 0) {
