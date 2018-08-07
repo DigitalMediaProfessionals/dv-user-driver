@@ -13,7 +13,8 @@
 #include "common.h"
 #include "context.hpp"
 #include "mem.hpp"
-#include "cmdlist.hpp"
+#include "cmdlist_conv.hpp"
+#include "cmdlist_fc.hpp"
 
 
 extern "C" {
@@ -33,13 +34,13 @@ const char *dmp_dv_get_version_string() {
 }
 
 
-dmp_dv_context* dmp_dv_context_create(const char *path) {
+dmp_dv_context* dmp_dv_context_create() {
   CDMPDVContext *ctx = new CDMPDVContext();
   if (!ctx) {
     SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDMPDVContext));
     return NULL;
   }
-  if (!ctx->Initialize(path)) {
+  if (!ctx->Initialize()) {
     delete ctx;
     return NULL;
   }
@@ -157,8 +158,21 @@ size_t dmp_dv_mem_get_size(dmp_dv_mem *mem) {
 }
 
 
-dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx) {
-  CDMPDVCmdList *cmdlist = new CDMPDVCmdList();
+dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx, dmp_dv_device_type device_type) {
+  CDMPDVCmdList *cmdlist;
+  switch(device_type) {
+    case DMP_DV_CONV:
+      cmdlist = new CDMPDVCmdListConv();
+      break;
+
+    case DMP_DV_FC:
+      cmdlist = new CDMPDVCmdListFC();
+      break;
+
+    default:
+      SET_ERR("Unsupported device type %d", (int)device_type);
+      return NULL;
+  }
   if (!cmdlist) {
     SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDMPDVCmdList));
     return NULL;
@@ -214,21 +228,12 @@ int dmp_dv_cmdlist_wait(dmp_dv_cmdlist *cmdlist, int64_t exec_id) {
 }
 
 
-int dmp_dv_cmdlist_add_raw_conv(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd) {
+int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return EINVAL;
   }
-  return ((CDMPDVCmdList*)cmdlist)->AddRawConv(cmd);
-}
-
-
-int dmp_dv_cmdlist_add_raw_fc(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd) {
-  if (!cmdlist) {
-    SET_ERR("Invalid argument: cmdlist is NULL");
-    return EINVAL;
-  }
-  return ((CDMPDVCmdList*)cmdlist)->AddRawFC(cmd);
+  return ((CDMPDVCmdList*)cmdlist)->AddRaw(cmd);
 }
 
 

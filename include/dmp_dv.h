@@ -26,9 +26,6 @@ extern "C" {
 
 
 /// @brief Device execution context.
-/// @details Context is bound to the specific device and has single execution queue.
-///          Multiple contexts can coexist, commands are executed in exclusive mode:
-///          execution from several contexts is possible but occure sequentially.
 typedef struct dmp_dv_context_impl dmp_dv_context;
 
 /// @brief Device-accessible memory allocation.
@@ -53,10 +50,9 @@ const char* dmp_dv_get_last_error_message();
 
 
 /// @brief Creates context for working with DV accelerator.
-/// @param path Path to the device, use NULL or empty string to select default device.
 /// @return Non-NULL on success, NULL on error.
 /// @details It is thread-safe.
-dmp_dv_context* dmp_dv_context_create(const char *path);
+dmp_dv_context* dmp_dv_context_create();
 
 
 /// @brief Returns information about context as human-readable string.
@@ -163,11 +159,22 @@ int dmp_dv_mem_sync_end(dmp_dv_mem *mem);
 size_t dmp_dv_mem_get_size(dmp_dv_mem *mem);
 
 
+/// @brief Convolutional device type id.
+#define DMP_DV_CONV 1
+
+/// @brief Fully connected device type id.
+#define DMP_DV_FC 2
+
+/// @brief Typedef for device type.
+typedef uint8_t dmp_dv_device_type;
+
+
 /// @brief Creates command list.
 /// @param ctx Context for working with DV accelerator, when NULL the error is returned.
+/// @param device_type Device type: DMP_DV_CONV or DMP_DV_FC.
 /// @return Handle to command list or NULL on error.
 /// @details It is thread-safe.
-dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx);
+dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx, dmp_dv_device_type device_type);
 
 
 /// @brief Releases the command list (decreases reference counter).
@@ -218,25 +225,19 @@ typedef struct dmp_dmp_dv_buf_impl {
 
 /// @brief Raw command for execution.
 typedef struct dmp_dmp_dv_cmdraw_impl {
-  uint32_t size;     // size of this structure
-  uint32_t version;  // version of this structure
+  uint32_t size;                   // size of this structure
+  dmp_dv_device_type device_type;  // device type
+  uint8_t version;                 // version of this structure
+  uint8_t rsvd[2];                 // padding to 64-bit size
 } dmp_dv_cmdraw;
 
 
-/// @brief Adds raw command for convolutional block to the command list.
+/// @brief Adds raw command to the command list.
 /// @return 0 on success, non-zero otherwise, known error codes:
 ///         EINVAL - invalid argument such as structure size,
 ///         ENOTSUP - raw command version is not supported.
 /// @details It is thread-safe only on different command lists.
-int dmp_dv_cmdlist_add_raw_conv(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
-
-
-/// @brief Adds raw command for fully connected block to the command list.
-/// @return 0 on success, non-zero otherwise, known error codes:
-///         EINVAL - invalid argument such as structure size,
-///         ENOTSUP - raw command version is not supported.
-/// @details It is thread-safe only on different command lists.
-int dmp_dv_cmdlist_add_raw_fc(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
+int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
 
 
 /// @brief Packs convolution layer weights and biases into output array.

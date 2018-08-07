@@ -165,14 +165,14 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
   bool fend;
   int64_t exec_id;
 
-  ctx  = dmp_dv_context_create(NULL);
+  ctx  = dmp_dv_context_create();
   if (!ctx) {
     ERR("dmp_dv_context_create() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
 
-  cmdlist = dmp_dv_cmdlist_create(ctx);
+  cmdlist = dmp_dv_cmdlist_create(ctx, DMP_DV_CONV);
   if (!cmdlist) {
     ERR("dmp_dv_cmdlist_create() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
@@ -393,7 +393,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
 
     //print_cmd(cmd);
 
-    if (dmp_dv_cmdlist_add_raw_conv(cmdlist, (dmp_dv_cmdraw*)&cmd)) {
+    if (dmp_dv_cmdlist_add_raw(cmdlist, (dmp_dv_cmdraw*)&cmd)) {
       ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }

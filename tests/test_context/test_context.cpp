@@ -41,7 +41,7 @@ int test_context() {
     return -1;
   }
 
-  dmp_dv_context *ctx = dmp_dv_context_create(NULL);
+  dmp_dv_context *ctx = dmp_dv_context_create();
   if (!ctx) {
     ERR("dmp_dv_context_create() failed: %s\n", dmp_dv_get_last_error_message());
     return -1;

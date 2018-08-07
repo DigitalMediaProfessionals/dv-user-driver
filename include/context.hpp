@@ -49,11 +49,8 @@ class CDMPDVContext : public CDMPDVBase {
   }
 
   /// @brief Initializes the DV device.
-  /// @param path Path to the device, can be NULL or empty. Currently returns default device regardless of path.
-  bool Initialize(const char *path) {
+  bool Initialize() {
     Cleanup();
-
-    path_ = path ? path : "";
 
     fd_ion_ = open("/dev/ion", O_RDONLY | O_CLOEXEC);  // O_CLOEXEC is suggested for security
     if (fd_ion_ == -1) {
@@ -109,16 +106,9 @@ class CDMPDVContext : public CDMPDVBase {
     conv_freq_ = sysfs_read_int("/sys/devices/platform/dmp_dv/conv_freq", 0);
     fc_freq_ = sysfs_read_int("/sys/devices/platform/dmp_dv/fc_freq", 0);
 
-    char s_path[256];
-    if (path_.length()) {
-      snprintf(s_path, sizeof(s_path), " (%s)", path_.c_str());
-    }
-    else {
-      s_path[0] = 0;
-    }
     char s[256];
-    snprintf(s, sizeof(s), "DMP DV%s: ub_size=%d max_kernel_size=%d conv_freq=%d fc_freq=%d",
-             s_path, ub_size_, max_kernel_size_, conv_freq_, fc_freq_);
+    snprintf(s, sizeof(s), "DMP DV: ub_size=%d max_kernel_size=%d conv_freq=%d fc_freq=%d",
+             ub_size_, max_kernel_size_, conv_freq_, fc_freq_);
     info_ = s;
 
     return true;
@@ -175,12 +165,6 @@ class CDMPDVContext : public CDMPDVBase {
   }
 
  private:
-  /// @brief Mutex for critical section for setting last execution id.
-  pthread_mutex_t mt_last_exec_id_;
-
-  /// @brief Path to the device.
-  std::string path_;
-
   /// @brief Size of the Unified Buffer.
   int ub_size_;
 
