@@ -26,7 +26,7 @@ class Main(object):
         args = parser.parse_args()
 
         if args.big:
-            self.generate_full(args)
+            self.generate_big(args)
         else:
             self.generate_small(args)
 
