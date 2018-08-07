@@ -292,8 +292,9 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
     }
 
     memset(&cmd, 0, sizeof(cmd));
-    cmd.size = sizeof(cmd);
-    cmd.version = 0;
+    cmd.header.size = sizeof(cmd);
+    cmd.header.device_type = DMP_DV_CONV;
+    cmd.header.version = 0;
     cmd.w = conf->width;
     cmd.h = conf->height;
     cmd.c = conf->n_channels;

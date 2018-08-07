@@ -69,8 +69,9 @@ class CDMPDVCmdListFC : public CDMPDVCmdList {
 
   /// @brief Adds raw structure describing the fully connected layer in version 0 format.
   int AddRaw_v0(dmp_dv_cmdraw_fc_v0 *cmd) {
-    if (cmd->size != sizeof(dmp_dv_cmdraw_fc_v0)) {
-      SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d", (int)cmd->size, (int)cmd->version);
+    if (cmd->header.size != sizeof(dmp_dv_cmdraw_fc_v0)) {
+      SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
+              (int)cmd->header.size, (int)cmd->header.version);
       return -1;
     }
 

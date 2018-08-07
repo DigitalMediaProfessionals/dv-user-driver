@@ -41,8 +41,8 @@ typedef struct dmp_dv_cmdraw_conv_v0_run_impl {
 
 /// @brief Raw command for convolutional block version 0.
 typedef struct dmp_dv_cmdraw_conv_v0_impl {
-  uint32_t size;                      // size of this structure
-  uint32_t version;                   // version of this structure
+  dmp_dv_cmdraw header;               // General structure information
+
   dmp_dv_buf input_buf;               // Input buffer
   dmp_dv_buf output_buf;              // Output buffer
   dmp_dv_buf eltwise_buf;             // Buffer for elementwise add (0 = UBUF Input Buffer)
@@ -59,8 +59,8 @@ typedef struct dmp_dv_cmdraw_conv_v0_impl {
 
 /// @brief Raw command for fully connected block version 0.
 typedef struct dmp_dv_cmdraw_fc_v0_impl {
-  uint32_t size;           // size of this structure
-  uint32_t version;        // version of this structure
+  dmp_dv_cmdraw header;    // General structure information
+
   dmp_dv_buf weight_buf;   // Buffer with packed weights
   dmp_dv_buf input_buf;    // Input buffer
   dmp_dv_buf output_buf;   // Output buffer
