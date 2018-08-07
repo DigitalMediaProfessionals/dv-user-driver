@@ -105,16 +105,7 @@ class CDMPDVCmdList : public CDMPDVBase {
     commited_ = false;
   }
 
-  /// @brief Returns file descriptor for CONV accelerator.
-  inline int get_fd_conv() const {
-    return fd_conv_;
-  }
-
-  /// @brief Returns file descriptor for FC accelerator.
-  inline int get_fd_fc() const {
-    return fd_fc_;
-  }
-
+  /// @brief Commits command list, filling hardware-specific structures and passing them to kernel module.
   int Commit() {
     if (commited_) {
       SET_ERR("Command list is already in commited state\n");
@@ -126,7 +117,7 @@ class CDMPDVCmdList : public CDMPDVBase {
     const int n = (int)commands_.size();
     for (int i = 0; i < n; ++i) {
       switch (commands_[i].type) {
-        case kCommandTypeRawConv_v0:  // TODO: add support for case kCommandTypeRawFC_v0.
+        case kCommandTypeRawConv_v0:
           has_conv = true;
           break;
         case kCommandTypeRawFC_v0:
@@ -231,6 +222,9 @@ class CDMPDVCmdList : public CDMPDVBase {
     return res;
   }
 
+  /// @brief Executes command list.
+  /// @return Id of this execution >= 0 on success, < 0 on error.
+  /// @details The result is undefined if command list was not in commited state.
   int64_t Exec() {
     // Issue ioctl on the kernel module requesting this list execution
     int64_t exec_id = -1;
@@ -248,6 +242,7 @@ class CDMPDVCmdList : public CDMPDVBase {
   }
 
   /// @brief Waits for the specific execution id to be completed.
+  /// @return 0 on success, non-zero on error.
   int Wait(int64_t exec_id) {
     for (;;) {
       int res = ioctl(fd_conv_, DMP_DV_IOC_WAIT, &exec_id);
@@ -267,6 +262,7 @@ class CDMPDVCmdList : public CDMPDVBase {
     return 0;
   }
 
+  /// @brief Adds raw structure describing the concolutional layer.
   int AddRawConv(dmp_dv_cmdraw *cmd) {
     if (commited_) {
       SET_ERR("Command list is already in commited state\n");
@@ -288,6 +284,7 @@ class CDMPDVCmdList : public CDMPDVBase {
     return -1;
   }
 
+  /// @brief Adds raw structure describing the fully connected layer.
   int AddRawFC(dmp_dv_cmdraw *cmd) {
     if (commited_) {
       SET_ERR("Command list is already in commited state\n");
@@ -310,6 +307,7 @@ class CDMPDVCmdList : public CDMPDVBase {
   }
 
  protected:
+  /// @brief Command type ids.
   enum CommandType {
     kCommandTypeSTART = 0,
     kCommandTypeRawConv_v0,
@@ -317,6 +315,7 @@ class CDMPDVCmdList : public CDMPDVBase {
     kCommandTypeEND
   };
 
+  /// @brief Command description.
   struct Command {
     union {
       CommandType type;  // command type
@@ -328,6 +327,7 @@ class CDMPDVCmdList : public CDMPDVBase {
     };
   };
 
+  /// @brief Adds raw structure describing the concolutional layer in version 0 format.
   int AddRawConv_v0(dmp_dv_cmdraw_conv_v0 *cmd) {
     if (cmd->size != sizeof(dmp_dv_cmdraw_conv_v0)) {
       SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d", (int)cmd->size, (int)cmd->version);
@@ -395,6 +395,7 @@ class CDMPDVCmdList : public CDMPDVBase {
     return 0;
   }
 
+  /// @brief Adds raw structure describing the fully connected layer in version 0 format.
   int AddRawFC_v0(dmp_dv_cmdraw_fc_v0 *cmd) {
     if (cmd->size != sizeof(dmp_dv_cmdraw_fc_v0)) {
       SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d", (int)cmd->size, (int)cmd->version);
