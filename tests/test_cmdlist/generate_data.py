@@ -19,29 +19,31 @@ import caffe
 class Main(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument("-f", "--full", action="store_true",
-                            help="Generate full configuration")
+        parser.add_argument("-b", "--big", action="store_true",
+                            help="Generate big configuration")
+        parser.add_argument("-f", "--float", action="store_true",
+                            help="Generate float random weights")
         args = parser.parse_args()
 
-        if args.full:
-            self.generate_full()
+        if args.big:
+            self.generate_full(args)
         else:
-            self.generate_small()
+            self.generate_small(args)
 
-    def generate_small(self):
+    def generate_small(self, args):
         for kx in range(1, 8, 1):
             for ky in range(1, 8, 1):
                 pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
                 for stride in ((1, 1),):
-                    for act in (0, 5):  # 0, 1, 3, 5: none, tanh, sigmoid, elu
+                    for act in (0,):  # 0, 1, 3, 5: none, tanh, sigmoid, elu
                         for x in (3, 17):
                             for y in (3, 17):
                                 for c in (3, 65):
                                     for m in (3, 65):
                                         self.generate(x, y, c, kx, ky, m,
-                                                      pad, stride, act)
+                                                      pad, stride, act, args)
 
-    def generate_full(self):
+    def generate_big(self, args):
         # Generate tests without activation function
         for kx in range(1, 8, 1):
             for ky in range(1, 8, 1):
@@ -53,7 +55,7 @@ class Main(object):
                                 for c in (1, 3, 9, 16, 65):
                                     for m in (1, 3, 9, 16, 65):
                                         self.generate(x, y, c, kx, ky, m,
-                                                      pad, stride, act)
+                                                      pad, stride, act, args)
 
         # Generate tests with activation function
         for kx in range(1, 8, 1):
@@ -66,13 +68,13 @@ class Main(object):
                                 for c in (1, 3, 9, 32):
                                     for m in (1, 3, 9, 32):
                                         self.generate(x, y, c, kx, ky, m,
-                                                      pad, stride, act)
+                                                      pad, stride, act, args)
 
     def get_ox(self, width, kx, pad_left, pad_right, stride):
         return (pad_left + width + pad_right - kx) // stride + 1
 
     def generate(self, width, height, n_channels, kx, ky, n_kernels,
-                 pad_ltrb, stride_xy, activation):
+                 pad_ltrb, stride_xy, activation, args):
         """Generates test data for convolutional layer and invokes caffe
         to generate gold output.
 
@@ -111,14 +113,21 @@ class Main(object):
 
         numpy.random.seed(12345)
 
-        bias = numpy.random.uniform(-1.0, 1.0, n_kernels).astype(numpy.float16)
+        if args.float:
+            values = numpy.random.uniform(
+                -1.0, 1.0, 1001).astype(numpy.float32)
+        else:
+            values = numpy.array([-2.0, -1.0, 0.0, 1.0, 2.0],
+                                 dtype=numpy.float32)
+
+        bias = numpy.random.choice(values, n_kernels).astype(numpy.float16)
         bias.tofile("%s.b.bin" % prefix)
 
-        input = numpy.random.uniform(
-            -1.0, 1.0, width * height * n_channels).astype(numpy.float16)
+        input = numpy.random.choice(
+            values, width * height * n_channels).astype(numpy.float16)
         input.tofile("%s.i.bin" % prefix)
 
-        quant = numpy.random.uniform(-1.0, 1.0, 256).astype(numpy.float16)
+        quant = numpy.random.choice(values, 256).astype(numpy.float16)
         quant[0] = 0
         quant.tofile("%s.q.bin" % prefix)
 

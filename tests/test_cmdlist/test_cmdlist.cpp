@@ -65,6 +65,7 @@ typedef struct conv_config_impl {
   size_t io_size;
   __fp16 *io_ptr;
   __fp16 *caffe_output;
+  bool pure_ints;  // only integers were used - error check should be exact
 
   bool operator <(const struct conv_config_impl& pt) const {
     return std::make_tuple(width, height, n_channels, kx, ky, n_kernels,
@@ -108,13 +109,18 @@ void print_cmd(dmp_dv_cmdraw_conv_v0& cmd) {
 /// @param conf Executed convolutional configuration.
 /// @return 0 if error is acceptable, non-zero otherwise.
 int check_err(float y, float t, conv_config *conf) {
+  const float diff = std::abs(y - t);
+  float dmax;
+  if (conf->pure_ints) {
+    dmax = conf->activation ? 1.0e-3 : 1.0e-6;
+    return diff < dmax ? 0 : -1;
+  }
+
   const int p = std::max(conf->kx, conf->ky) | 1;
   const int n_adds = p * p * conf->n_channels;
 
   const float ta = std::abs(t);
-  const float diff = std::abs(y - t);
 
-  float dmax;
   if (ta < 0.09f) {
     dmax = 0.03f;
   }
@@ -126,6 +132,18 @@ int check_err(float y, float t, conv_config *conf) {
   }
 
   return diff < dmax ? 0 : -1;
+}
+
+
+/// @brief Checks if an array has a float.
+bool has_float(__fp16 *x, int n) {
+  for (int i = 0; i < n; ++i) {
+    float vle = (float)x[i];
+    if (vle != (float)(int)vle) {
+      return true;
+    }
+  }
+  return false;
 }
 
 
@@ -225,6 +243,9 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
       ERR("File is bigger than expected: %s\n", fnme);
       goto L_EXIT;
     }
+
+    // Find if we are using only integers or not
+    conf->pure_ints = ((!has_float((__fp16*)quant_map, 256) && (!has_float(caffe_input.data(), caffe_input.size()))));
 
     // Load weights
     snprintf(fnme, sizeof(fnme), "%s.w.bin", prefix);
