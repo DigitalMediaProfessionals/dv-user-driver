@@ -149,24 +149,17 @@ int dmp_dv_mem_sync_start(dmp_dv_mem *mem, int rd, int wr);
 
 
 /// @brief Finishes the last started Device <-> CPU synchronization.
+/// @param mem Handle to the allocated memory, when NULL the error is returned.
 /// @return 0 on success, non-zero otherwise.
 /// @details It is thread-safe only on different memory handles.
 int dmp_dv_mem_sync_end(dmp_dv_mem *mem);
 
 
-/// @brief Returns allocated size in bytes for provided memory handle.
+/// @brief Returns allocated size in bytes for the provided memory handle.
+/// @param mem Handle to the allocated memory, when NULL the function will return 0.
+/// @return Size in bytes (can be greater than requested in dmp_dv_mem_alloc()) or 0 if mem is NULL.
 /// @details It is thread-safe.
 size_t dmp_dv_mem_get_size(dmp_dv_mem *mem);
-
-
-/// @brief Convolutional device type id.
-#define DMP_DV_CONV 1
-
-/// @brief Fully connected device type id.
-#define DMP_DV_FC 2
-
-/// @brief Typedef for device type.
-typedef uint8_t dmp_dv_device_type;
 
 
 /// @brief Creates command list.
@@ -174,7 +167,7 @@ typedef uint8_t dmp_dv_device_type;
 /// @param device_type Device type: DMP_DV_CONV or DMP_DV_FC.
 /// @return Handle to command list or NULL on error.
 /// @details It is thread-safe.
-dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx, dmp_dv_device_type device_type);
+dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx);
 
 
 /// @brief Releases the command list (decreases reference counter).
@@ -222,13 +215,21 @@ typedef struct dmp_dmp_dv_buf_impl {
   uint64_t offs;      // offset from the start of the buffer
 } dmp_dv_buf;
 
+/// @brief Convolutional device type id.
+#define DMP_DV_DEV_CONV 1
+
+/// @brief Fully connected device type id.
+#define DMP_DV_DEV_FC 2
+
+/// @brief Upper bound of different device type ids.
+#define DMP_DV_DEV_COUNT 3
 
 /// @brief Raw command for execution.
 typedef struct dmp_dmp_dv_cmdraw_impl {
-  uint32_t size;                   // size of this structure
-  dmp_dv_device_type device_type;  // device type
-  uint8_t version;                 // version of this structure
-  uint8_t rsvd[2];                 // padding to 64-bit size
+  uint32_t size;        // size of this structure
+  uint8_t device_type;  // device type
+  uint8_t version;      // version of this structure
+  uint8_t rsvd[2];      // padding to 64-bit size
 } dmp_dv_cmdraw;
 
 

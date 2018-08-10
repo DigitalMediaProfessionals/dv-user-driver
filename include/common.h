@@ -27,6 +27,7 @@
 
 #include "dmp_dv.h"
 #include "../../dv-kernel-driver/uapi/dmp-dv.h"
+#include "../../dv-kernel-driver/uapi/dimensions.h"
 
 
 #ifdef __cplusplus
@@ -44,6 +45,10 @@ extern char s_last_error_message[256];
 
 /// @brief Helper to set the last error message for ioctl call.
 #define SET_IOCTL_ERR(dev, cmd) SET_ERR("ioctl(%s) failed for %s", cmd, dev)
+
+
+/// @brief Helper to set the last error message on implementation logic error.
+#define SET_LOGIC_ERR() SET_ERR("Control should not reach line %d of file %s", __LINE__, __FILE__)
 
 
 #ifdef __cplusplus

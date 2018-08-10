@@ -24,6 +24,7 @@
 #include "dmp_dv.h"
 #include "dmp_dv_cmdraw_v0.h"
 #include "../common/stats.h"
+#include "../../dv-kernel-driver/uapi/dimensions.h"
 
 
 #define LOG(...) fprintf(stdout, __VA_ARGS__); fflush(stdout)
@@ -117,7 +118,7 @@ int test_weights(uint32_t state[4], const char *s_gold_hash,
   }
 
   std::vector<uint8_t> weights;
-  size_t weights_size = 0;
+  size_t weights_size = 0, kweights_size = 0;
 
   if (dmp_dv_pack_conv_weights(
         n_channels, kx, ky, n_kernels,
@@ -125,12 +126,18 @@ int test_weights(uint32_t state[4], const char *s_gold_hash,
     ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
+  LOG("Required %zu bytes for weights\n", weights_size);
+  kweights_size = get_weight_size(n_channels, n_kernels, std::max(kx, ky) | 1, quant_map ? 1 : 0, 0);
+  if (kweights_size != weights_size) {
+    ERR("Kernel module function get_weight_size() returned %zu while user-space function dmp_dv_pack_conv_weights() returned %zu\n",
+        kweights_size, weights_size);
+    goto L_EXIT;
+  }
   weights.resize(weights_size);
   if (weights.size() != weights_size) {
     ERR("Failed to allocated %zu bytes of memory\n", weights_size);
     goto L_EXIT;
   }
-  LOG("Allocated %zu bytes for weights\n", weights_size);
 
   // Fill weights
   {

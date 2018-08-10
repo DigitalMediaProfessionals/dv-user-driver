@@ -13,8 +13,15 @@
 #include "common.h"
 #include "context.hpp"
 #include "mem.hpp"
-#include "cmdlist_conv.hpp"
-#include "cmdlist_fc.hpp"
+#include "cmdlist.hpp"
+
+
+/// @brief Creators for the specific device types.
+f_device_helper_creator CDMPDVCmdListDeviceHelper::creators_[DMP_DV_DEV_COUNT] = {
+    NULL,
+    CDMPDVCmdListConvHelper::Create,
+    NULL
+};
 
 
 extern "C" {
@@ -152,27 +159,14 @@ int dmp_dv_mem_sync_end(dmp_dv_mem *mem) {
 size_t dmp_dv_mem_get_size(dmp_dv_mem *mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
-    return EINVAL;
+    return 0;
   }
   return ((CDMPDVMem*)mem)->get_size();
 }
 
 
-dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx, dmp_dv_device_type device_type) {
-  CDMPDVCmdList *cmdlist;
-  switch(device_type) {
-    case DMP_DV_CONV:
-      cmdlist = new CDMPDVCmdListConv();
-      break;
-
-    case DMP_DV_FC:
-      cmdlist = new CDMPDVCmdListFC();
-      break;
-
-    default:
-      SET_ERR("Unsupported device type %d", (int)device_type);
-      return NULL;
-  }
+dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx) {
+  CDMPDVCmdList *cmdlist = new CDMPDVCmdList();
   if (!cmdlist) {
     SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDMPDVCmdList));
     return NULL;

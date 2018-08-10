@@ -35,7 +35,7 @@ int test_context() {
   }
 
   if ((sizeof(dmp_dv_kbuf) & 7) ||
-      (sizeof(dmp_dv_kcmdraw_v0) & 7) || (sizeof(dmp_dv_kcmdraw_v0_conv_run) & 7) ||
+      (sizeof(dmp_dv_kcmdraw_conv_v0) & 7) || (sizeof(dmp_dv_kcmdraw_conv_v0_run) & 7) ||
       (sizeof(dmp_dv_kcmdraw_fc_v0) & 7)) {
     ERR("Detected structure for communication with kernel module with size not multiple of 8\n");
     return -1;

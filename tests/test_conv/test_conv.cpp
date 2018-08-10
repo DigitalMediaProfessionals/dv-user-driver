@@ -6,6 +6,7 @@
 * The code is licenced under Apache License, Version 2.0
 *------------------------------------------------------------
 */
+/// @brief Tests command list for CONV accelerator.
 #include <unistd.h>
 #include <sys/mman.h>
 #include <time.h>
@@ -190,7 +191,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
   }
   LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
 
-  cmdlist = dmp_dv_cmdlist_create(ctx, DMP_DV_CONV);
+  cmdlist = dmp_dv_cmdlist_create(ctx);
   if (!cmdlist) {
     ERR("dmp_dv_cmdlist_create() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
@@ -314,7 +315,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
 
     memset(&cmd, 0, sizeof(cmd));
     cmd.header.size = sizeof(cmd);
-    cmd.header.device_type = DMP_DV_CONV;
+    cmd.header.device_type = DMP_DV_DEV_CONV;
     cmd.header.version = 0;
     cmd.w = conf->width;
     cmd.h = conf->height;
@@ -614,6 +615,8 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
 }
 
 
+/// @brief Entry point.
+/// @details All messages will be logged to filename argv[1] if argc > 1.
 int main(int argc, char **argv) {
   g_flog = fopen(argc > 1 ? argv[1] : "/dev/null", "w");
   if (!g_flog) {

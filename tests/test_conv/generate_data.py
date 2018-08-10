@@ -16,6 +16,11 @@ import os
 import caffe
 
 
+def roundup(a, b):
+    d = a % b
+    return a + (b - d) if d else a
+
+
 class Main(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
@@ -23,6 +28,13 @@ class Main(object):
                             help="Generate big configuration")
         parser.add_argument("-f", "--float", action="store_true",
                             help="Generate float random weights")
+        parser.add_argument("-s", "--square", action="store_true",
+                            help="Generate only square sizes")
+        parser.add_argument("-o", "--odd", action="store_true",
+                            help="Generate only odd sizes")
+        parser.add_argument("-m", "--multiple", type=int, default=1,
+                            help="Force generated channels to be multiple "
+                                 "of this value (default: 1)")
         args = parser.parse_args()
 
         if args.big:
@@ -31,8 +43,16 @@ class Main(object):
             self.generate_small(args)
 
     def generate_small(self, args):
-        for kx in range(1, 8, 1):
-            for ky in range(1, 8, 1):
+        if args.odd:
+            kxx = (1, 3, 5, 7)
+        else:
+            kxx = (1, 2, 3, 4, 5, 6, 7)
+        for kx in kxx:
+            if args.square:
+                kyy = (kx,)
+            else:
+                kyy = kxx
+            for ky in kyy:
                 pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
                 for stride in ((1, 1),):
                     for act in (0,):  # 0, 1, 3, 5: none, tanh, sigmoid, elu
@@ -40,13 +60,23 @@ class Main(object):
                             for y in (3, 17):
                                 for c in (3, 65):
                                     for m in (3, 65):
-                                        self.generate(x, y, c, kx, ky, m,
-                                                      pad, stride, act, args)
+                                        self.generate(
+                                            x, y, roundup(c, args.multiple),
+                                            kx, ky, roundup(m, args.multiple),
+                                            pad, stride, act, args)
 
     def generate_big(self, args):
         # Generate tests without activation function
-        for kx in range(1, 8, 1):
-            for ky in range(1, 8, 1):
+        if args.odd:
+            kxx = (1, 3, 5, 7)
+        else:
+            kxx = (1, 2, 3, 4, 5, 6, 7)
+        for kx in kxx:
+            if args.square:
+                kyy = (kx,)
+            else:
+                kyy = kxx
+            for ky in kyy:
                 pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
                 for stride in ((1, 1), (2, 2)):
                     for act in (0,):  # 0, 1, 3, 5: none, tanh, sigmoid, elu
@@ -54,12 +84,22 @@ class Main(object):
                             for y in (1, 3, 5, 8, 17, 128):
                                 for c in (1, 3, 9, 16, 65):
                                     for m in (1, 3, 9, 16, 65):
-                                        self.generate(x, y, c, kx, ky, m,
-                                                      pad, stride, act, args)
+                                        self.generate(
+                                            x, y, roundup(c, args.multiple),
+                                            kx, ky, roundup(m, args.multiple),
+                                            pad, stride, act, args)
 
         # Generate tests with activation function
-        for kx in range(1, 8, 1):
-            for ky in range(1, 8, 1):
+        if args.odd:
+            kxx = (1, 3, 5, 7)
+        else:
+            kxx = (1, 2, 3, 4, 5, 6, 7)
+        for kx in kxx:
+            if args.square:
+                kyy = (kx,)
+            else:
+                kyy = kxx
+            for ky in kyy:
                 pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
                 for stride in ((1, 1), (2, 2)):
                     for act in (1, 3, 5):  # 0, 1, 3, 5: none, tanh, sigmoid, elu
@@ -67,8 +107,10 @@ class Main(object):
                             for y in (11, 128):
                                 for c in (1, 3, 9, 32):
                                     for m in (1, 3, 9, 32):
-                                        self.generate(x, y, c, kx, ky, m,
-                                                      pad, stride, act, args)
+                                        self.generate(
+                                            x, y, roundup(c, args.multiple),
+                                            kx, ky, roundup(m, args.multiple),
+                                            pad, stride, act, args)
 
     def get_ox(self, width, kx, pad_left, pad_right, stride):
         return (pad_left + width + pad_right - kx) // stride + 1
