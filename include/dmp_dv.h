@@ -249,15 +249,34 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
 /// @param quant_map Quantization table for weights (but not bias), can be NULL.
 /// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format, else array of 1-byte indices.
 /// @param bias Array of half precision floating point biases of size n_kernels.
-/// @param output Output buffer for packed weights information (can be NULL if output_size is 0).
-/// @param output_size On input, contains the size of the output buffer in bytes (can be 0, in such case it will be filled with the required output size), on output will contain the required output size.
+/// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
+/// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
 /// @return 0 on success, non-zero otherwise.
 /// @details It is thread-safe.
 int dmp_dv_pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],
     const void *weights, const uint16_t *bias,
-    uint8_t *output, size_t *output_size);
+    uint8_t *packed_weights, size_t *packed_weights_size);
+
+
+/// @brief Packs fully connected layer weights and biases into output array.
+/// @param n_channels Number of input channels (or input size in case of 1D input).
+/// @param height Input height (set to 1 in case of 1D input).
+/// @param width Input width (set to 1 in case of 1D input).
+/// @param output_size Output size in elements.
+/// @param quant_map Quantization table for weights (but not bias), can be NULL.
+/// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format (N=output_size), else array of 1-byte indices.
+/// @param bias Array of half precision floating point biases of size output_size.
+/// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
+/// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
+/// @return 0 on success, non-zero otherwise.
+/// @details It is thread-safe.
+int dmp_dv_pack_fc_weights(
+    int n_channels, int height, int width, int output_size,
+    const uint16_t quant_map[256],
+    const void *weights, const uint16_t *bias,
+    uint8_t *packed_weights, size_t *packed_weights_size);
 
 
 #ifdef __GNUC__

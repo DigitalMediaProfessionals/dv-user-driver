@@ -7,7 +7,7 @@
 *------------------------------------------------------------
 */
 /*
- * @brief Weights-packing helper functions.
+ * @brief Weights-packing helper functions for convolutional layer.
  */
 
 #include "common.h"
@@ -48,19 +48,18 @@ static inline void write_bias(int m_start, int m_stop, size_t *out_offs, size_t 
 /// @param kx Kernel width.
 /// @param ky Kernel height.
 /// @param n_kernels Number of output channels.
-/// @param quant_map Quantization table for weights (but not bias), when NULL, no quantization is assumed.
+/// @param quant_map Quantization table for weights (but not bias), can be NULL.
 /// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format, else array of 1-byte indices.
 /// @param bias Array of half precision floating point biases of size n_kernels.
-/// @param output Output buffer for packed weights information (can be NULL if output_size is 0).
-/// @param output_size On input, contains the size of the output buffer in bytes (can be 0, in such case it will be filled with the required output size), on output will contain the required output size.
-/// @param msg Message with error description.
-/// @param msg_size Size of msg in bytes.
+/// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
+/// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
 /// @return 0 on success, non-zero otherwise.
+/// @details It is thread-safe.
 int dmp_dv_pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],
     const void *weights, const uint16_t *bias,
-    uint8_t *output, size_t *output_size) {
+    uint8_t *packed_weights, size_t *packed_weights_size) {
 
   const int p = imax(kx, ky) | 1;  // next odd number
 
@@ -76,25 +75,25 @@ int dmp_dv_pack_conv_weights(
     SET_ERR("Number of output channels must be positive, got %d", n_kernels);
     return -1;
   }
-  if (!output_size) {
-    SET_ERR("output_size must not be NULL");
+  if (!packed_weights_size) {
+    SET_ERR("packed_weights_size must not be NULL");
     return -1;
   }
-  if ((!output) && (*output_size)) {
-    SET_ERR("output is NULL but *output_size is non-zero");
+  if ((!packed_weights) && (*packed_weights_size)) {
+    SET_ERR("packed_weights is NULL but *packed_weights_size is non-zero");
     return -1;
   }
 
   int retval = 0;
 
-  if (*output_size) {
-    memset(output, 0, *output_size);
+  if (*packed_weights_size) {
+    memset(packed_weights, 0, *packed_weights_size);
   }
 
   size_t out_offs = 0;
   if (quant_map) {
-    if (out_offs + 512 <= *output_size) {
-      memcpy(output + out_offs, quant_map, 512);
+    if (out_offs + 512 <= *packed_weights_size) {
+      memcpy(packed_weights + out_offs, quant_map, 512);
     }
     out_offs += 512;
   }
@@ -124,7 +123,7 @@ int dmp_dv_pack_conv_weights(
       for (int m_start = 0; m_start < n_kernels; m_start += 8) {  // loop by kernels (chunks of size 8) i.e. output channels
         const int m_stop = imin(m_start + 8, n_kernels);
 
-        write_bias(m_start, m_stop, &out_offs, output_size, output, bias);  // write bias values for a specific chunk with zero padding to 8
+        write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, bias);  // write bias values for a specific chunk with zero padding to 8
 
         for (int c_start = 0; c_start < n_channels; c_start += 8) {  // loop by input channels (chunks of size 8)
           const int c_stop = imin(c_start + 8, n_channels);
@@ -132,7 +131,7 @@ int dmp_dv_pack_conv_weights(
             for (int c = c_start; c < c_stop; ++c) {  // loop by specific channel inside chunk
               const int offs2 = m * s0 + c * s1;
               if (quant_map) {  // Quantized 8-bit weights
-                if (out_offs + sizeof(buf8) <= *output_size) {
+                if (out_offs + sizeof(buf8) <= *packed_weights_size) {
                   const uint8_t *w = (const uint8_t*)weights;
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < imin(6, kx); ++x) {
@@ -148,12 +147,12 @@ int dmp_dv_pack_conv_weights(
                       buf8p[remap[y + (p - ky)]] = w[offs2 + y * s2 + 6];
                     }
                   }
-                  memcpy(output + out_offs, &buf8[0][0], sizeof(buf8));
+                  memcpy(packed_weights + out_offs, &buf8[0][0], sizeof(buf8));
                 }
                 out_offs += sizeof(buf8);
               }
               else {  // Half float 16-bit weights
-                if (out_offs + sizeof(buf16) <= *output_size) {
+                if (out_offs + sizeof(buf16) <= *packed_weights_size) {
                   const uint16_t *w = (const uint16_t*)weights;
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < imin(6, kx); ++x) {
@@ -169,7 +168,7 @@ int dmp_dv_pack_conv_weights(
                       buf16p[remap[y + (p - ky)]] = w[offs2 + y * s2 + 6];
                     }
                   }
-                  memcpy(output + out_offs, &buf16[0][0], sizeof(buf16));
+                  memcpy(packed_weights + out_offs, &buf16[0][0], sizeof(buf16));
                 }
                 out_offs += sizeof(buf16);
               }
@@ -184,7 +183,7 @@ int dmp_dv_pack_conv_weights(
       for (int m_start = 0; m_start < n_kernels; m_start += 8) {
         const int m_stop = imin(m_start + 8, n_kernels);
 
-        write_bias(m_start, m_stop, &out_offs, output_size, output, bias);
+        write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, bias);
 
         for (int c_start = 0; c_start < n_channels; c_start += 8) {
           const int c_stop = imin(c_start + 8, n_channels);
@@ -197,7 +196,7 @@ int dmp_dv_pack_conv_weights(
                 if ((t == 0) && (c == c_stop - 1)) {
                   memset(&buf8[0][0], 0, sizeof(buf8));
                 }
-                if (out_offs + sizeof(buf8) <= *output_size) {
+                if (out_offs + sizeof(buf8) <= *packed_weights_size) {
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < kx; ++x) {
                       buf8[7 - t * 6 + y + (p - ky)][x] = w[offs2 + y * s2 + x];
@@ -205,8 +204,8 @@ int dmp_dv_pack_conv_weights(
                   }
                 }
                 if ((t == 1) || ((t == 0) && (c == c_stop - 1))) {
-                  if (out_offs + sizeof(buf8) <= *output_size) {
-                    memcpy(output + out_offs, &buf8[0][0], sizeof(buf8));
+                  if (out_offs + sizeof(buf8) <= *packed_weights_size) {
+                    memcpy(packed_weights + out_offs, &buf8[0][0], sizeof(buf8));
                   }
                   out_offs += sizeof(buf8);
                 }
@@ -220,7 +219,7 @@ int dmp_dv_pack_conv_weights(
                 if ((t == 0) && (c == c_stop - 1)) {
                   memset(&buf16[0][0], 0, sizeof(buf16));
                 }
-                if (out_offs + sizeof(buf16) <= *output_size) {
+                if (out_offs + sizeof(buf16) <= *packed_weights_size) {
                   for (int y = 0; y < ky; ++y) {
                     for (int x = 0; x < kx; ++x) {
                       buf16[7 - t * 6 + y + (p - ky)][x] = w[offs2 + y * s2 + x];
@@ -228,8 +227,8 @@ int dmp_dv_pack_conv_weights(
                   }
                 }
                 if ((t == 1) || ((t == 0) && (c == c_stop - 1))) {
-                  if (out_offs + sizeof(buf16) <= *output_size) {
-                    memcpy(output + out_offs, &buf16[0][0], sizeof(buf16));
+                  if (out_offs + sizeof(buf16) <= *packed_weights_size) {
+                    memcpy(packed_weights + out_offs, &buf16[0][0], sizeof(buf16));
                   }
                   out_offs += sizeof(buf16);
                 }
@@ -245,7 +244,7 @@ int dmp_dv_pack_conv_weights(
       for (int m_start = 0; m_start < n_kernels; m_start += 8) {
         const int m_stop = imin(m_start + 8, n_kernels);
 
-        write_bias(m_start, m_stop, &out_offs, output_size, output, bias);
+        write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, bias);
 
         for (int c_start = 0; c_start < n_channels; c_start += 8) {
           const int c_stop = imin(c_start + 8, n_channels);
@@ -259,7 +258,7 @@ int dmp_dv_pack_conv_weights(
           }
           for (int m = m_start; m < m_stop; ++m) {
             if (quant_map) {  // Quantized 8-bit weights
-              if (out_offs + sizeof(buf8) <= *output_size) {
+              if (out_offs + sizeof(buf8) <= *packed_weights_size) {
                 const uint8_t *w = (const uint8_t*)weights;
                 for (int c = c_start; c < c_stop; ++c) {
                   const int offs2 = m * s0 + c * s1;
@@ -270,12 +269,12 @@ int dmp_dv_pack_conv_weights(
                     }
                   }
                 }
-                memcpy(output + out_offs, &buf8[0][0], sizeof(buf8));
+                memcpy(packed_weights + out_offs, &buf8[0][0], sizeof(buf8));
               }
               out_offs += sizeof(buf8);
             }
             else {  // Half float 16-bit weights
-              if (out_offs + sizeof(buf16) <= *output_size) {
+              if (out_offs + sizeof(buf16) <= *packed_weights_size) {
                 const uint16_t *w = (const uint16_t*)weights;
                 for (int c = c_start; c < c_stop; ++c) {
                   const int offs2 = m * s0 + c * s1;
@@ -286,7 +285,7 @@ int dmp_dv_pack_conv_weights(
                     }
                   }
                 }
-                memcpy(output + out_offs, &buf16[0][0], sizeof(buf16));
+                memcpy(packed_weights + out_offs, &buf16[0][0], sizeof(buf16));
               }
               out_offs += sizeof(buf16);
             }
@@ -300,7 +299,7 @@ int dmp_dv_pack_conv_weights(
       for (int m_start = 0; m_start < n_kernels; m_start += 8) {
         const int m_stop = imin(m_start + 8, n_kernels);
 
-        write_bias(m_start, m_stop, &out_offs, output_size, output, bias);
+        write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, bias);
 
         for (int c_start = 0; c_start < n_channels; c_start += 64) {
           const int c_stop = imin(c_start + 64, n_channels);
@@ -314,7 +313,7 @@ int dmp_dv_pack_conv_weights(
           }
           for (int m = m_start; m < m_stop; ++m) {
             if (quant_map) {  // Quantized 8-bit weights
-              if (out_offs + sizeof(buf8) <= *output_size) {
+              if (out_offs + sizeof(buf8) <= *packed_weights_size) {
                 const uint8_t *w = (const uint8_t*)weights;
                 for (int c = c_start; c < c_stop; ++c) {
                   const int t = c & 7;
@@ -322,12 +321,12 @@ int dmp_dv_pack_conv_weights(
                   const int y = ((c & 63) >> 3) / 3;
                   buf8[11 - (t >> 1) * 3 - y][(t & 1) * 3 + x] = w[m * s0 + c * s1];
                 }
-                memcpy(output + out_offs, &buf8[0][0], sizeof(buf8));
+                memcpy(packed_weights + out_offs, &buf8[0][0], sizeof(buf8));
               }
               out_offs += sizeof(buf8);
             }
             else {  // Half float 16-bit weights
-              if (out_offs + sizeof(buf16) <= *output_size) {
+              if (out_offs + sizeof(buf16) <= *packed_weights_size) {
                 const uint16_t *w = (const uint16_t*)weights;
                 for (int c = c_start; c < c_stop; ++c) {
                   const int t = c & 7;
@@ -335,7 +334,7 @@ int dmp_dv_pack_conv_weights(
                   const int y = ((c & 63) >> 3) / 3;
                   buf16[11 - (t >> 1) * 3 - y][(t & 1) * 3 + x] = w[m * s0 + c * s1];
                 }
-                memcpy(output + out_offs, &buf16[0][0], sizeof(buf16));
+                memcpy(packed_weights + out_offs, &buf16[0][0], sizeof(buf16));
               }
               out_offs += sizeof(buf16);
             }
@@ -351,11 +350,11 @@ int dmp_dv_pack_conv_weights(
     }
   }
 
-  if ((!retval) && (*output_size) && (*output_size < out_offs)) {
-    SET_ERR("Not all weights were filled: provided buffer size %zu while %zu is required", *output_size, out_offs);
+  if ((!retval) && (*packed_weights_size) && (*packed_weights_size < out_offs)) {
+    SET_ERR("Not all weights were filled: provided buffer size %zu while %zu is required", *packed_weights_size, out_offs);
     retval = -1;
   }
 
-  *output_size = out_offs;
+  *packed_weights_size = out_offs;
   return retval;
 }
