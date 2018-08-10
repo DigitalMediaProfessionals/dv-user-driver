@@ -470,6 +470,8 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
       // DV output is stored as chunks by max of 8 channels as width, height, channel
       float max_diff[N_T], max_diff_y[N_T], max_diff_t[N_T];
       memset(max_diff, 0, sizeof(max_diff));
+      memset(max_diff_y, 0, sizeof(max_diff_y));
+      memset(max_diff_t, 0, sizeof(max_diff_t));
       int oo_offs = o_offs;
       for (int chan_group = 0; chan_group < conf->n_kernels; chan_group += 8) {
         const int last_chan = std::min(chan_group + 8, conf->n_kernels);

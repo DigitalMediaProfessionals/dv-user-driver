@@ -20,7 +20,7 @@
 f_device_helper_creator CDMPDVCmdListDeviceHelper::creators_[DMP_DV_DEV_COUNT] = {
     NULL,
     CDMPDVCmdListConvHelper::Create,
-    NULL
+    CDMPDVCmdListFCHelper::Create
 };
 
 

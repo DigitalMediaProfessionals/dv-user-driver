@@ -420,6 +420,8 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
       // DV output is stored as chunks by max of 8 channels as width, height, channel
       float max_diff[N_T], max_diff_y[N_T], max_diff_t[N_T];
       memset(max_diff, 0, sizeof(max_diff));
+      memset(max_diff_y, 0, sizeof(max_diff_y));
+      memset(max_diff_t, 0, sizeof(max_diff_t));
       for (int i = 0; i < conf->output_size; ++i) {
         const __fp16 vle = conf->caffe_output[i];
         const float y = (float)conf->io_ptr[o_offs + i], t = (float)vle;
