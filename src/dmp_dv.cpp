@@ -14,6 +14,8 @@
 #include "context.hpp"
 #include "mem.hpp"
 #include "cmdlist.hpp"
+#include "cmdlist_conv.hpp"
+#include "cmdlist_fc.hpp"
 
 
 /// @brief Creators for the specific device types.
