@@ -57,7 +57,7 @@ static float g_max_diff_t[N_T] = {0, 0, 0, 0, 0, 0};
 
 /// @brief Configuration description to be tested.
 typedef struct fc_config_impl {
-  int input_size, output_size, activation;
+  int c_input, h_input, w_input, c_output, h_output, w_output, activation;
   bool hash_set;
   bool failed;
   uint8_t hash[32];
@@ -68,8 +68,8 @@ typedef struct fc_config_impl {
   bool pure_ints;  // only integers were used - error check should be exact
 
   bool operator <(const struct fc_config_impl& pt) const {
-    return std::make_tuple(input_size, output_size, activation) <
-        std::make_tuple(pt.input_size, pt.output_size, pt.activation);
+    return std::make_tuple(c_input, h_input, w_input, c_output, h_output, w_output, activation) <
+        std::make_tuple(pt.c_input, pt.h_input, pt.w_input, pt.c_output, pt.h_output, pt.w_output, pt.activation);
   }
 } fc_config;
 
@@ -87,7 +87,7 @@ int check_err(float y, float t, fc_config *conf) {
     return diff < dmax ? 0 : -1;
   }
 
-  const int n_adds = conf->input_size;
+  const int n_adds = conf->c_input * conf->h_input * conf->w_input;
 
   const float ta = std::abs(t);
 
@@ -123,8 +123,8 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
   LOG("ENTER: test_cmdlists: %d commands:", (int)confs.size());
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     fc_config *conf = *it;
-    snprintf(prefix, sizeof(prefix), "data/%d/%d_act%d",
-             conf->input_size, conf->output_size, conf->activation);
+    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%d_act%d",
+             conf->c_input, conf->h_input, conf->w_input, conf->c_output * conf->h_output * conf->w_output, conf->activation);
     LOG(" %s", prefix);
   }
   LOG("\n");
@@ -167,8 +167,11 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
   // Outer loop by configurations to be packed in the single command list
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     fc_config *conf = *it;
-    snprintf(prefix, sizeof(prefix), "data/%d/%d_act%d",
-             conf->input_size, conf->output_size, conf->activation);
+    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%d_act%d",
+             conf->c_input, conf->h_input, conf->w_input, conf->c_output * conf->h_output * conf->w_output, conf->activation);
+
+    const int input_size = conf->c_input * conf->h_input * conf->w_input;
+    const int output_size = conf->c_output * conf->h_output * conf->w_output;
 
     // Load quantization map
     snprintf(fnme, sizeof(fnme), "%s.q.bin", prefix);
@@ -196,12 +199,13 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
       ERR("fopen() failed for %s\n", fnme);
       goto L_EXIT;
     }
-    caffe_input.resize(conf->input_size);
+
+    caffe_input.resize(input_size);
     n = fread(caffe_input.data(), sizeof(caffe_input[0]), caffe_input.size(), fin);
     fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
     fclose(fin);
-    if (n != conf->input_size) {
-      ERR("fread() returned %d while expecting %d for %s\n", n, conf->input_size, fnme);
+    if (n != input_size) {
+      ERR("fread() returned %d while expecting %d for %s\n", n, input_size, fnme);
       goto L_EXIT;
     }
     if (!fend) {
@@ -219,13 +223,13 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
       ERR("fopen() failed for %s\n", fnme);
       goto L_EXIT;
     }
-    caffe_weights.resize(conf->input_size * conf->output_size);
+    caffe_weights.resize(input_size * output_size);
     n = fread(caffe_weights.data(), sizeof(caffe_weights[0]), caffe_weights.size(), fin);
     fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
     fclose(fin);
-    if (n != conf->input_size * conf->output_size) {
+    if (n != input_size * output_size) {
       ERR("fread() returned %d while expecting %d for %s\n",
-          n, conf->input_size * conf->output_size, fnme);
+          n, input_size * output_size, fnme);
       goto L_EXIT;
     }
     if (!fend) {
@@ -240,12 +244,12 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
       ERR("fopen() failed for %s\n", fnme);
       goto L_EXIT;
     }
-    caffe_bias.resize(conf->output_size);
+    caffe_bias.resize(output_size);
     n = fread(caffe_bias.data(), sizeof(caffe_bias[0]), caffe_bias.size(), fin);
     fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
     fclose(fin);
-    if (n != conf->output_size) {
-      ERR("fread() returned %d while expecting %d for %s\n", n, conf->output_size, fnme);
+    if (n != output_size) {
+      ERR("fread() returned %d while expecting %d for %s\n", n, output_size, fnme);
       goto L_EXIT;
     }
     if (!fend) {
@@ -261,12 +265,12 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
         ERR("fopen() failed for %s\n", fnme);
         goto L_EXIT;
       }
-      conf->caffe_output = (__fp16*)malloc(conf->output_size * sizeof(__fp16));
-      n = fread(conf->caffe_output, sizeof(__fp16), conf->output_size, fin);
+      conf->caffe_output = (__fp16*)malloc(output_size * sizeof(__fp16));
+      n = fread(conf->caffe_output, sizeof(__fp16), output_size, fin);
       fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
       fclose(fin);
-      if (n != conf->output_size) {
-        ERR("fread() returned %d while expecting %d for %s\n", n, conf->output_size, fnme);
+      if (n != output_size) {
+        ERR("fread() returned %d while expecting %d for %s\n", n, output_size, fnme);
         goto L_EXIT;
       }
       if (!fend) {
@@ -279,11 +283,11 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
     cmd.header.size = sizeof(cmd);
     cmd.header.device_type = DMP_DV_DEV_FC;
     cmd.header.version = 0;
-    cmd.input_size = conf->input_size;
-    cmd.output_size = conf->output_size;
+    cmd.input_size = input_size;
+    cmd.output_size = output_size;
     cmd.actfunc = conf->activation;
 
-    conf->io_size = (roundup(conf->input_size, 4) + roundup(conf->output_size, 4)) * sizeof(__fp16);
+    conf->io_size = (roundup(input_size, 4) + roundup(output_size, 4)) * sizeof(__fp16);
     conf->io_mem = dmp_dv_mem_alloc(ctx, conf->io_size);
     if (!conf->io_mem) {
       ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", conf->io_size, dmp_dv_get_last_error_message());
@@ -293,11 +297,12 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
     cmd.input_buf.mem = conf->io_mem;
     cmd.input_buf.offs = 0;
     cmd.output_buf.mem = conf->io_mem;
-    cmd.output_buf.offs = roundup(conf->input_size, 4) * sizeof(__fp16);
+    cmd.output_buf.offs = roundup(input_size, 4) * sizeof(__fp16);
 
     weights_size = 0;
     if (dmp_dv_pack_fc_weights(
-            conf->input_size, 1, 1, conf->output_size,
+            conf->c_input, conf->h_input, conf->w_input,
+            conf->c_output, conf->h_output, conf->w_output,
             quant_map, NULL, NULL, NULL, &weights_size)) {
       ERR("dmp_dv_pack_fc_weights() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
@@ -325,7 +330,8 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
 
     // Fill weights
     if (dmp_dv_pack_fc_weights(
-          conf->input_size, 1, 1, conf->output_size,
+          conf->c_input, conf->h_input, conf->w_input,
+          conf->c_output, conf->h_output, conf->w_output,
           quant_map, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size)) {
       ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
@@ -361,7 +367,7 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
         }
       }
     }*/
-    memcpy(conf->io_ptr, caffe_input.data(), conf->input_size * 2);
+    memcpy(conf->io_ptr, caffe_input.data(), input_size * 2);
 
     if (dmp_dv_mem_sync_end(conf->io_mem)) {
       ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
@@ -397,18 +403,21 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     fc_config *conf = *it;
 
+    const int input_size = conf->c_input * conf->h_input * conf->w_input;
+    const int output_size = conf->c_output * conf->h_output * conf->w_output;
+
     if (dmp_dv_mem_sync_start(conf->io_mem, 1, 0)) {
       ERR("dmp_dv_mem_sync_start() failed for input/output: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
 
     // Compare output with the gold one
-    const int o_offs = roundup(conf->input_size, 4);
+    const int o_offs = roundup(input_size, 4);
     if (conf->hash_set) {  // check hash
       uint8_t hash[32];
       SHA256_CTX sha256;
       SHA256_Init(&sha256);
-      SHA256_Update(&sha256, conf->io_ptr + o_offs, conf->output_size * sizeof(__fp16));
+      SHA256_Update(&sha256, conf->io_ptr + o_offs, output_size * sizeof(__fp16));
       SHA256_Final(hash, &sha256);
       if (memcmp(conf->hash, hash, 32)) {
         ERR("Hash differs\n");
@@ -422,7 +431,7 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
       memset(max_diff, 0, sizeof(max_diff));
       memset(max_diff_y, 0, sizeof(max_diff_y));
       memset(max_diff_t, 0, sizeof(max_diff_t));
-      for (int i = 0; i < conf->output_size; ++i) {
+      for (int i = 0; i < output_size; ++i) {
         const __fp16 vle = conf->caffe_output[i];
         const float y = (float)conf->io_ptr[o_offs + i], t = (float)vle;
         caffe_a = std::min(caffe_a, t);
@@ -472,14 +481,14 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
       }
     }
     if (!conf->failed) {  // compute hash
-      const int output_size = conf->output_size * sizeof(__fp16);
-      if (o_offs * sizeof(__fp16) + output_size > conf->io_size) {
+      const int n_bytes = output_size * sizeof(__fp16);
+      if (o_offs * sizeof(__fp16) + n_bytes > conf->io_size) {
         ERR("Incorrect allocation size for input/output");
         _exit(-1);
       }
       SHA256_CTX sha256;
       SHA256_Init(&sha256);
-      SHA256_Update(&sha256, conf->io_ptr + o_offs, output_size);
+      SHA256_Update(&sha256, conf->io_ptr + o_offs, n_bytes);
       SHA256_Final(&conf->hash[0], &sha256);
       conf->hash_set = true;
     }
@@ -544,8 +553,8 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
   LOG("EXIT: test_cmdlists: %d commands, %d FDs:", (int)confs.size(), n_fd);
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     fc_config *conf = *it;
-    snprintf(prefix, sizeof(prefix), "data/%d/%d_act%d",
-             conf->input_size, conf->output_size, conf->activation);
+    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%d_act%d",
+             conf->c_input, conf->h_input, conf->w_input, conf->c_output * conf->h_output * conf->w_output, conf->activation);
     LOG(" %s", prefix);
   }
   LOG("\n");
@@ -591,7 +600,7 @@ int main(int argc, char **argv) {
         break;
       }
     }
-    if (sscanf(fnme, "%d", &config.input_size) != 1) {
+    if (sscanf(fnme, "%d%d%d", &config.c_input, &config.h_input, &config.w_input) != 3) {
       continue;
     }
     snprintf(fnme, sizeof(fnme), "data/%s", dir->d_name);
@@ -611,14 +620,22 @@ int main(int argc, char **argv) {
         }
       }
 
-      if (sscanf(fnme, "%d%d",
-                 &config.output_size, &config.activation) != 2) {
+      config.h_output = 1;
+      config.w_output = 1;
+      if (sscanf(fnme, "%d%d", &config.c_output, &config.activation) != 2) {
+        continue;
+      }
+
+      const int input_size = config.c_input * config.h_input * config.w_input;
+      const int output_size = config.c_output * config.h_output * config.w_output;
+      if ((input_size > 65535) || (output_size > 65535)) {
+        ERR("Input/output size is too large: %d => %d\n", input_size, output_size);
         continue;
       }
 
       char prefix[256];
-      snprintf(prefix, sizeof(prefix), "data/%d/%d_act%d",
-               config.input_size, config.output_size, config.activation);
+      snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%d_act%d",
+               config.c_input, config.h_input, config.w_input, config.c_output * config.h_output * config.w_output, config.activation);
 
       const int prev_size = (int)config_set->size();
       config_set->emplace(config);

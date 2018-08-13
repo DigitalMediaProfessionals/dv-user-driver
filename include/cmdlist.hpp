@@ -530,7 +530,8 @@ class CDMPDVCmdListFCHelper : public CDMPDVCmdListKHelper {
     size_t weights_size = 0;
     uint16_t quant_map[256];
     int res = dmp_dv_pack_fc_weights(
-        cmd->input_size, 1, 1, cmd->output_size,
+        cmd->input_size, 1, 1,
+        cmd->output_size, 1, 1,
         cmd->weight_fmt == 1 ? quant_map : NULL,
         NULL, NULL, NULL, &weights_size);
     if (res) {

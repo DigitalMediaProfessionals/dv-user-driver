@@ -13,47 +13,41 @@
 #include "common.h"
 
 
-/// @brief Packs fully connected layer weights and biases into output array.
-/// @param n_channels Number of input channels (or input size in case of 1D input).
-/// @param height Input height (set to 1 in case of 1D input).
-/// @param width Input width (set to 1 in case of 1D input).
-/// @param output_size Output size in elements.
-/// @param quant_map Quantization table for weights (but not bias), can be NULL.
+/// @brief Packs fully connected layer weights and biases into output array possibly rearranging them to match input and output shapes.
+/// @param c_input Number of input channels.
+/// @param h_input Input height (set to 1 for 1D input).
+/// @param w_input Input width (set to 1 for 1D input).
+/// @param c_output Number of output channels.
+/// @param h_output Output height (set to 1 for 1D output).
+/// @param w_output Output width (set to 1 for 1D output).
+/// @param quant_map Quantization table for weights (but not bias), 256 elements, can be NULL.
 /// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format (N=output_size), else array of 1-byte indices.
 /// @param bias Array of half precision floating point biases of size output_size.
 /// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
 /// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
 /// @return 0 on success, non-zero otherwise.
-/// @details It is thread-safe.
+/// @details The function packs weights in Caffe NCHW format to the DV input format WHC8
+///          with rearranging to produce output in DV format WHC8.
+///          It is thread-safe.
 int dmp_dv_pack_fc_weights(
-    int n_channels, int height, int width, int output_size,
+    int c_input, int h_input, int w_input,
+    int c_output, int h_output, int w_output,
     const uint16_t quant_map[256],
     const void *weights, const uint16_t *bias,
     uint8_t *packed_weights, size_t *packed_weights_size) {
 
-  if (n_channels <= 0) {
-    SET_ERR("Number of input channels must be positive, got %d", n_channels);
-    return -1;
-  }
-  if (height <= 0) {
-    SET_ERR("Height must be positive, got %d", height);
-    return -1;
-  }
-  if (width <= 0) {
-    SET_ERR("Width must be positive, got %d", width);
-    return -1;
-  }
-  if (output_size <= 0) {
-    SET_ERR("Output size must be positive, got %d", output_size);
-    return -1;
+  if ((c_input <= 0) || (h_input <= 0) || (w_input <= 0) ||
+      (c_output <= 0) || (h_output <= 0) || (w_output <= 0)) {
+    SET_ERR("Input/output dimensions must be positive");
+    return EINVAL;
   }
   if (!packed_weights_size) {
     SET_ERR("packed_weights_size must not be NULL");
-    return -1;
+    return EINVAL;
   }
   if ((!packed_weights) && (*packed_weights_size)) {
     SET_ERR("packed_weights is NULL but *packed_weights_size is non-zero");
-    return -1;
+    return EINVAL;
   }
 
   size_t out_offs = 0;
@@ -64,8 +58,10 @@ int dmp_dv_pack_fc_weights(
     out_offs += 512;
   }
 
-  if ((height == 1) && (width == 1)) {  // 1D input
-    size_t weights_size = (size_t)n_channels * output_size;
+  size_t output_size;
+  if ((h_input == 1) && (w_input == 1) &&
+      (h_output == 1) && (w_output == 1)) {  // 1D input and 1D output
+    size_t weights_size = (size_t)c_input * c_output;
     if (!quant_map) {
       weights_size <<= 1;
     }
@@ -73,9 +69,10 @@ int dmp_dv_pack_fc_weights(
       memcpy(packed_weights + out_offs, weights, weights_size);
     }
     out_offs += weights_size;
+    output_size = c_output;
   }
   else {
-    SET_ERR("CHW input is not yet supported");
+    SET_ERR("CHW input/output is not yet supported");
     return -1;
   }
 

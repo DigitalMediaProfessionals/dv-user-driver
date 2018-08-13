@@ -32,26 +32,41 @@ class Main(object):
         self.generate_fc(args)
 
     def generate_fc(self, args):
+        # Generate 1D inputs
         for input_size in (512, 1024):
             for output_size in (512, 1024):
                 for act in (0,):
-                    self.generate(input_size, output_size, act, args)
+                    self.generate((input_size, 1, 1), output_size, act, args)
 
-    def generate(self, input_size, output_size, activation, args):
+        # Generate 3D inputs
+        for c in (8, 256):
+            for h in (8, 16):
+                for w in (8, 16):
+                    for output_size in (512, 1024):
+                        for act in (0,):
+                            self.generate((c, h, w), output_size, act, args)
+
+    def generate(self, input_shape, output_size, activation, args):
         """Generates test data for fully connected layer and invokes caffe
         to generate gold output.
 
         Parameters:
-            input_size: size of the input in elements.
+            input_shape: input shape in CHW format.
             output_size: size of the output in elements.
             activation: activation function (0 - none, 1 - tanh,
                         3 - sigmoid, 5 - elu).
         """
+        assert len(input_shape) == 3
+        assert all(x > 0 for x in input_shape)
+        input_size = int(numpy.prod(input_shape))
+        if input_size > 65535 or output_size > 65535:
+            return
+
         try:
             os.mkdir("data")
         except OSError:
             pass
-        s_dir = "data/%d" % input_size
+        s_dir = "data/%dx%dx%d" % input_shape
         try:
             os.mkdir(s_dir)
         except OSError:
@@ -71,7 +86,8 @@ class Main(object):
         bias = numpy.random.choice(values, output_size).astype(numpy.float16)
         bias.tofile("%s.b.bin" % prefix)
 
-        input = numpy.random.choice(values, input_size).astype(numpy.float16)
+        input = numpy.random.choice(values, input_size).reshape(
+            input_shape).astype(numpy.float16)
         input.tofile("%s.i.bin" % prefix)
 
         quant = numpy.random.choice(values, 256).astype(numpy.float16)
@@ -83,7 +99,8 @@ class Main(object):
         i_weights = numpy.random.randint(
             0, 256, input_size * output_size).astype(numpy.uint8)
         i_weights.tofile("%s.w.bin" % prefix)
-        weights = quant[i_weights].copy().reshape(output_size, input_size)
+        weights = quant[i_weights].copy().reshape(
+            output_size, input_shape[0], input_shape[1], input_shape[2])
         assert numpy.count_nonzero(numpy.isnan(weights)) == 0
         del i_weights
         del quant
@@ -103,8 +120,8 @@ layer {
   input_param {
     shape {
       dim: 1
-      dim: 1
-      dim: 1
+      dim: %d
+      dim: %d
       dim: %d
     }
   }
@@ -118,7 +135,7 @@ layer {
     num_output: %d
   }
 }
-""" % (input_size, output_size))
+""" % (input_shape[0], input_shape[1], input_shape[2], output_size))
             if activation == 5:
                 fout.write("""
 layer {
@@ -154,7 +171,7 @@ layer {
         net.params["fc1"][1].data[:] = bias.astype(numpy.float32)
         del bias
 
-        net.blobs["data"].data[0, 0, 0, :] = input.astype(numpy.float32)
+        net.blobs["data"].data[0, :, :, :] = input.astype(numpy.float32)
         del input
 
         results = net.forward()

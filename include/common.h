@@ -21,6 +21,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <errno.h>
 
 #include <linux/dma-buf.h>
 #include "ion.h"
