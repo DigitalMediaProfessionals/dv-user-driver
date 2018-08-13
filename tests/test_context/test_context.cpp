@@ -55,17 +55,18 @@ int test_context() {
   info.max_kernel_size = -1;
   info.conv_freq = -1;
   info.fc_freq = -1;
+  info.max_fc_vector_size = -1;
   if (dmp_dv_context_get_info(ctx, (dmp_dv_info*)&info)) {
     ERR("dmp_dv_context_get_info() failed: %s\n", dmp_dv_get_last_error_message());
     dmp_dv_context_release(ctx);
     return -1;
   }
 
-  LOG("ub_size=%d\nmax_kernel_size=%d\nconv_freq=%d\nfc_freq=%d\n",
-      info.ub_size, info.max_kernel_size, info.conv_freq, info.fc_freq);
+  LOG("ub_size=%d\nmax_kernel_size=%d\nconv_freq=%d\nfc_freq=%d\nmax_fc_vector_size=%d\n",
+      info.ub_size, info.max_kernel_size, info.conv_freq, info.fc_freq, info.max_fc_vector_size);
 
   if ((info.ub_size < 0) || (info.max_kernel_size < 0) ||
-      (info.conv_freq < 0) || (info.fc_freq < 0)) {
+      (info.conv_freq < 0) || (info.fc_freq < 0) || (info.max_fc_vector_size < 0)) {
     ERR("dmp_dv_context_get_info() returned some invalid values\n");
     dmp_dv_context_release(ctx);
     return -1;

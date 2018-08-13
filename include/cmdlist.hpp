@@ -525,6 +525,12 @@ class CDMPDVCmdListFCHelper : public CDMPDVCmdListKHelper {
       return -1;
     }
 
+    if ((int)cmd->input_size > ctx_->get_max_fc_vector_size()) {
+      SET_ERR("Unsupported input vector size %d, only sizes from 1 to %d are supported",
+              (int)cmd->input_size, ctx_->get_max_fc_vector_size());
+      return -1;
+    }
+
     input_bufs.push_back(std::make_pair(cmd->input_buf, cmd->input_size * 2));
 
     size_t weights_size = 0;

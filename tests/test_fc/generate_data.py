@@ -39,12 +39,15 @@ class Main(object):
                     self.generate((input_size, 1, 1), output_size, act, args)
 
         # Generate 3D inputs
-        for c in (8, 256):
+        for c in (8, 128):
             for h in (8, 16):
                 for w in (8, 16):
-                    for output_size in (512, 1024):
+                    for output_size in (256, 512):
                         for act in (0,):
                             self.generate((c, h, w), output_size, act, args)
+
+        self.generate((16383, 1, 1), 512, 0, args)
+        self.generate((16384, 1, 1), 512, 0, args)
 
     def generate(self, input_shape, output_size, activation, args):
         """Generates test data for fully connected layer and invokes caffe
@@ -59,7 +62,7 @@ class Main(object):
         assert len(input_shape) == 3
         assert all(x > 0 for x in input_shape)
         input_size = int(numpy.prod(input_shape))
-        if input_size > 65535 or output_size > 65535:
+        if input_size > 16484 or output_size > 16484:
             return
 
         try:

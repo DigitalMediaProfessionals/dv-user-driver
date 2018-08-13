@@ -353,21 +353,25 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
     }
     memset(conf->io_ptr, 0, conf->io_size);
 
-    /*// Caffe's input is stored as channel, height, width
-    // DV input should be stored as chunks by max of 8 channels as width, height, channel
-    for (int chan_group = 0, o_offs = 0; chan_group < conf->n_channels; chan_group += 8) {
-      const int last_chan = std::min(chan_group + 8, conf->n_channels);
-      for (int i = 0; i < conf->width; ++i) {
-        for (int j = 0; j < conf->height; ++j) {
-          for (int k = chan_group; k < last_chan; ++k, ++o_offs) {
-            const int i_offs = k * conf->width * conf->height + j * conf->width + i;
-            const __fp16 vle = caffe_input[i_offs];
-            conf->io_ptr[o_offs] = vle;
+    if ((conf->h_input == 1) && (conf->w_input == 1)) {
+      memcpy(conf->io_ptr, caffe_input.data(), input_size * 2);
+    }
+    else {
+      // Caffe's input is stored as channel, height, width
+      // DV input should be stored as chunks by max of 8 channels as width, height, channel
+      for (int chan_group = 0, o_offs = 0; chan_group < conf->c_input; chan_group += 8) {
+        const int last_chan = std::min(chan_group + 8, conf->c_input);
+        for (int i = 0; i < conf->w_input; ++i) {
+          for (int j = 0; j < conf->h_input; ++j) {
+            for (int k = chan_group; k < last_chan; ++k, ++o_offs) {
+              const int i_offs = k * conf->h_input * conf->w_input + j * conf->w_input + i;
+              const __fp16 vle = caffe_input[i_offs];
+              conf->io_ptr[o_offs] = vle;
+            }
           }
         }
       }
-    }*/
-    memcpy(conf->io_ptr, caffe_input.data(), input_size * 2);
+    }
 
     if (dmp_dv_mem_sync_end(conf->io_mem)) {
       ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
@@ -623,13 +627,6 @@ int main(int argc, char **argv) {
       config.h_output = 1;
       config.w_output = 1;
       if (sscanf(fnme, "%d%d", &config.c_output, &config.activation) != 2) {
-        continue;
-      }
-
-      const int input_size = config.c_input * config.h_input * config.w_input;
-      const int output_size = config.c_output * config.h_output * config.w_output;
-      if ((input_size > 65535) || (output_size > 65535)) {
-        ERR("Input/output size is too large: %d => %d\n", input_size, output_size);
         continue;
       }
 

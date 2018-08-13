@@ -69,12 +69,14 @@ typedef struct dmp_dv_info_impl {
 
 /// @brief Structure with information about the context (version 0).
 typedef struct dmp_dv_info_v0_impl {
-  uint32_t size;            // size of this structure
-  uint32_t version;         // version of this structure (set to 0)
-  int32_t ub_size;          // unified buffer size
-  int32_t max_kernel_size;  // maximum supported convolutional kernel size
-  int32_t conv_freq;        // convolutional block frequency in MHz
-  int32_t fc_freq;          // fully connected block frequency in MHz
+  uint32_t size;               // size of this structure
+  uint32_t version;            // version of this structure (set to 0)
+  int32_t ub_size;             // unified buffer size
+  int32_t max_kernel_size;     // maximum supported convolutional kernel size
+  int32_t conv_freq;           // convolutional block frequency in MHz
+  int32_t fc_freq;             // fully connected block frequency in MHz
+  int32_t max_fc_vector_size;  // fully connected block maximum input vector size in elements
+  int32_t rsvd;                // padding to 64-bits
 } dmp_dv_info_v0;
 
 

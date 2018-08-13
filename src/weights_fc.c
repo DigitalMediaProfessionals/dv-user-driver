@@ -26,8 +26,9 @@
 /// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
 /// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
 /// @return 0 on success, non-zero otherwise.
-/// @details The function packs weights in Caffe NCHW format to the DV input format WHC8
-///          with rearranging to produce output in DV format WHC8.
+/// @details The function packs weights in Caffe NCHW format in such way that DV input format WHC8 (blocks of (width, heights, 8 channels))
+///          will produce output in DV format WHC8.
+///          Weights are packed in NCHW with N=(c_output, h_output, w_output) and will be rearranged to match DV format WHC8.
 ///          It is thread-safe.
 int dmp_dv_pack_fc_weights(
     int c_input, int h_input, int w_input,
@@ -61,7 +62,8 @@ int dmp_dv_pack_fc_weights(
   size_t output_size;
   if ((h_input == 1) && (w_input == 1) &&
       (h_output == 1) && (w_output == 1)) {  // 1D input and 1D output
-    size_t weights_size = (size_t)c_input * c_output;
+    output_size = c_output;
+    size_t weights_size = (size_t)c_input * output_size;
     if (!quant_map) {
       weights_size <<= 1;
     }
@@ -69,11 +71,64 @@ int dmp_dv_pack_fc_weights(
       memcpy(packed_weights + out_offs, weights, weights_size);
     }
     out_offs += weights_size;
-    output_size = c_output;
   }
   else {
-    SET_ERR("CHW input/output is not yet supported");
-    return -1;
+    const int s1 = h_input * w_input;
+    const int s2 = c_input * s1;
+    const int s3 = w_output * s2;
+    const int s4 = h_output * s3;
+    output_size = c_output * h_output * w_output;
+    const size_t weights_size = (size_t)c_input * h_input * w_input * output_size;
+    if ((quant_map) && (out_offs + weights_size <= *packed_weights_size)) {
+      // Input is in 1CHW format, weights are NCHW where N=(chw) itself:
+      // weights are: (N=(c_output, h_output, w_output), C=c_input, H=h_input, W=w_input)
+      // => (w_output, h_output, 8)+, (w_input, h_input, 8)+.
+      const uint8_t *wi = (const uint8_t*)weights;
+      uint8_t *wo = packed_weights + out_offs;
+      for (int c_out_start = 0, o_offs = 0; c_out_start < c_output; c_out_start += 8) {
+        const int c_out_end = c_out_start + 8 <= c_output ? c_out_start + 8 : c_output;
+        for (int w_out = 0; w_out < w_output; ++w_out) {
+          for (int h_out = 0; h_out < h_output; ++h_out) {
+            for (int c_out = c_out_start; c_out < c_out_end; ++c_out) {
+              for (int c_in_start = 0; c_in_start < c_input; c_in_start += 8) {
+                const int c_in_end = c_in_start + 8 <= c_input ? c_in_start + 8 : c_input;
+                for (int w_in = 0; w_in < w_input; ++w_in) {
+                  for (int h_in = 0; h_in < h_input; ++h_in) {
+                    for (int c_in = c_in_start; c_in < c_in_end; ++c_in, ++o_offs) {
+                      wo[o_offs] = wi[c_out * s4 + h_out * s3 + w_out * s2 + c_in * s1 + h_in * w_input + w_in];
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    else if ((!quant_map) && (out_offs + weights_size * 2 <= *packed_weights_size)) {
+      const uint16_t *wi = (const uint16_t*)weights;
+      uint16_t *wo = (uint16_t*)(packed_weights + out_offs);
+      for (int c_out_start = 0, o_offs = 0; c_out_start < c_output; c_out_start += 8) {
+        const int c_out_end = c_out_start + 8 <= c_output ? c_out_start + 8 : c_output;
+        for (int w_out = 0; w_out < w_output; ++w_out) {
+          for (int h_out = 0; h_out < h_output; ++h_out) {
+            for (int c_out = c_out_start; c_out < c_out_end; ++c_out) {
+              for (int c_in_start = 0; c_in_start < c_input; c_in_start += 8) {
+                const int c_in_end = c_in_start + 8 <= c_input ? c_in_start + 8 : c_input;
+                for (int w_in = 0; w_in < w_input; ++w_in) {
+                  for (int h_in = 0; h_in < h_input; ++h_in) {
+                    for (int c_in = c_in_start; c_in < c_in_end; ++c_in, ++o_offs) {
+                      wo[o_offs] = wi[c_out * s4 + h_out * s3 + w_out * s2 + c_in * s1 + h_in * w_input + w_in];
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    out_offs += quant_map ? weights_size : weights_size << 1;
   }
 
   if (out_offs + output_size * 2 <= *packed_weights_size) {
@@ -89,27 +144,4 @@ int dmp_dv_pack_fc_weights(
 
   *packed_weights_size = out_offs;
   return res;
-  /*
-    centers, labels = calc_kmeans(node._weight)
-    index8 = labels.astype(np.uint8)
-    bias16 = node._bias.astype(np.float16)
-
-    centers.tofile(of)
-    if conv_node is not None:
-        if len(conv_node._output_dim) == 3:
-            w, h, c = conv_node._output_dim
-        elif len(conv_node._output_dim) == 1:
-            w, h, c = 1, 1, conv_node._output_dim[0]
-        m = node._param.num_output
-        if w != 1 or h != 1:
-            logging.info('Reordering FC weight for node: %s.', node._name)
-            index8.shape = (m, c, h, w)
-            for n in range(m):
-                for d in range(0, c, 8):
-                    e = d + 8 if d + 8 < c else c
-                    tr_index8 = index8[n, d:e, :, :].transpose(2, 1, 0)
-                    index8[n, d:e, :, :] = tr_index8.reshape(e - d, h, w)
-    index8.tofile(of)
-    bias16.tofile(of)
-   */
 }

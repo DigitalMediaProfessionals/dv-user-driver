@@ -32,6 +32,7 @@ class CDMPDVContext : public CDMPDVBase {
     max_kernel_size_ = 3;
     conv_freq_ = 0;
     fc_freq_ = 0;
+    max_fc_vector_size_ = 16384;
   }
 
   /// @brief Called when the object is about to be destroyed.
@@ -101,21 +102,24 @@ class CDMPDVContext : public CDMPDVBase {
       return false;
     }
 
-    ub_size_ = sysfs_read_int("/sys/devices/platform/dmp_dv/ub_size", 0);
-    max_kernel_size_ = sysfs_read_int("/sys/devices/platform/dmp_dv/max_kernel_size", 3);
-    conv_freq_ = sysfs_read_int("/sys/devices/platform/dmp_dv/conv_freq", 0);
-    fc_freq_ = sysfs_read_int("/sys/devices/platform/dmp_dv/fc_freq", 0);
+    ub_size_ = sysfs_read_int("ub_size", 0);
+    max_kernel_size_ = sysfs_read_int("max_kernel_size", 3);
+    conv_freq_ = sysfs_read_int("conv_freq", 0);
+    fc_freq_ = sysfs_read_int("fc_freq", 0);
+    max_fc_vector_size_ = sysfs_read_int("max_fc_vector_size", 16384);
 
     char s[256];
-    snprintf(s, sizeof(s), "DMP DV: ub_size=%d max_kernel_size=%d conv_freq=%d fc_freq=%d",
-             ub_size_, max_kernel_size_, conv_freq_, fc_freq_);
+    snprintf(s, sizeof(s), "DMP DV: ub_size=%d max_kernel_size=%d conv_freq=%d fc_freq=%d max_fc_vector_size=%d",
+             ub_size_, max_kernel_size_, conv_freq_, fc_freq_, max_fc_vector_size_);
     info_ = s;
 
     return true;
   }
 
   /// @brief Reads single int value from sysfs file.
-  int sysfs_read_int(const char *path, int def) {
+  int sysfs_read_int(const char *key, int def) {
+    char path[256];
+    snprintf(path, sizeof(path), "/sys/devices/platform/dmp_dv/%s", key);
     FILE *fin = fopen(path, "r");
     if (!fin) {
       return def;
@@ -148,6 +152,11 @@ class CDMPDVContext : public CDMPDVBase {
     return max_kernel_size_;
   }
 
+  /// @brief Returns maximum supported fully connected block input size.
+  inline int get_max_fc_vector_size() const {
+    return max_fc_vector_size_;
+  }
+
   int GetInfo(dmp_dv_info *p_info) {
     if (p_info->size < 8) {
       SET_ERR("Invalid argument: info->size is too small: %u", p_info->size);
@@ -160,6 +169,7 @@ class CDMPDVContext : public CDMPDVBase {
       info->max_kernel_size = max_kernel_size_;
       info->conv_freq = conv_freq_;
       info->fc_freq = fc_freq_;
+      info->max_fc_vector_size = max_fc_vector_size_;
     }
     return 0;
   }
@@ -176,6 +186,9 @@ class CDMPDVContext : public CDMPDVBase {
 
   /// @brief Fully Connected block frequency in MHz.
   int fc_freq_;
+
+  /// @brief Fully Connected block maximum input vector size in elements.
+  int max_fc_vector_size_;
 
   /// @brief Device information.
   std::string info_;
