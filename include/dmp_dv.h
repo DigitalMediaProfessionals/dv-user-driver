@@ -122,6 +122,7 @@ dmp_dv_mem* dmp_dv_mem_alloc(dmp_dv_context *ctx, size_t size);
 /// @brief Releases allocated memory (decreses reference counter).
 /// @param mem Handle for the allocated memory, when NULL it is ignored.
 /// @details Call this when "mem" is no longer needed.
+///          dmp_dv_mem_unmap() will be called automatically before the memory is returned to the system.
 ///          It is thread-safe.
 void dmp_dv_mem_release(dmp_dv_mem *mem);
 
@@ -144,6 +145,7 @@ uint8_t *dmp_dv_mem_map(dmp_dv_mem *mem);
 /// @brief Unmaps previously allocated and mapped memory from the user address space.
 /// @param mem Handle to the allocated memory, when NULL the error is returned.
 /// @details Function can be called repeatedly.
+///          dmp_dv_mem_sync_end() will be called automatically before unmapping.
 ///          It is thread-safe only on different memory handles.
 void dmp_dv_mem_unmap(dmp_dv_mem *mem);
 

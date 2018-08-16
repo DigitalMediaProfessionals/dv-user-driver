@@ -359,6 +359,10 @@ class CDMPDVCmdList : public CDMPDVBase {
   /// @brief Schedules commited command list for execution.
   /// @return >= 0 - execution id on sucess, < 0 on error.
   int64_t Exec() {
+    if (!commited_) {
+      SET_ERR("Command list is not in commited state");
+      return -EINVAL;
+    }
     if (single_device_) {
       return single_device_->Exec();
     }
