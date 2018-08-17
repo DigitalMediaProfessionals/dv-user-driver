@@ -103,7 +103,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
     uint64_t output_size = 0;
     for (int topo = cmd->topo, i = 0; topo; topo >>= 1, ++i) {
       // Check for validness
-      if ((!cmd->run[i].conv_enable) && (!cmd->run[i].pool_enable) && (!cmd->run[i].actfunc)) {
+      if ((!cmd->run[i].conv_enable) && (!cmd->run[i].pool_enable) &&
+          (!cmd->run[i].actfunc) && (!(cmd->run[i].lrn & 1))) {
         SET_ERR("Invalid argument: cmd->run[%d] specify no operation", i);
         return -1;
       }
