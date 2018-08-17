@@ -117,18 +117,23 @@ class CDMPDVMem : public CDMPDVBase {
 
   /// @brief Starts CPU <-> Device memory syncronization.
   int SyncStart(int rd, int wr) {
+    if (!map_ptr_) {
+      SET_ERR("Memory must be mapped before starting synchronization");
+      return EINVAL;
+    }
+    int new_sync_flags = (rd ? DMA_BUF_SYNC_READ : 0) | (wr ? DMA_BUF_SYNC_WRITE : 0);
+    if (!new_sync_flags) {
+      SET_ERR("Invalid arguments: either rd or wr must be non-zero");
+      return EINVAL;
+    }
+    if ((sync_flags_ | new_sync_flags) == sync_flags_) {  // already mapped with same or greater set of flags
+      return 0;
+    }
     int res = SyncEnd();
     if (res) {
       return res;
     }
-    if (!map_ptr_) {
-      return 0;
-    }
-    sync_flags_ = (rd ? DMA_BUF_SYNC_READ : 0) | (wr ? DMA_BUF_SYNC_WRITE : 0);
-    if (!sync_flags_) {
-      SET_ERR("Invalid arguments: either rd or wr should be non-zero");
-      return -1;
-    }
+    sync_flags_ = new_sync_flags;
     struct dma_buf_sync sync_args;
     memset(&sync_args, 0, sizeof(sync_args));
     sync_args.flags = DMA_BUF_SYNC_START | sync_flags_;

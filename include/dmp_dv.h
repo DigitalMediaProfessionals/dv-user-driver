@@ -155,14 +155,16 @@ void dmp_dv_mem_unmap(dmp_dv_mem *mem);
 /// @param rd If non-zero, the Device -> CPU synchronization will occure.
 /// @param wr If non-zero, the CPU -> Device synchronization will occure on dmp_dv_mem_sync_end().
 /// @return 0 on success, non-zero otherwise.
-/// @details It is thread-safe only on different memory handles.
+/// @details When called multiple times with the same or less flags rd | wr, the function does nothing.
+///          It is thread-safe only on different memory handles.
 int dmp_dv_mem_sync_start(dmp_dv_mem *mem, int rd, int wr);
 
 
 /// @brief Finishes the last started Device <-> CPU synchronization.
 /// @param mem Handle to the allocated memory, when NULL the error is returned.
 /// @return 0 on success, non-zero otherwise.
-/// @details It is thread-safe only on different memory handles.
+/// @details When calling second time before next call to dmp_dv_mem_sync_start(), the function does nothing.
+///          It is thread-safe only on different memory handles.
 int dmp_dv_mem_sync_end(dmp_dv_mem *mem);
 
 
