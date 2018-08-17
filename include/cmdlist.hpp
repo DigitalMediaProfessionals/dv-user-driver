@@ -445,6 +445,10 @@ class CDMPDVCmdList : public CDMPDVBase {
 
   /// @brief Commits command list in case of single device.
   int CommitSingleDevice() {  // TODO: when non-raw commands will be implemented, convert all commands to raw format before this function call.
+    if (!commands_.size()) {
+      SET_ERR("Command list is empty");
+      return EINVAL;
+    }
     int res;
     size_t total_size = 0;
     for (auto cmd_it = commands_.begin(); cmd_it != commands_.end(); ++cmd_it) {
@@ -454,6 +458,10 @@ class CDMPDVCmdList : public CDMPDVBase {
         return res;
       }
       total_size += size;
+    }
+    if (!total_size) {
+      SET_ERR("Calculated memory size for command list raw representation is 0");
+      return EINVAL;
     }
 
     // Allocate temporary buffer for the kernel command
