@@ -107,10 +107,10 @@ class CDMPDVMem : public CDMPDVBase {
 
   /// @brief Unmaps allocated memory from user address space.
   void Unmap() {
-    SyncEnd();
     if (!map_ptr_) {
       return;
     }
+    SyncEnd();
     munmap(map_ptr_, real_size_);
     map_ptr_ = NULL;
   }
