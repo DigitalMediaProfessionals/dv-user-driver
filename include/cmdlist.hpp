@@ -428,6 +428,11 @@ class CDMPDVCmdList : public CDMPDVBase {
       SET_ERR("Memory handle in buffer is NULL");
       return EINVAL;
     }
+    if (buf.offs & 1) {
+      SET_ERR("Offset in buffer must be 16-bit aligned, got %llu",
+              (unsigned long long)buf.offs);
+      return EINVAL;
+    }
     uint64_t n = dmp_dv_mem_get_size(buf.mem);
     if ((buf.offs >= n) || (n - buf.offs < size)) {
       SET_ERR("Insufficient space detected in the provided buffer: "

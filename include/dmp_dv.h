@@ -225,7 +225,7 @@ typedef struct dmp_dmp_dv_buf_impl {
     dmp_dv_mem *mem;  // memory handle
     uint64_t rsvd;    // padding to 64-bit size
   };
-  uint64_t offs;      // offset from the start of the buffer
+  uint64_t offs;      // offset from the start of the buffer, must be 16-bit aligned
 } dmp_dv_buf;
 
 /// @brief Convolutional device type id.
