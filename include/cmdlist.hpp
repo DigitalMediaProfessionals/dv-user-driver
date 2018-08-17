@@ -494,7 +494,7 @@ class CDMPDVCmdList : public CDMPDVBase {
 
   /// @brief Command in command list.
   struct Command {
-    std::vector<uint64_t> cmd;  // raw command
+    std::vector<uint8_t> cmd;  // raw command
     CDMPDVCmdListDeviceHelper *device_helper;  // pointer to device helper for convenience
     std::vector<std::pair<dmp_dv_buf, uint64_t> > input_bufs, output_bufs;  // buffers used during this command
   };
