@@ -113,7 +113,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       }
       if (cmd->run[i].conv_enable == 1) {
         const int kx = cmd->run[i].p & 0xFF;
-        const int ky = (cmd->run[i].p >> 8) & 0xFF;
+        const int ky0 = (cmd->run[i].p >> 8) & 0xFF;
+        const int ky = ky0 ? ky0 : kx;
         const int max_kernel_size = ctx_->get_max_kernel_size();
         if ((kx < 1) || (kx > max_kernel_size) || (ky < 1) || (ky > max_kernel_size)) {
           SET_ERR("Unsupported convolutional kernel size %dx%d, only sizes from 1 to %d are supported",

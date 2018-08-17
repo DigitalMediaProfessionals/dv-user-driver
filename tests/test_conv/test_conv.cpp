@@ -334,6 +334,9 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
     cmd.run[0].m = conf->n_kernels;
     cmd.run[0].conv_enable = 1;
     cmd.run[0].p = (uint16_t)conf->kx | (((uint16_t)conf->ky) << 8);
+    if (conf->io_offs & 16) {  // some randomization over valid p representation
+      cmd.run[0].p = (uint16_t)conf->kx;
+    }
     cmd.run[0].pz = 1;
     cmd.run[0].conv_pad = (uint32_t)conf->pad_left | ((uint32_t)conf->pad_right << 8) |
                           ((uint32_t)conf->pad_top << 16) | ((uint32_t)conf->pad_bottom << 24);
