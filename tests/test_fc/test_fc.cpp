@@ -71,7 +71,7 @@ typedef struct fc_config_impl {
   bool failed;
   uint8_t hash[32];
   dmp_dv_mem *io_mem, *weights_mem;
-  size_t io_size;
+  size_t io_size, io_offs, weights_offs;
   __fp16 *io_ptr;
   __fp16 *caffe_output;
   bool pure_ints;  // only integers were used - error check should be exact
@@ -297,16 +297,16 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
     cmd.actfunc = conf->activation;
 
     conf->io_size = (roundup(input_size, 4) + roundup(output_size, 4)) * sizeof(__fp16);
-    conf->io_mem = dmp_dv_mem_alloc(ctx, conf->io_size);
+    conf->io_mem = dmp_dv_mem_alloc(ctx, conf->io_offs + conf->io_size);
     if (!conf->io_mem) {
-      ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", conf->io_size, dmp_dv_get_last_error_message());
+      ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", conf->io_offs + conf->io_size, dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    LOG("Allocated %zu (%zu requested) bytes for input/output\n", dmp_dv_mem_get_size(conf->io_mem), conf->io_size);
+    LOG("Allocated %zu (%zu+%zu requested) bytes for input/output\n", dmp_dv_mem_get_size(conf->io_mem), conf->io_size, conf->io_offs);
     cmd.input_buf.mem = conf->io_mem;
-    cmd.input_buf.offs = 0;
+    cmd.input_buf.offs = conf->io_offs;
     cmd.output_buf.mem = conf->io_mem;
-    cmd.output_buf.offs = roundup(input_size, 4) * sizeof(__fp16);
+    cmd.output_buf.offs = conf->io_offs + roundup(input_size, 4) * sizeof(__fp16);
 
     weights_size = 0;
     if (dmp_dv_pack_fc_weights(
@@ -317,17 +317,17 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
       goto L_EXIT;
     }
 
-    conf->weights_mem = dmp_dv_mem_alloc(ctx, weights_size);
+    conf->weights_mem = dmp_dv_mem_alloc(ctx, conf->weights_offs + weights_size);
     if (!conf->weights_mem) {
       ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", weights_size, dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    LOG("Allocated %zu (%zu requested) bytes for weights\n", dmp_dv_mem_get_size(conf->weights_mem), weights_size);
+    LOG("Allocated %zu (%zu+%zu requested) bytes for weights\n", dmp_dv_mem_get_size(conf->weights_mem), weights_size, conf->weights_offs);
     cmd.weight_buf.mem = conf->weights_mem;
-    cmd.weight_buf.offs = 0;
+    cmd.weight_buf.offs = conf->weights_offs;
     cmd.weight_fmt = 1;
 
-    weights = dmp_dv_mem_map(conf->weights_mem);
+    weights = dmp_dv_mem_map(conf->weights_mem) + conf->weights_offs;
     if (!weights) {
       ERR("dmp_dv_mem_map() failed for weights: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
@@ -351,7 +351,7 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
     }
     dmp_dv_mem_unmap(conf->weights_mem);
 
-    conf->io_ptr = (__fp16*)dmp_dv_mem_map(conf->io_mem);
+    conf->io_ptr = (__fp16*)(dmp_dv_mem_map(conf->io_mem) + conf->io_offs);
     if (!conf->io_ptr) {
       ERR("dmp_dv_mem_map() failed for input/output: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
@@ -671,6 +671,9 @@ int main(int argc, char **argv) {
     configs[i] = config_data.data() + i;
   }
 
+  std::mt19937 mt_rand(time(NULL));
+  std::uniform_int_distribution<int> rnd_offs(0, 1024);
+
   const int n_passes = 2;
   for (int i_pass = 0; i_pass < n_passes; ++i_pass) {
     // Randomize configrations order
@@ -687,6 +690,8 @@ int main(int argc, char **argv) {
         if (conf->failed) {
           continue;
         }
+        conf->io_offs = rnd_offs(mt_rand) << 4;
+        conf->weights_offs = rnd_offs(mt_rand) << 4;
         confs.push_back(conf);
         if (confs.size() < pack_sizes[i_pack]) {
           continue;
