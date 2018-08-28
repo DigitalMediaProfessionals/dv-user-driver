@@ -109,11 +109,11 @@ class CDMPDVContext : public CDMPDVBase {
       return false;
     }
 
-    ub_size_ = sysfs_read_int("ub_size", 0);
-    max_kernel_size_ = sysfs_read_int("max_kernel_size", 3);
-    conv_freq_ = sysfs_read_int("conv_freq", 0);
-    fc_freq_ = sysfs_read_int("fc_freq", 0);
-    max_fc_vector_size_ = sysfs_read_int("max_fc_vector_size", 16384);
+    ub_size_ = sysfs_read_int("conv/ub_size", 0);
+    max_kernel_size_ = sysfs_read_int("conv/max_kernel_size", 3);
+    conv_freq_ = sysfs_read_int("conv/conv_freq", 0);
+    fc_freq_ = sysfs_read_int("fc/fc_freq", 0);
+    max_fc_vector_size_ = sysfs_read_int("fc/max_fc_vector_size", 16384);
 
     char s[256];
     snprintf(s, sizeof(s), "DMP DV: ub_size=%d max_kernel_size=%d conv_freq=%d fc_freq=%d max_fc_vector_size=%d",
@@ -126,7 +126,7 @@ class CDMPDVContext : public CDMPDVBase {
   /// @brief Reads single int value from sysfs file.
   int sysfs_read_int(const char *key, int def) {
     char path[256];
-    snprintf(path, sizeof(path), "/sys/devices/platform/dmp_dv/%s", key);
+    snprintf(path, sizeof(path), "/sys/class/dmp_dv/dv_%s", key);
     FILE *fin = fopen(path, "r");
     if (!fin) {
       return def;
