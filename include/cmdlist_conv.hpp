@@ -101,7 +101,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
     dmp_dv_kcmdraw_conv_v0_run run;
     memset(&run, 0, sizeof(run));
     uint64_t output_size = 0;
-    for (int topo = cmd->topo, i = 0; topo; topo >>= 1, ++i) {
+    for (uint32_t topo = cmd->topo, i = 0; topo; topo >>= 1, ++i) {
       // Check for validness
       if ((!cmd->run[i].conv_enable) && (!cmd->run[i].pool_enable) &&
           (!cmd->run[i].actfunc) && (!(cmd->run[i].lrn & 1))) {
@@ -128,6 +128,15 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
           SET_ERR("Stride of convolution must be greater than 0, got %dx%d", stride_x, stride_y);
           return -1;
         }
+        const int pad_left = cmd->run[i].conv_pad & 0xFF;
+        const int pad_right = (cmd->run[i].conv_pad >> 8) & 0xFF;
+        const int pad_top = (cmd->run[i].conv_pad >> 16) & 0xFF;
+        const int pad_bottom = (cmd->run[i].conv_pad >> 24) & 0xFF;
+        if ((kx > pad_left + cmd->w + pad_right) || (ky > pad_top + cmd->h + pad_bottom)) {
+          SET_ERR("Input (%d, %d) with padding L=%d, R=%d, T=%d, B=%d is too small for convolution of size (%d, %d)",
+                  (int)cmd->w, (int)cmd->h, pad_left, pad_right, pad_top, pad_bottom, kx, ky);
+          return -1;
+        }
       }
 
       // Calculate input/output/weights dimensions
@@ -152,10 +161,10 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       run.rectifi_en = cmd->run[i].rectifi_en;
       run.weight_fmt = cmd->run[i].weight_fmt;
 
-      uint64_t weights_size = 0;
-      get_conv_output_size_v0(&run, &conv_size, &conv_size, (uint32_t*)&weights_size);
+      uint32_t weights_size = 0;
+      get_conv_output_size_v0(&run, &conv_size, &conv_size, &weights_size);
       if (weights_size) {
-        input_bufs.push_back(std::make_pair(cmd->run[i].weight_buf, weights_size));
+        input_bufs.push_back(std::make_pair(cmd->run[i].weight_buf, (uint64_t)weights_size));
       }
       if (topo & 1) {  // output goes to main memory
         if (!conv_size.size) {

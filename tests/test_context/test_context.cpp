@@ -31,7 +31,7 @@
 
 #define LOG(...) fprintf(stdout, __VA_ARGS__); fflush(stdout)
 #define ERR(...) fprintf(stderr, __VA_ARGS__); fflush(stderr)
-
+#define CHECK_SIZEOF(name, got, expected) if (got != expected) { ERR("sizeof(%s) is %zu while expecting %d\n", name, got, expected); return -1; }
 
 int test_context() {
   LOG("ENTER: test_context\n");
@@ -45,11 +45,25 @@ int test_context() {
   }
 
   if ((sizeof(dmp_dv_kbuf) & 7) ||
-      (sizeof(dmp_dv_kcmdraw_conv_v0) & 7) || (sizeof(dmp_dv_kcmdraw_conv_v0_run) & 7) ||
+      (sizeof(dmp_dv_kcmdraw_conv_v0_run) & 7) || (sizeof(dmp_dv_kcmdraw_conv_v0) & 7) ||
       (sizeof(dmp_dv_kcmdraw_fc_v0) & 7)) {
     ERR("Detected structure for communication with kernel module with size not multiple of 8\n");
     return -1;
   }
+
+  CHECK_SIZEOF("__fp16", sizeof(__fp16),  2);
+
+  CHECK_SIZEOF("dmp_dv_info_v0", sizeof(dmp_dv_info_v0), 32);
+  CHECK_SIZEOF("dmp_dv_buf", sizeof(dmp_dv_buf), 16);
+  CHECK_SIZEOF("dmp_dv_cmdraw", sizeof(dmp_dv_cmdraw), 8);
+  CHECK_SIZEOF("dmp_dv_cmdraw_conv_v0_run", sizeof(dmp_dv_cmdraw_conv_v0_run), 56);
+  CHECK_SIZEOF("dmp_dv_cmdraw_conv_v0", sizeof(dmp_dv_cmdraw_conv_v0), 1864);
+  CHECK_SIZEOF("dmp_dv_cmdraw_fc_v0", sizeof(dmp_dv_cmdraw_fc_v0), 72);
+
+  CHECK_SIZEOF("dmp_dv_kbuf", sizeof(dmp_dv_kbuf), 16);
+  CHECK_SIZEOF("dmp_dv_kcmdraw_conv_v0_run", sizeof(dmp_dv_kcmdraw_conv_v0_run), 56);
+  CHECK_SIZEOF("dmp_dv_kcmdraw_conv_v0", sizeof(dmp_dv_kcmdraw_conv_v0), 1864);
+  CHECK_SIZEOF("dmp_dv_kcmdraw_fc_v0", sizeof(dmp_dv_kcmdraw_fc_v0), 72);
 
   dmp_dv_context *ctx = dmp_dv_context_create();
   if (!ctx) {

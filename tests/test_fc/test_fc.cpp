@@ -302,7 +302,7 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
       ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", conf->io_offs + conf->io_size, dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    LOG("Allocated %zu (%zu+%zu requested) bytes for input/output\n", dmp_dv_mem_get_size(conf->io_mem), conf->io_size, conf->io_offs);
+    LOG("Allocated %zu (%zu(+%zu random offset) requested) bytes for input/output\n", dmp_dv_mem_get_size(conf->io_mem), conf->io_size, conf->io_offs);
     cmd.input_buf.mem = conf->io_mem;
     cmd.input_buf.offs = conf->io_offs;
     cmd.output_buf.mem = conf->io_mem;
@@ -322,7 +322,7 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
       ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", weights_size, dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    LOG("Allocated %zu (%zu+%zu requested) bytes for weights\n", dmp_dv_mem_get_size(conf->weights_mem), weights_size, conf->weights_offs);
+    LOG("Allocated %zu (%zu(+%zu random offset) requested) bytes for weights\n", dmp_dv_mem_get_size(conf->weights_mem), weights_size, conf->weights_offs);
     cmd.weight_buf.mem = conf->weights_mem;
     cmd.weight_buf.offs = conf->weights_offs;
     cmd.weight_fmt = 1;
@@ -643,9 +643,9 @@ int main(int argc, char **argv) {
       snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%d_act%d",
                config.c_input, config.h_input, config.w_input, config.c_output * config.h_output * config.w_output, config.activation);
 
-      const int prev_size = (int)config_set->size();
+      const size_t prev_size = (int)config_set->size();
       config_set->emplace(config);
-      const int this_size = (int)config_set->size();
+      const size_t this_size = (int)config_set->size();
 
       if ((this_size != prev_size) && (!(this_size % 1000))) {
         LOG("Loaded %zu configurations\n", this_size);

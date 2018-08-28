@@ -334,7 +334,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
     cmd.run[0].m = conf->n_kernels;
     cmd.run[0].conv_enable = 1;
     cmd.run[0].p = (uint16_t)conf->kx | (((uint16_t)conf->ky) << 8);
-    if (conf->io_offs & 16) {  // some randomization over valid p representation
+    if ((conf->kx == conf->ky) && (conf->io_offs & 16)) {  // some randomization over valid square kernel size representation
       cmd.run[0].p = (uint16_t)conf->kx;
     }
     cmd.run[0].pz = 1;
@@ -349,7 +349,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
       ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", conf->io_offs + conf->io_size, dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    LOG("Allocated %zu (%zu+%zu requested) bytes for input/output\n", dmp_dv_mem_get_size(conf->io_mem), conf->io_size, conf->io_offs);
+    LOG("Allocated %zu (%zu(+%zu random offset) requested) bytes for input/output\n", dmp_dv_mem_get_size(conf->io_mem), conf->io_size, conf->io_offs);
     cmd.input_buf.mem = conf->io_mem;
     cmd.input_buf.offs = conf->io_offs;
     cmd.output_buf.mem = conf->io_mem;
@@ -368,7 +368,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
       ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", conf->weights_offs + weights_size, dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    LOG("Allocated %zu (%zu+%zu requested) bytes for weights\n", dmp_dv_mem_get_size(conf->weights_mem), weights_size, conf->weights_offs);
+    LOG("Allocated %zu (%zu(+%zu random offset) requested) bytes for weights\n", dmp_dv_mem_get_size(conf->weights_mem), weights_size, conf->weights_offs);
     cmd.run[0].weight_buf.mem = conf->weights_mem;
     cmd.run[0].weight_buf.offs = conf->weights_offs;
     cmd.run[0].weight_fmt = 3;
@@ -702,9 +702,9 @@ int main(int argc, char **argv) {
         continue;
       }*/
 
-      const int prev_size = (int)config_set->size();
+      const size_t prev_size = (int)config_set->size();
       config_set->emplace(config);
-      const int this_size = (int)config_set->size();
+      const size_t this_size = (int)config_set->size();
 
       if ((this_size != prev_size) && (!(this_size % 1000))) {
         LOG("Loaded %zu configurations\n", this_size);
@@ -730,13 +730,14 @@ int main(int argc, char **argv) {
     configs[i] = config_data.data() + i;
   }
 
-  std::mt19937 mt_rand(time(NULL));
+  const int seed = 1234;  // time(NULL);
+  std::mt19937 mt_rand(seed);
   std::uniform_int_distribution<int> rnd_offs(0, 1024);
 
   const int n_passes = 2;
   for (int i_pass = 0; i_pass < n_passes; ++i_pass) {
     // Randomize configrations order
-    std::shuffle(configs.begin(), configs.end(), std::default_random_engine(std::chrono::system_clock::now().time_since_epoch().count()));
+    std::shuffle(configs.begin(), configs.end(), mt_rand);
 
     // Execute configurations in different chunk sizes
     const size_t pack_sizes[2] = {1, 50};
