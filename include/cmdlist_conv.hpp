@@ -95,12 +95,20 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       return -1;
     }
 
-    int res = 0;
     struct conv_data_size conv_size;
     init_conv_input_size_v0_4(cmd->w, cmd->h, cmd->z, cmd->c, &conv_size);
-    dmp_dv_kcmdraw_conv_v0_run run;
-    memset(&run, 0, sizeof(run));
+    dmp_dv_kcmdraw_conv_v0 kcmd;
+    memset(&kcmd, 0, sizeof(kcmd));
+    kcmd.size = sizeof(kcmd);
+    kcmd.topo = cmd->topo;
+    kcmd.w = cmd->w;
+    kcmd.h = cmd->h;
+    kcmd.c = cmd->c;
+    kcmd.z = cmd->z;
+    kcmd.input_circular_offset = cmd->input_circular_offset;
+    kcmd.output_mode = cmd->output_mode;
     uint64_t output_size = 0;
+    //uint32_t ub_size_used = 0;
     for (uint32_t topo = cmd->topo, i = 0; topo; topo >>= 1, ++i) {
       // Check for validness
       if ((!cmd->run[i].conv_enable) && (!cmd->run[i].pool_enable) &&
@@ -143,29 +151,30 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       const uint64_t input_size = (uint64_t)cmd->w * cmd->h * cmd->c * cmd->z;
       input_bufs.push_back(std::make_pair(cmd->input_buf, input_size));
 
-      run.actfunc = cmd->run[i].actfunc;
-      run.actfunc_param = cmd->run[i].actfunc_param;
-      run.conv_dilation = cmd->run[i].conv_dilation;
-      run.conv_enable = cmd->run[i].conv_enable;
-      run.conv_pad = cmd->run[i].conv_pad;
-      run.conv_stride = cmd->run[i].conv_stride;
-      run.lrn = cmd->run[i].lrn;
-      run.m = cmd->run[i].m;
-      run.p = cmd->run[i].p;
-      run.pool_avg_param = cmd->run[i].pool_avg_param;
-      run.pool_enable = cmd->run[i].pool_enable;
-      run.pool_pad = cmd->run[i].pool_pad;
-      run.pool_size = cmd->run[i].pool_size;
-      run.pool_stride = cmd->run[i].pool_stride;
-      run.pz = cmd->run[i].pz;
-      run.rectifi_en = cmd->run[i].rectifi_en;
-      run.weight_fmt = cmd->run[i].weight_fmt;
+      kcmd.run[i].actfunc = cmd->run[i].actfunc;
+      kcmd.run[i].actfunc_param = cmd->run[i].actfunc_param;
+      kcmd.run[i].conv_dilation = cmd->run[i].conv_dilation;
+      kcmd.run[i].conv_enable = cmd->run[i].conv_enable;
+      kcmd.run[i].conv_pad = cmd->run[i].conv_pad;
+      kcmd.run[i].conv_stride = cmd->run[i].conv_stride;
+      kcmd.run[i].lrn = cmd->run[i].lrn;
+      kcmd.run[i].m = cmd->run[i].m;
+      kcmd.run[i].p = cmd->run[i].p;
+      kcmd.run[i].pool_avg_param = cmd->run[i].pool_avg_param;
+      kcmd.run[i].pool_enable = cmd->run[i].pool_enable;
+      kcmd.run[i].pool_pad = cmd->run[i].pool_pad;
+      kcmd.run[i].pool_size = cmd->run[i].pool_size;
+      kcmd.run[i].pool_stride = cmd->run[i].pool_stride;
+      kcmd.run[i].pz = cmd->run[i].pz;
+      kcmd.run[i].rectifi_en = cmd->run[i].rectifi_en;
+      kcmd.run[i].weight_fmt = cmd->run[i].weight_fmt;
 
       uint32_t weights_size = 0;
-      get_conv_output_size_v0(&run, &conv_size, &conv_size, &weights_size);
+      get_conv_output_size_v0(&kcmd.run[i], &conv_size, &conv_size, &weights_size);
       if (weights_size) {
         input_bufs.push_back(std::make_pair(cmd->run[i].weight_buf, (uint64_t)weights_size));
       }
+
       if (topo & 1) {  // output goes to main memory
         if (!conv_size.size) {
           SET_ERR("Invalid argument: cmd->run[%d] produces output with zero size", i);
@@ -182,12 +191,19 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       return -1;
     }
 
+    // Additional check that command fits into Unified Buffer
+    if (!get_conv_tiles_v0(&kcmd, ctx_->get_ub_size())) {
+      SET_ERR("Input is too big for unified buffer of size %d: W=%d H=%d C=%d",
+              ctx_->get_ub_size(), (int)cmd->w, (int)cmd->h, (int)cmd->c);
+      return -1;
+    }
+
+    // Success
     output_bufs.push_back(std::make_pair(cmd->output_buf, output_size));
     if (cmd->eltwise_buf.mem) {
       output_bufs.push_back(std::make_pair(cmd->eltwise_buf, output_size));
     }
-
-    return res;
+    return 0;
   }
 
   /// @brief Fills command of version 0 in the format suitable for later execution on the device.
