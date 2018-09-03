@@ -19,6 +19,15 @@ libdmpdv.so:	dmp_dv.o weights_conv.o weights_fc.o
 tests:	libdmpdv.so
 	$(MAKE) -C tests $@
 
+.SILENT:	install
+
+install:
+	echo Copying libdmpdv.so to /usr/lib/
+	cp libdmpdv.so /usr/lib/
+	echo ldconfig
+	ldconfig
+	echo libdmpdv.so has been successfully installed
+
 clean:
 	rm -f libdmpdv.so *.o
 	$(MAKE) -C tests $@
