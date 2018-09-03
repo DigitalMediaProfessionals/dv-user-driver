@@ -164,6 +164,11 @@ class CDMPDVContext : public CDMPDVBase {
     return max_fc_vector_size_;
   }
 
+  /// @brief Returns unified buffer size in bytes.
+  inline int get_ub_size() const {
+    return ub_size_;
+  }
+
   int GetInfo(dmp_dv_info *p_info) {
     if (p_info->size < 8) {
       SET_ERR("Invalid argument: info->size is too small: %u", p_info->size);

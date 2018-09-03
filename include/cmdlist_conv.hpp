@@ -95,86 +95,123 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       return -1;
     }
 
-    int res = 0;
+    const uint64_t input_size = (uint64_t)cmd->w * cmd->h * cmd->c * cmd->z;
+    input_bufs.push_back(std::make_pair(cmd->input_buf, input_size));
+
     struct conv_data_size conv_size;
     init_conv_input_size_v0_4(cmd->w, cmd->h, cmd->z, cmd->c, &conv_size);
-    dmp_dv_kcmdraw_conv_v0_run run;
-    memset(&run, 0, sizeof(run));
+    dmp_dv_kcmdraw_conv_v0 kcmd;
+    memset(&kcmd, 0, sizeof(kcmd));
+    kcmd.size = sizeof(kcmd);
+    kcmd.topo = cmd->topo;
+    kcmd.w = cmd->w;
+    kcmd.h = cmd->h;
+    kcmd.c = cmd->c;
+    kcmd.z = cmd->z;
+    kcmd.input_circular_offset = cmd->input_circular_offset;
+    kcmd.output_mode = cmd->output_mode;
     uint64_t output_size = 0;
-    for (uint32_t topo = cmd->topo, i = 0; topo; topo >>= 1, ++i) {
-      // Check for validness
-      if ((!cmd->run[i].conv_enable) && (!cmd->run[i].pool_enable) &&
-          (!cmd->run[i].actfunc) && (!(cmd->run[i].lrn & 1))) {
-        SET_ERR("Invalid argument: cmd->run[%d] specify no operation", i);
+    int ub_size_available = ctx_->get_ub_size();
+    for (uint32_t topo = cmd->topo, i_run = 0; topo; topo >>= 1, ++i_run) {
+      const int kx = cmd->run[i_run].p & 0xFF;
+      const int ky = (cmd->run[i_run].p & 0xFF00) ? (cmd->run[i_run].p & 0xFF00) >> 8 : kx;
+      const int pad[4] = {(int)(cmd->run[i_run].conv_pad & 0xFF), (int)((cmd->run[i_run].conv_pad >> 8) & 0xFF),
+                          (int)((cmd->run[i_run].conv_pad >> 16) & 0xFF), (int)((cmd->run[i_run].conv_pad >> 24) & 0xFF)};
+      const int stride[2] = {(int)(cmd->run[i_run].conv_stride & 0xFF), (int)((cmd->run[i_run].conv_stride >> 8) & 0xFF)};
+      const int m = cmd->run[i_run].m;
+      const int w = conv_size.w, h = conv_size.h, c = conv_size.c;
+
+      if ((!cmd->run[i_run].conv_enable) && (!cmd->run[i_run].pool_enable) &&
+          (!cmd->run[i_run].actfunc) && (!(cmd->run[i_run].lrn & 1))) {
+        SET_ERR("Invalid argument: cmd->run[%d] specify no operation", i_run);
         return -1;
       }
-      if ((cmd->run[i].conv_enable == 1) && (!cmd->run[i].weight_buf.mem)) {
-        SET_ERR("Invalid argument: cmd->run[%d].weight_buf.mem is NULL", i);
+      if ((cmd->run[i_run].conv_enable == 1) && (!cmd->run[i_run].weight_buf.mem)) {
+        SET_ERR("Invalid argument: cmd->run[%d].weight_buf.mem is NULL", i_run);
         return -1;
       }
-      if (cmd->run[i].conv_enable == 1) {
-        const int kx = cmd->run[i].p & 0xFF;
-        const int ky0 = (cmd->run[i].p >> 8) & 0xFF;
-        const int ky = ky0 ? ky0 : kx;
+      if (cmd->run[i_run].conv_enable == 1) {
         const int max_kernel_size = ctx_->get_max_kernel_size();
         if ((kx < 1) || (kx > max_kernel_size) || (ky < 1) || (ky > max_kernel_size)) {
           SET_ERR("Unsupported convolutional kernel size %dx%d, only sizes from 1 to %d are supported",
                   kx, ky, max_kernel_size);
           return -1;
         }
-        const int stride_x = cmd->run[i].conv_stride & 0xFF;
-        const int stride_y = (cmd->run[i].conv_stride >> 8) & 0xFF;
-        if ((stride_x < 1) || (stride_y < 1)) {
-          SET_ERR("Stride of convolution must be greater than 0, got %dx%d", stride_x, stride_y);
+        if ((stride[0] < 1) || (stride[1] < 1)) {
+          SET_ERR("Stride of convolution must be greater than 0, got %dx%d", stride[0], stride[1]);
           return -1;
         }
-        const int pad_left = cmd->run[i].conv_pad & 0xFF;
-        const int pad_right = (cmd->run[i].conv_pad >> 8) & 0xFF;
-        const int pad_top = (cmd->run[i].conv_pad >> 16) & 0xFF;
-        const int pad_bottom = (cmd->run[i].conv_pad >> 24) & 0xFF;
-        if ((kx > pad_left + cmd->w + pad_right) || (ky > pad_top + cmd->h + pad_bottom)) {
+        if ((kx > pad[0] + cmd->w + pad[1]) || (ky > pad[2] + cmd->h + pad[3])) {
           SET_ERR("Input (%d, %d) with padding L=%d, R=%d, T=%d, B=%d is too small for convolution of size (%d, %d)",
-                  (int)cmd->w, (int)cmd->h, pad_left, pad_right, pad_top, pad_bottom, kx, ky);
+                  (int)cmd->w, (int)cmd->h, pad[0], pad[1], pad[2], pad[3], kx, ky);
           return -1;
         }
       }
 
-      // Calculate input/output/weights dimensions
-      const uint64_t input_size = (uint64_t)cmd->w * cmd->h * cmd->c * cmd->z;
-      input_bufs.push_back(std::make_pair(cmd->input_buf, input_size));
-
-      run.actfunc = cmd->run[i].actfunc;
-      run.actfunc_param = cmd->run[i].actfunc_param;
-      run.conv_dilation = cmd->run[i].conv_dilation;
-      run.conv_enable = cmd->run[i].conv_enable;
-      run.conv_pad = cmd->run[i].conv_pad;
-      run.conv_stride = cmd->run[i].conv_stride;
-      run.lrn = cmd->run[i].lrn;
-      run.m = cmd->run[i].m;
-      run.p = cmd->run[i].p;
-      run.pool_avg_param = cmd->run[i].pool_avg_param;
-      run.pool_enable = cmd->run[i].pool_enable;
-      run.pool_pad = cmd->run[i].pool_pad;
-      run.pool_size = cmd->run[i].pool_size;
-      run.pool_stride = cmd->run[i].pool_stride;
-      run.pz = cmd->run[i].pz;
-      run.rectifi_en = cmd->run[i].rectifi_en;
-      run.weight_fmt = cmd->run[i].weight_fmt;
+      kcmd.run[i_run].actfunc = cmd->run[i_run].actfunc;
+      kcmd.run[i_run].actfunc_param = cmd->run[i_run].actfunc_param;
+      kcmd.run[i_run].conv_dilation = cmd->run[i_run].conv_dilation;
+      kcmd.run[i_run].conv_enable = cmd->run[i_run].conv_enable;
+      kcmd.run[i_run].conv_pad = cmd->run[i_run].conv_pad;
+      kcmd.run[i_run].conv_stride = cmd->run[i_run].conv_stride;
+      kcmd.run[i_run].lrn = cmd->run[i_run].lrn;
+      kcmd.run[i_run].m = cmd->run[i_run].m;
+      kcmd.run[i_run].p = cmd->run[i_run].p;
+      kcmd.run[i_run].pool_avg_param = cmd->run[i_run].pool_avg_param;
+      kcmd.run[i_run].pool_enable = cmd->run[i_run].pool_enable;
+      kcmd.run[i_run].pool_pad = cmd->run[i_run].pool_pad;
+      kcmd.run[i_run].pool_size = cmd->run[i_run].pool_size;
+      kcmd.run[i_run].pool_stride = cmd->run[i_run].pool_stride;
+      kcmd.run[i_run].pz = cmd->run[i_run].pz;
+      kcmd.run[i_run].rectifi_en = cmd->run[i_run].rectifi_en;
+      kcmd.run[i_run].weight_fmt = cmd->run[i_run].weight_fmt;
 
       uint32_t weights_size = 0;
-      get_conv_output_size_v0(&run, &conv_size, &conv_size, &weights_size);
+      get_conv_output_size_v0(&kcmd.run[i_run], &conv_size, &conv_size, &weights_size);
       if (weights_size) {
-        input_bufs.push_back(std::make_pair(cmd->run[i].weight_buf, (uint64_t)weights_size));
+        input_bufs.push_back(std::make_pair(cmd->run[i_run].weight_buf, (uint64_t)weights_size));
       }
+
+      int ub_in_size = 0, ub_out_size = 0;
+      int tiles = 1;
+      if (is_conv_2d_v0(&kcmd.run[i_run])) {
+        tiles = get_conv_2d_tiles(w, h, c, kx, ky, m,
+                                  pad, stride, ub_size_available,
+                                  &ub_in_size, &ub_out_size);
+      }
+      // TODO: get tiles for average pooling.
+      if (ub_size_available == ctx_->get_ub_size()) {
+        ub_size_available -= ub_in_size + ub_out_size;
+      }
+      else {
+        ub_size_available -= ub_out_size;
+      }
+      if (!(topo & 1)) {  // output goes to unified buffer
+        ub_size_available -= conv_size.size;
+      }
+      if (ub_size_available < 0) {
+        SET_ERR("The command will result in unified buffer overflow (%d bytes) at cmd->run[%d]",
+                -ub_size_available, i_run);
+        return -1;
+      }
+
       if (topo & 1) {  // output goes to main memory
         if (!conv_size.size) {
-          SET_ERR("Invalid argument: cmd->run[%d] produces output with zero size", i);
+          SET_ERR("Invalid argument: cmd->run[%d] produces output with zero size", i_run);
           return -1;
         }
         output_size += conv_size.size;
 
         // Next input will be the first
         init_conv_input_size_v0_4(cmd->w, cmd->h, cmd->z, cmd->c, &conv_size);
+        ub_size_available = ctx_->get_ub_size();
+      }
+      else {  // output goes to unified buffer
+        if (tiles != 1) {
+          SET_ERR("cmd->run[%d] wants tiles to be %d while only %d is supported",
+                  i_run, tiles, 1);
+          return -1;
+        }
       }
     }
     if (!output_size) {
@@ -182,12 +219,19 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       return -1;
     }
 
+    // Additional check that command fits into Unified Buffer
+    if (!get_conv_tiles_v0(&kcmd, ctx_->get_ub_size())) {
+      SET_ERR("Input is too big for unified buffer of size %d: W=%d H=%d C=%d",
+              ctx_->get_ub_size(), (int)cmd->w, (int)cmd->h, (int)cmd->c);
+      return -1;
+    }
+
+    // Success
     output_bufs.push_back(std::make_pair(cmd->output_buf, output_size));
     if (cmd->eltwise_buf.mem) {
       output_bufs.push_back(std::make_pair(cmd->eltwise_buf, output_size));
     }
-
-    return res;
+    return 0;
   }
 
   /// @brief Fills command of version 0 in the format suitable for later execution on the device.
