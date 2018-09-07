@@ -26,7 +26,9 @@ install:
 	cp libdmpdv.so /usr/lib/
 	echo ldconfig
 	ldconfig
-	echo libdmpdv.so has been successfully installed
+	echo Copying header files to /usr/include/
+	cp include/dmp_dv.h include/dmp_dv_cmdraw_v0.h /usr/include/
+	echo Successfully installed
 
 clean:
 	rm -f libdmpdv.so *.o
