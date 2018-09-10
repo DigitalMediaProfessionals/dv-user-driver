@@ -246,6 +246,8 @@ typedef struct dmp_dmp_dv_cmdraw_impl {
 
 
 /// @brief Adds raw command to the command list.
+/// @param cmdlist Handle to command list, when NULL the error is returned.
+/// @param cmd Raw command for execution, see dmp_dv_cmdraw_v0.h for the description of command version 0.
 /// @return 0 on success, non-zero otherwise, known error codes:
 ///         EINVAL - invalid argument such as structure size,
 ///         ENOTSUP - raw command version is not supported.
