@@ -4,7 +4,7 @@ include ../../../env.mk
 
 all:	test_conv
 
-test_conv:	test_conv.cpp
+test_conv:	test_conv.cpp ../../libdmpdv.so
 	$(GPP) test_conv.cpp -o test_conv -std=c++11 -Wall -Werror -I../../include $(OPT) -L../.. -ldmpdv -lcrypto
 
 clean:

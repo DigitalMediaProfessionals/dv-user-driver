@@ -4,7 +4,7 @@ include ../../../env.mk
 
 all:	test_weights
 
-test_weights:	test_weights.cpp
+test_weights:	test_weights.cpp ../../libdmpdv.so
 	$(GPP) test_weights.cpp -o test_weights -std=c++11 -Wall -Werror -Wno-unused-function -I../../include $(OPT) -L../.. -ldmpdv -lcrypto
 
 clean:

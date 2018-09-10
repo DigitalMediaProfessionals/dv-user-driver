@@ -4,7 +4,7 @@ include ../../../env.mk
 
 all:	test_context
 
-test_context:	test_context.cpp
+test_context:	test_context.cpp ../../libdmpdv.so
 	$(GPP) test_context.cpp -o test_context -std=c++11 -Wall -Werror -I../../include $(OPT) -L../.. -ldmpdv
 
 clean:

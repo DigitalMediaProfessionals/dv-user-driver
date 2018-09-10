@@ -4,7 +4,7 @@ include ../../../env.mk
 
 all:	test_mem
 
-test_mem:	test_mem.cpp
+test_mem:	test_mem.cpp ../../libdmpdv.so
 	$(GPP) test_mem.cpp -o test_mem -std=c++11 -Wall -Werror -I../../include $(OPT) -L../.. -ldmpdv
 
 clean:
