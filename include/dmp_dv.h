@@ -152,8 +152,8 @@ void dmp_dv_mem_unmap(dmp_dv_mem *mem);
 
 /// @brief Starts Device <-> CPU synchronization of the memory buffer.
 /// @param mem Handle to the allocated memory, when NULL the error is returned.
-/// @param rd If non-zero, the Device -> CPU synchronization will occure.
-/// @param wr If non-zero, the CPU -> Device synchronization will occure on dmp_dv_mem_sync_end().
+/// @param rd If non-zero, the Device -> CPU synchronization will occur before this function returns.
+/// @param wr If non-zero, the CPU -> Device synchronization will occur on dmp_dv_mem_sync_end().
 /// @return 0 on success, non-zero otherwise.
 /// @details When called multiple times with the same or less flags rd | wr, the function does nothing.
 ///          It is thread-safe only on different memory handles.
@@ -177,7 +177,6 @@ size_t dmp_dv_mem_get_size(dmp_dv_mem *mem);
 
 /// @brief Creates command list.
 /// @param ctx Context for working with DV accelerator, when NULL the error is returned.
-/// @param device_type Device type: DMP_DV_CONV or DMP_DV_FC.
 /// @return Handle to command list or NULL on error.
 /// @details It is thread-safe.
 dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx);
