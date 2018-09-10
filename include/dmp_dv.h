@@ -287,7 +287,7 @@ int dmp_dv_pack_conv_weights(
 /// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
 /// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
 /// @return 0 on success, non-zero otherwise.
-/// @details The function packs weights in Caffe NCHW format to the DV input format WHC8
+/// @details The function packs weights in NCHW format to the DV input format WHC8 (n_channels / 8, width, height, 8 channels)
 ///          with rearranging to produce output in DV format WHC8.
 ///          It is thread-safe.
 int dmp_dv_pack_fc_weights(
