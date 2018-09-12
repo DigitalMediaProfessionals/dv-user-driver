@@ -10,7 +10,7 @@ weights_conv.o:	src/weights_conv.c include/dmp_dv.h
 weights_fc.o:	src/weights_fc.c include/dmp_dv.h
 	$(GCC) -fPIC -c src/weights_fc.c -o weights_fc.o -std=c99 -Wall -Werror -Wno-unused-function -I./include $(OPT) -fvisibility=hidden
 
-dmp_dv.o:	src/dmp_dv.cpp include/dmp_dv.h
+dmp_dv.o:	src/dmp_dv.cpp include/*.h include/*.hpp
 	$(GPP) -fPIC -c src/dmp_dv.cpp -o dmp_dv.o -std=c++11 -Wall -Werror -Wno-unused-function -Wno-psabi -I./include $(OPT) -fvisibility=hidden
 
 libdmpdv.so:	dmp_dv.o weights_conv.o weights_fc.o

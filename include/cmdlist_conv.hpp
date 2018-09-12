@@ -111,7 +111,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
     kcmd.input_circular_offset = cmd->input_circular_offset;
     kcmd.output_mode = cmd->output_mode;
     uint64_t output_size = 0;
-    int ub_size_available = ctx_->get_ub_size();
+    bool valid_multi_run = true;
     for (uint32_t topo = cmd->topo, i_run = 0; topo; topo >>= 1, ++i_run) {
       const int kx = cmd->run[i_run].p & 0xFF;
       const int ky = (cmd->run[i_run].p & 0xFF00) ? (cmd->run[i_run].p & 0xFF00) >> 8 : kx;
@@ -172,27 +172,16 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         input_bufs.push_back(std::make_pair(cmd->run[i_run].weight_buf, (uint64_t)weights_size));
       }
 
-      int ub_in_size = 0, ub_out_size = 0;
       int tiles = 1;
       if (is_conv_2d_v0(&kcmd.run[i_run])) {
         tiles = get_conv_2d_tiles(w, h, c, kx, ky, m,
-                                  pad, stride, ub_size_available,
-                                  &ub_in_size, &ub_out_size);
+                                  pad, stride, ctx_->get_ub_size());
       }
-      // TODO: get tiles for average pooling.
-      if (ub_size_available == ctx_->get_ub_size()) {
-        ub_size_available -= ub_in_size + ub_out_size;
-      }
-      else {
-        ub_size_available -= ub_out_size;
-      }
-      if (!(topo & 1)) {  // output goes to unified buffer
-        ub_size_available -= conv_size.size;
-      }
-      if (ub_size_available < 0) {
-        SET_ERR("The command will result in unified buffer overflow (%d bytes) at cmd->run[%d]",
-                -ub_size_available, i_run);
-        return -1;
+
+      if ((kcmd.z > 1) || (kcmd.run[i_run].pz > 1) ||
+          (kcmd.run[i_run].conv_dilation)) {
+        // TODO: add more checks: no maxpool_with_argmax, no unpool_with_argmax.
+        valid_multi_run = false;
       }
 
       if (topo & 1) {  // output goes to main memory
@@ -204,7 +193,6 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
 
         // Next input will be the first
         init_conv_input_size_v0_4(cmd->w, cmd->h, cmd->z, cmd->c, &conv_size);
-        ub_size_available = ctx_->get_ub_size();
       }
       else {  // output goes to unified buffer
         if (tiles != 1) {
@@ -218,12 +206,21 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       SET_LOGIC_ERR();
       return -1;
     }
-
-    // Additional check that command fits into Unified Buffer
-    if (!get_conv_tiles_v0(&kcmd, ctx_->get_ub_size())) {
-      SET_ERR("Input is too big for unified buffer of size %d: W=%d H=%d C=%d",
-              ctx_->get_ub_size(), (int)cmd->w, (int)cmd->h, (int)cmd->c);
-      return -1;
+    if (kcmd.topo != 1) {
+      if (!valid_multi_run) {
+        SET_ERR("Command cannot be executed with multiple runs (input is W=%d H=%d C=%d Z=%d)",
+                (int)cmd->w, (int)cmd->h, (int)cmd->c, (int)cmd->z);
+        return -1;
+      }
+      int ubuf_used = ubuf_get_single_tile_usage(&kcmd);
+      //fprintf(stderr, "UBUF used size for the input W=%d H=%d C=%d is %d\n",
+      //        (int)cmd->w, (int)cmd->h, (int)cmd->c, ubuf_used);
+      //fflush(stderr);
+      if (ubuf_used > ctx_->get_ub_size()) {
+        SET_ERR("Unified buffer should be at least %d bytes to process the input W=%d H=%d C=%d",
+                ubuf_used, (int)cmd->w, (int)cmd->h, (int)cmd->c);
+        return -1;
+      }
     }
 
     // Success
