@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 /*
- * @brief Tests command list for CONV accelerator.
+ * @brief Tests Fully-Connected layers.
  */
 #include <unistd.h>
 #include <sys/mman.h>
@@ -127,9 +127,9 @@ bool has_float(__fp16 *x, int n) {
 
 
 /// @brief Tests convolutional configurations for correctness using data from folder "data".
-int test_cmdlists(const std::vector<fc_config*>& confs) {
+int test_fc(const std::vector<fc_config*>& confs) {
   char prefix[256];
-  LOG("ENTER: test_cmdlists: %d commands:", (int)confs.size());
+  LOG("ENTER: test_fc: %d commands:", (int)confs.size());
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     fc_config *conf = *it;
     snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%d_act%d",
@@ -563,7 +563,7 @@ int test_cmdlists(const std::vector<fc_config*>& confs) {
     result = -1;
   }
 
-  LOG("EXIT: test_cmdlists: %d commands, %d FDs:", (int)confs.size(), n_fd);
+  LOG("EXIT: test_fc: %d commands, %d FDs:", (int)confs.size(), n_fd);
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     fc_config *conf = *it;
     snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%d_act%d",
@@ -696,7 +696,7 @@ int main(int argc, char **argv) {
         if (confs.size() < pack_sizes[i_pack]) {
           continue;
         }
-        res = test_cmdlists(confs);
+        res = test_fc(confs);
         if (res) {
           ++n_err;
         }
@@ -706,7 +706,7 @@ int main(int argc, char **argv) {
         confs.clear();
       }
       if (confs.size()) {
-        res = test_cmdlists(confs);
+        res = test_fc(confs);
         if (res) {
           ++n_err;
         }
