@@ -30,6 +30,14 @@ def roundup(a, b):
     return a + (b - d) if d else a
 
 
+ACT_MAP = {
+    0: "",
+    1: "ReLU",
+    2: "TanH",
+    4: "Sigmoid"
+}
+
+
 class Main(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
@@ -44,7 +52,7 @@ class Main(object):
         # Generate 1D inputs
         for input_size in (512, 1024):
             for output_size in (512, 1024):
-                for act in (0,):
+                for act in ACT_MAP.keys():
                     self.generate((input_size, 1, 1), output_size, act, args)
 
         # Generate 3D inputs
@@ -55,6 +63,7 @@ class Main(object):
                         for act in (0,):
                             self.generate((c, h, w), output_size, act, args)
 
+        # Generate big inputs
         self.generate((16383, 1, 1), 512, 0, args)
         self.generate((16384, 1, 1), 512, 0, args)
 
@@ -65,8 +74,9 @@ class Main(object):
         Parameters:
             input_shape: input shape in CHW format.
             output_size: size of the output in elements.
-            activation: activation function (0 - none, 1 - tanh,
-                        3 - sigmoid, 5 - elu).
+            activation: activation function: 0 = None, 1 = ReLU, 2 = Tanh,
+                        3 = Leaky ReLU, 4 = Sigmoid, 5 = PReLU
+                        (PReLU must be used with POST-OP=1)).
         """
         assert len(input_shape) == 3
         assert all(x > 0 for x in input_shape)
@@ -148,33 +158,15 @@ layer {
   }
 }
 """ % (input_shape[0], input_shape[1], input_shape[2], output_size))
-            if activation == 5:
+            if activation:
                 fout.write("""
 layer {
-  name: "fc1/ELU"
-  type: "ELU"
+  name: "fc1/ACT"
+  type: "%s"
   bottom: "fc1"
   top: "fc1"
 }
-""")
-            elif activation == 3:
-                fout.write("""
-layer {
-  name: "fc1/Sigmoid"
-  type: "Sigmoid"
-  bottom: "fc1"
-  top: "fc1"
-}
-""")
-            elif activation == 1:
-                fout.write("""
-layer {
-  name: "fc1/TanH"
-  type: "TanH"
-  bottom: "fc1"
-  top: "fc1"
-}
-""")
+""" % ACT_MAP[activation])
 
         net = caffe.Net("data/test.prototxt", caffe.TEST)
         net.params["fc1"][0].data[:] = weights.astype(

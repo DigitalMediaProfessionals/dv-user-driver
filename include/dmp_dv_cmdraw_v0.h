@@ -77,7 +77,7 @@ typedef struct dmp_dv_cmdraw_fc_v0_impl {
 
   uint16_t weight_fmt;     // Weights format: 0 = half-float unquantized, 1 = 8-bit quantized
 
-  uint16_t actfunc;        // Activation Function: 0 = None, 1 = Tanh, 2 = Leaky ReLU, 3 = Sigmoid, 4 = PReLU, 5 = ELU, 6 = ReLU6
+  uint16_t actfunc;        // Activation Function: 0 = None, 1 = ReLU, 2 = Tanh, 3 = Leaky ReLU, 4 = Sigmoid, 5 = PReLU (PReLU must be used with POST-OP=1)
   uint16_t actfunc_param;  // Leaky ReLU parameter (in FP16 format), 0 = non-leaky
   uint16_t rsvd[3];        // padding to 64-bit size
 } dmp_dv_cmdraw_fc_v0;
