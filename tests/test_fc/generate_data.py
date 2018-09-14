@@ -49,6 +49,9 @@ class Main(object):
         self.generate_fc(args)
 
     def generate_fc(self, args):
+        for i in range(1, 1025):
+            self.generate((i, 1, 1), 1, 0, args)
+
         # Generate 1D inputs
         for input_size in (512, 1024):
             for output_size in (512, 1024):
@@ -81,7 +84,7 @@ class Main(object):
         assert len(input_shape) == 3
         assert all(x > 0 for x in input_shape)
         input_size = int(numpy.prod(input_shape))
-        if input_size > 16484 or output_size > 16484:
+        if input_size > 16484 or output_size > 16484 or input_size % 16 != 0:
             return
 
         try:
@@ -96,7 +99,7 @@ class Main(object):
 
         prefix = "%s/%d_act%d" % (s_dir, output_size, activation)
 
-        numpy.random.seed(12345)
+        # numpy.random.seed(12345)
 
         if args.float:
             values = numpy.random.uniform(
@@ -107,22 +110,27 @@ class Main(object):
 
         bias = numpy.random.choice(values, output_size).astype(numpy.float16)
         bias.tofile("%s.b.bin" % prefix)
+        # print("bias:", bias)
 
         input = numpy.random.choice(values, input_size).reshape(
             input_shape).astype(numpy.float16)
         input.tofile("%s.i.bin" % prefix)
+        # print("input:", input.ravel())
 
         quant = numpy.random.choice(values, 256).astype(numpy.float16)
         quant[0] = 0
         quant.tofile("%s.q.bin" % prefix)
+        # print("quant:", quant)
 
         assert len(quant) == 256
         assert numpy.count_nonzero(numpy.isnan(quant)) == 0
         i_weights = numpy.random.randint(
             0, 256, input_size * output_size).astype(numpy.uint8)
         i_weights.tofile("%s.w.bin" % prefix)
+        # print("i_weights:", i_weights)
         weights = quant[i_weights].copy().reshape(
             output_size, input_shape[0], input_shape[1], input_shape[2])
+        # print("weights:", weights.ravel())
         assert numpy.count_nonzero(numpy.isnan(weights)) == 0
         del i_weights
         del quant
@@ -180,6 +188,7 @@ layer {
 
         results = net.forward()
         output = results["fc1"].copy()
+        # print("output:", output.ravel())
 
         assert output.shape == (1, output_size), \
             "output.shape = %s" % str(output.shape)

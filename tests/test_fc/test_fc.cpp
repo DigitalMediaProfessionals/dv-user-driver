@@ -67,6 +67,7 @@ static float g_max_diff_t[N_T] = {0, 0, 0, 0, 0, 0};
 /// @brief Configuration description to be tested.
 typedef struct fc_config_impl {
   int c_input, h_input, w_input, c_output, h_output, w_output, activation;
+  bool quantized;
   bool hash_set;
   bool failed;
   uint8_t hash[32];
@@ -77,8 +78,8 @@ typedef struct fc_config_impl {
   bool pure_ints;  // only integers were used - error check should be exact
 
   bool operator <(const struct fc_config_impl& pt) const {
-    return std::make_tuple(c_input, h_input, w_input, c_output, h_output, w_output, activation) <
-        std::make_tuple(pt.c_input, pt.h_input, pt.w_input, pt.c_output, pt.h_output, pt.w_output, pt.activation);
+    return std::make_tuple(c_input, h_input, w_input, c_output, h_output, w_output, activation, quantized) <
+        std::make_tuple(pt.c_input, pt.h_input, pt.w_input, pt.c_output, pt.h_output, pt.w_output, pt.activation, pt.quantized);
   }
 } fc_config;
 
@@ -134,7 +135,7 @@ int test_fc(const std::vector<fc_config*>& confs) {
     fc_config *conf = *it;
     snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%d_act%d",
              conf->c_input, conf->h_input, conf->w_input, conf->c_output * conf->h_output * conf->w_output, conf->activation);
-    LOG(" %s", prefix);
+    LOG(" %s %s", prefix, conf->quantized ? "Q8" : "FP16");
   }
   LOG("\n");
 
@@ -312,7 +313,7 @@ int test_fc(const std::vector<fc_config*>& confs) {
     if (dmp_dv_pack_fc_weights(
             conf->c_input, conf->h_input, conf->w_input,
             conf->c_output, conf->h_output, conf->w_output,
-            quant_map, NULL, NULL, NULL, &weights_size)) {
+            conf->quantized ? quant_map : NULL, NULL, NULL, NULL, &weights_size)) {
       ERR("dmp_dv_pack_fc_weights() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
@@ -325,7 +326,7 @@ int test_fc(const std::vector<fc_config*>& confs) {
     LOG("Allocated %zu (%zu(+%zu random offset) requested) bytes for weights\n", dmp_dv_mem_get_size(conf->weights_mem), weights_size, conf->weights_offs);
     cmd.weight_buf.mem = conf->weights_mem;
     cmd.weight_buf.offs = conf->weights_offs;
-    cmd.weight_fmt = 1;
+    cmd.weight_fmt = conf->quantized ? 1 : 0;
 
     weights = dmp_dv_mem_map(conf->weights_mem) + conf->weights_offs;
     if (!weights) {
@@ -338,13 +339,22 @@ int test_fc(const std::vector<fc_config*>& confs) {
     }
 
     // Fill weights
+    if (!conf->quantized) {  // replace indices with values
+      const int n_weights = caffe_weights.size();
+      caffe_weights.resize(n_weights * 2);
+      uint16_t *wu16 = (uint16_t*)caffe_weights.data();
+      for (int i = n_weights - 1; i >= 0; --i) {
+        wu16[i] = quant_map[caffe_weights[i]];
+      }
+    }
     if (dmp_dv_pack_fc_weights(
           conf->c_input, conf->h_input, conf->w_input,
           conf->c_output, conf->h_output, conf->w_output,
-          quant_map, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size)) {
+          conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size)) {
       ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
+
     if (dmp_dv_mem_sync_end(conf->weights_mem)) {
       ERR("dmp_dv_mem_sync_end() failed for weights: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
@@ -488,8 +498,8 @@ int test_fc(const std::vector<fc_config*>& confs) {
         }
       }
       if (failed_diff > 0.0f) {
-        ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f i=%d %s\n", failed_diff, failed_diff_y, failed_diff_t,
-            failed_i, prefix);
+        ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f i=%d %s %s\n", failed_diff, failed_diff_y, failed_diff_t,
+            failed_i, prefix, conf->quantized ? "Q8" : "FP16");
         goto L_EXIT;
       }
     }
@@ -568,7 +578,7 @@ int test_fc(const std::vector<fc_config*>& confs) {
     fc_config *conf = *it;
     snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%d_act%d",
              conf->c_input, conf->h_input, conf->w_input, conf->c_output * conf->h_output * conf->w_output, conf->activation);
-    LOG(" %s", prefix);
+    LOG(" %s %s", prefix, conf->quantized ? "Q8" : "FP16");
   }
   LOG("\n");
 
@@ -644,6 +654,9 @@ int main(int argc, char **argv) {
                config.c_input, config.h_input, config.w_input, config.c_output * config.h_output * config.w_output, config.activation);
 
       const size_t prev_size = (int)config_set->size();
+      config.quantized = true;
+      config_set->emplace(config);
+      config.quantized = false;
       config_set->emplace(config);
       const size_t this_size = (int)config_set->size();
 
@@ -677,7 +690,7 @@ int main(int argc, char **argv) {
   const int n_passes = 2;
   for (int i_pass = 0; i_pass < n_passes; ++i_pass) {
     // Randomize configrations order
-    std::shuffle(configs.begin(), configs.end(), std::default_random_engine(std::chrono::system_clock::now().time_since_epoch().count()));
+    //std::shuffle(configs.begin(), configs.end(), std::default_random_engine(std::chrono::system_clock::now().time_since_epoch().count()));
 
     // Execute configurations in different chunk sizes
     const size_t pack_sizes[2] = {1, 50};

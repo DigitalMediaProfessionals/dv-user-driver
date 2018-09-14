@@ -95,8 +95,14 @@ class CDMPDVCmdListFCHelper : public CDMPDVCmdListKHelper {
       return -1;
     }
 
-    if ((int)cmd->input_size > ctx_->get_max_fc_vector_size()) {
-      SET_ERR("Unsupported input vector size %d, only sizes from 1 to %d are supported",
+    if ((!cmd->input_size) || ((int)cmd->input_size > ctx_->get_max_fc_vector_size()) || (cmd->input_size & 15)) {
+      SET_ERR("Unsupported input vector size %d, only sizes multiple of 16 from 16 to %d are supported",
+              (int)cmd->input_size, ctx_->get_max_fc_vector_size());
+      return -1;
+    }
+
+    if ((!cmd->output_size) || ((int)cmd->output_size > ctx_->get_max_fc_vector_size())) {
+      SET_ERR("Unsupported output vector size %d, only sizes from 1 to %d are supported",
               (int)cmd->input_size, ctx_->get_max_fc_vector_size());
       return -1;
     }
