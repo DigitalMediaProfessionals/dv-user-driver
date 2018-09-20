@@ -33,6 +33,10 @@ f_device_helper_creator CDMPDVCmdListDeviceHelper::creators_[DMP_DV_DEV_COUNT] =
 };
 
 
+/// @brief Total per-process allocated device-accessible memory size in bytes instantiation.
+int64_t CDMPDVMem::total_size_ = 0;
+
+
 extern "C" {
 
 
@@ -171,6 +175,11 @@ size_t dmp_dv_mem_get_size(dmp_dv_mem *mem) {
     return 0;
   }
   return ((CDMPDVMem*)mem)->get_size();
+}
+
+
+int64_t dmp_dv_mem_get_total_size() {
+  return CDMPDVMem::get_total_size();
 }
 
 

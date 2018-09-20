@@ -175,6 +175,11 @@ int dmp_dv_mem_sync_end(dmp_dv_mem *mem);
 size_t dmp_dv_mem_get_size(dmp_dv_mem *mem);
 
 
+/// @brief Returns total per-process allocated size in bytes.
+/// @details It is thread-safe.
+int64_t dmp_dv_mem_get_total_size();
+
+
 /// @brief Creates command list.
 /// @param ctx Context for working with DV accelerator, when NULL the error is returned.
 /// @return Handle to command list or NULL on error.

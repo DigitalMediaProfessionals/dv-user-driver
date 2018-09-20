@@ -70,6 +70,7 @@ class CDMPDVMem : public CDMPDVBase {
       return false;
     }
     real_size_ = buf_size;
+    __sync_add_and_fetch(&total_size_, (int64_t)real_size_);
 
     ctx->Retain();
     ctx_ = ctx;
@@ -83,6 +84,7 @@ class CDMPDVMem : public CDMPDVBase {
     if (fd_mem_ != -1) {
       close(fd_mem_);
       fd_mem_ = -1;
+      __sync_add_and_fetch(&total_size_, -(int64_t)real_size_);
     }
     requested_size_ = 0;
     real_size_ = 0;
@@ -172,6 +174,11 @@ class CDMPDVMem : public CDMPDVBase {
     return mem ? ((CDMPDVMem*)mem)->fd_mem_ : -1;
   }
 
+  /// @brief Returns total per-process allocated device-accessible memory size in bytes.
+  static inline int64_t get_total_size() {
+    return __sync_add_and_fetch(&total_size_, 0);
+  }
+
  private:
   /// @brief Pointer to dv context.
   CDMPDVContext *ctx_;
@@ -190,4 +197,7 @@ class CDMPDVMem : public CDMPDVBase {
 
   /// @brief Last used DMA synchronization flags.
   int sync_flags_;
+
+  /// @brief Total per-process allocated device-accessible memory size in bytes.
+  static int64_t total_size_;
 };

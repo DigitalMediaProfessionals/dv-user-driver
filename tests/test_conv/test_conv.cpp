@@ -578,6 +578,18 @@ int test_conv(const std::vector<conv_config*>& confs) {
   LOG("SUCCESS: test_cmdlist\n");
 
   L_EXIT:
+
+  if ((!result) && (confs.size())) {
+    const int64_t total_size = dmp_dv_mem_get_total_size();
+    if (total_size) {
+      LOG("Totally allocated: %lld bytes\n", (long long)total_size);
+    }
+    else {
+      ERR("dmp_dv_mem_get_total_size() returned zero while it shouldn't\n");
+      result = -1;
+    }
+  }
+
   dmp_dv_cmdlist_release(cmdlist);
   for (auto it = confs.rbegin(); it != confs.rend(); ++it) {
     conv_config *conf = *it;
@@ -626,7 +638,12 @@ int test_conv(const std::vector<conv_config*>& confs) {
     result = -1;
   }
 
-  LOG("EXIT: test_conv: %d commands, %d FDs:", (int)confs.size(), n_fd);
+  if (dmp_dv_mem_get_total_size()) {
+    ERR("Memory leak detected: %lld bytes left\n", (long long)dmp_dv_mem_get_total_size());
+    result = -1;
+  }
+
+  LOG("EXIT%s: test_conv: %d commands, %d FDs:", result ? "(FAILED)" : "", (int)confs.size(), n_fd);
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     conv_config *conf = *it;
     snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_t%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
