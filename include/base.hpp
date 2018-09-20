@@ -49,7 +49,7 @@ class CDMPDVBase {
   /// @brief Decrements reference counter, when reference counter reaches zero, destroys an object.
   /// @return Reference counter value after decrement.
   int Release() {
-    int n = __sync_sub_and_fetch(&n_ref_, 1);
+    int n = __sync_add_and_fetch(&n_ref_, -1);
     if (n > 0) {
       return n;
     }
