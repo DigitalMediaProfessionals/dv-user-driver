@@ -256,7 +256,7 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
 
 
 /// @brief Packs convolution layer weights and biases into output array.
-/// @param n_channels Number of input channels.
+/// @param n_channels Number of input channels, for depthwise convolution this must be set to 1.
 /// @param kx Kernel width.
 /// @param ky Kernel height.
 /// @param n_kernels Number of output channels.

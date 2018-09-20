@@ -147,6 +147,11 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
           return -1;
         }
       }
+      if ((cmd->run[i_run].conv_enable == 3) && (cmd->run[i_run].m != c)) {
+        SET_ERR("Depthwise convolution only supports one-to-one mapping, got c=%d m=%d",
+                c, cmd->run[i_run].m);
+        return -1;
+      }
 
       kcmd.run[i_run].actfunc = cmd->run[i_run].actfunc;
       kcmd.run[i_run].actfunc_param = cmd->run[i_run].actfunc_param;

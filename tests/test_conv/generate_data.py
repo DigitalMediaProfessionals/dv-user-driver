@@ -62,17 +62,21 @@ class Main(object):
             else:
                 kyy = kxx
             for ky in kyy:
-                pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
-                for stride in ((1, 1),):
-                    for act in (0,):  # 0, 1, 3, 5: none, tanh, sigmoid, elu
-                        for x in (3, 17):
-                            for y in (3, 17):
-                                for c in (3, 65):
-                                    for m in (3, 65):
-                                        self.generate(
-                                            x, y, roundup(c, args.multiple),
-                                            kx, ky, roundup(m, args.multiple),
-                                            pad, stride, act, args)
+                for pad in set(((kx >> 1, ky >> 1, kx >> 1, ky >> 1),
+                                (0, 0, 0, 0))):
+                    for stride in ((1, 1),):
+                        for act in (0,):
+                            for x in (3, 17):
+                                for y in (3, 17):
+                                    for c in (3, 65):
+                                        for m in (3, 65):
+                                            for dw in (False, True):
+                                                self.generate(
+                                                    x, y,
+                                                    roundup(c, args.multiple),
+                                                    kx, ky,
+                                                    roundup(m, args.multiple),
+                                                    pad, stride, act, dw, args)
 
     def generate_big(self, args):
         # Generate tests without activation function
@@ -86,17 +90,21 @@ class Main(object):
             else:
                 kyy = kxx
             for ky in kyy:
-                pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
-                for stride in ((1, 1), (2, 2)):
-                    for act in (0,):  # 0, 1, 3, 5: none, tanh, sigmoid, elu
-                        for x in (1, 3, 5, 8, 17, 128):
-                            for y in (1, 3, 5, 8, 17, 128):
-                                for c in (1, 3, 9, 16, 65):
-                                    for m in (1, 3, 9, 16, 65):
-                                        self.generate(
-                                            x, y, roundup(c, args.multiple),
-                                            kx, ky, roundup(m, args.multiple),
-                                            pad, stride, act, args)
+                for pad in set(((kx >> 1, ky >> 1, kx >> 1, ky >> 1),
+                                (0, 0, 0, 0))):
+                    for stride in ((1, 1), (2, 2)):
+                        for act in (0,):
+                            for x in (1, 3, 5, 8, 17, 128):
+                                for y in (1, 3, 5, 8, 17, 128):
+                                    for c in (1, 3, 9, 16, 65):
+                                        for m in (1, 3, 9, 16, 65):
+                                            for dw in (False, True):
+                                                self.generate(
+                                                    x, y,
+                                                    roundup(c, args.multiple),
+                                                    kx, ky,
+                                                    roundup(m, args.multiple),
+                                                    pad, stride, act, dw, args)
 
         # Generate tests with activation function
         if args.odd:
@@ -109,23 +117,27 @@ class Main(object):
             else:
                 kyy = kxx
             for ky in kyy:
-                pad = (kx >> 1, ky >> 1, kx >> 1, ky >> 1)
-                for stride in ((1, 1), (2, 2)):
-                    for act in (1, 3, 5):  # 0, 1, 3, 5: none, tanh, sigmoid, elu
-                        for x in (11, 128):
-                            for y in (11, 128):
-                                for c in (1, 3, 9, 32):
-                                    for m in (1, 3, 9, 32):
-                                        self.generate(
-                                            x, y, roundup(c, args.multiple),
-                                            kx, ky, roundup(m, args.multiple),
-                                            pad, stride, act, args)
+                for pad in set(((kx >> 1, ky >> 1, kx >> 1, ky >> 1),
+                                (0, 0, 0, 0))):
+                    for stride in ((1, 1), (2, 2)):
+                        for act in (1, 3, 5):  # tanh, sigmoid, elu
+                            for x in (11, 128):
+                                for y in (11, 128):
+                                    for c in (1, 3, 9, 32):
+                                        for m in (1, 3, 9, 32):
+                                            for dw in (False, True):
+                                                self.generate(
+                                                    x, y,
+                                                    roundup(c, args.multiple),
+                                                    kx, ky,
+                                                    roundup(m, args.multiple),
+                                                    pad, stride, act, dw, args)
 
     def get_ox(self, width, kx, pad_left, pad_right, stride):
         return (pad_left + width + pad_right - kx) // stride + 1
 
     def generate(self, width, height, n_channels, kx, ky, n_kernels,
-                 pad_ltrb, stride_xy, activation, args):
+                 pad_ltrb, stride_xy, activation, dw, args):
         """Generates test data for convolutional layer and invokes caffe
         to generate gold output.
 
@@ -141,16 +153,21 @@ class Main(object):
             stride_xy: stride (x, y).
             activation: activation function (0 - none, 1 - tanh,
                         3 - sigmoid, 5 - elu).
+            dw: use depth-wise (caffe's group=n_channels == n_kernels).
         """
-        if pad_ltrb[0] != pad_ltrb[2] or pad_ltrb[1] != pad_ltrb[3]:
-            raise ValueError("Caffe doesn't support padding "
-                             "(left, top, right, bottom): %s" % pad_ltrb)
+        if dw and n_kernels != n_channels:  # check if dw is applicable
+            return
+
+        if ((pad_ltrb[0] + width + pad_ltrb[2] < kx) or
+                (pad_ltrb[1] + height + pad_ltrb[3] < ky)):
+            return
 
         try:
             os.mkdir("data")
         except OSError:
             pass
-        s_dir = "data/%dx%dx%d" % (width, height, n_channels)
+        s_dir = "data/%dx%dx%d_t%d" % (width, height, n_channels,
+                                       1 if dw else 0)
         try:
             os.mkdir(s_dir)
         except OSError:
@@ -182,13 +199,16 @@ class Main(object):
         quant[0] = 0
         quant.tofile("%s.q.bin" % prefix)
 
+        weights_dim_1 = 1 if dw else n_channels
+
         assert len(quant) == 256
         assert numpy.count_nonzero(numpy.isnan(quant)) == 0
         i_weights = numpy.random.randint(
-            0, 256, kx * ky * n_channels * n_kernels).astype(numpy.uint8)
+            0, 256, kx * ky * weights_dim_1 * n_kernels).astype(
+                numpy.uint8)
         i_weights.tofile("%s.w.bin" % prefix)
         weights = quant[i_weights].copy().reshape(
-            n_kernels, n_channels, ky, kx)
+            n_kernels, weights_dim_1, ky, kx)
         assert numpy.count_nonzero(numpy.isnan(weights)) == 0
         del i_weights
         del quant
@@ -198,11 +218,14 @@ class Main(object):
         s_kern = ("kernel_size: %d" % kx if kx == ky
                   else "kernel_w: %d\n    kernel_h: %d" % (kx, ky))
 
-        s_pad = ("pad: %d" % pad_ltrb[0] if pad_ltrb[0] == pad_ltrb[1] else
-                 "pad_w: %d\n    pad_h: %d" % (pad_ltrb[0], pad_ltrb[1]))
+        s_pad = ("pad: %d" % pad_ltrb[0] if min(pad_ltrb) == max(pad_ltrb) else
+                 "pad_w: %d\n    pad_h: %d" % (max(pad_ltrb[0], pad_ltrb[2]),
+                                               max(pad_ltrb[1], pad_ltrb[3])))
 
         s_stride = ("stride: %d" % stride_xy[0] if stride_xy[0] == stride_xy[1]
                     else "stride_w: %d\n    stride_h: %d" % stride_xy)
+
+        s_dw = "\n    group: %d" % n_channels if dw else ""
 
         with open("data/test.prototxt", "w") as fout:
             fout.write("""name: "Test"
@@ -232,10 +255,10 @@ layer {
     num_output: %d
     %s
     %s
-    %s
+    %s%s
   }
 }
-""" % (n_channels, height, width, n_kernels, s_pad, s_kern, s_stride))
+""" % (n_channels, height, width, n_kernels, s_pad, s_kern, s_stride, s_dw))
             if activation == 5:
                 fout.write("""
 layer {
@@ -266,7 +289,7 @@ layer {
 
         net = caffe.Net("data/test.prototxt", caffe.TEST)
         net.params["conv1"][0].data[:] = weights.astype(
-            numpy.float32).reshape(n_kernels, n_channels, ky, kx)
+            numpy.float32).reshape(n_kernels, weights_dim_1, ky, kx)
         del weights
         net.params["conv1"][1].data[:] = bias.astype(numpy.float32)
         del bias
@@ -281,7 +304,6 @@ layer {
         ox = self.get_ox(width, kx, pad_ltrb[0], pad_ltrb[2], stride_xy[0])
         oy = self.get_ox(height, ky, pad_ltrb[1], pad_ltrb[3], stride_xy[1])
         assert output.shape == (1, n_kernels, oy, ox)
-
         output.astype(numpy.float16).tofile("%s.o.bin" % prefix)
 
         print("Successfully generated test input/weights/output for %s" %

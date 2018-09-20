@@ -68,6 +68,8 @@ static float g_max_diff_t[N_T] = {0, 0, 0, 0, 0, 0};
 typedef struct conv_config_impl {
   int width, height, n_channels, kx, ky, n_kernels,
       pad_left, pad_top, pad_right, pad_bottom, stride_x, stride_y, activation;
+  int tpe;  // 0 - 2D, 1 - depthwise
+  bool quantized;
   bool hash_set;
   bool failed;
   uint8_t hash[32];
@@ -78,12 +80,12 @@ typedef struct conv_config_impl {
   bool pure_ints;  // only integers were used - error check should be exact
 
   bool operator <(const struct conv_config_impl& pt) const {
-    return std::make_tuple(width, height, n_channels, kx, ky, n_kernels,
+    return std::make_tuple(width, height, n_channels, tpe, kx, ky, n_kernels,
                            pad_left, pad_top, pad_right, pad_bottom,
-                           stride_x, stride_y, activation) <
-        std::make_tuple(pt.width, pt.height, pt.n_channels, pt.kx, pt.ky, pt.n_kernels,
+                           stride_x, stride_y, activation, quantized) <
+        std::make_tuple(pt.width, pt.height, pt.n_channels, pt.tpe, pt.kx, pt.ky, pt.n_kernels,
                         pt.pad_left, pt.pad_top, pt.pad_right, pt.pad_bottom,
-                        pt.stride_x, pt.stride_y, pt.activation);
+                        pt.stride_x, pt.stride_y, pt.activation, pt.quantized);
   }
 } conv_config;
 
@@ -163,11 +165,11 @@ int test_conv(const std::vector<conv_config*>& confs) {
   LOG("ENTER: test_conv: %d commands:", (int)confs.size());
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     conv_config *conf = *it;
-    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
-             conf->width, conf->height, conf->n_channels, conf->kx, conf->ky, conf->n_kernels,
+    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_t%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
+             conf->width, conf->height, conf->n_channels, conf->tpe, conf->kx, conf->ky, conf->n_kernels,
              conf->pad_left, conf->pad_top, conf->pad_right, conf->pad_bottom,
              conf->stride_x, conf->stride_y, conf->activation);
-    LOG(" %s", prefix);
+    LOG(" %s %s", prefix, conf->quantized ? "Q8" : "FP16");
   }
   LOG("\n");
 
@@ -210,10 +212,12 @@ int test_conv(const std::vector<conv_config*>& confs) {
   // Outer loop by configurations to be packed in the single command list
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     conv_config *conf = *it;
-    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
-             conf->width, conf->height, conf->n_channels, conf->kx, conf->ky, conf->n_kernels,
+    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_t%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
+             conf->width, conf->height, conf->n_channels, conf->tpe, conf->kx, conf->ky, conf->n_kernels,
              conf->pad_left, conf->pad_top, conf->pad_right, conf->pad_bottom,
              conf->stride_x, conf->stride_y, conf->activation);
+
+    const int weights_dim_1 = (conf->tpe == 1) ? 1 : conf->n_channels;
 
     // Load quantization map
     snprintf(fnme, sizeof(fnme), "%s.q.bin", prefix);
@@ -264,13 +268,13 @@ int test_conv(const std::vector<conv_config*>& confs) {
       ERR("fopen() failed for %s\n", fnme);
       goto L_EXIT;
     }
-    caffe_weights.resize(conf->n_kernels * conf->n_channels * conf->kx * conf->ky);
+    caffe_weights.resize(conf->n_kernels * weights_dim_1 * conf->kx * conf->ky);
     n = fread(caffe_weights.data(), sizeof(caffe_weights[0]), caffe_weights.size(), fin);
     fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
     fclose(fin);
-    if (n != conf->n_kernels * conf->n_channels * conf->kx * conf->ky) {
+    if (n != conf->n_kernels * weights_dim_1 * conf->kx * conf->ky) {
       ERR("fread() returned %d while expecting %d for %s\n",
-          n, conf->n_kernels * conf->n_channels * conf->kx * conf->ky, fnme);
+          n, conf->n_kernels * weights_dim_1 * conf->kx * conf->ky, fnme);
       goto L_EXIT;
     }
     if (!fend) {
@@ -332,7 +336,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     cmd.z = 1;
     cmd.topo = 1;
     cmd.run[0].m = conf->n_kernels;
-    cmd.run[0].conv_enable = 1;
+    cmd.run[0].conv_enable = (conf->tpe == 1 ? 3 : 1);
     cmd.run[0].p = (uint16_t)conf->kx | (((uint16_t)conf->ky) << 8);
     if ((conf->kx == conf->ky) && (conf->io_offs & 16)) {  // some randomization over valid square kernel size representation
       cmd.run[0].p = (uint16_t)conf->kx;
@@ -357,8 +361,8 @@ int test_conv(const std::vector<conv_config*>& confs) {
 
     weights_size = 0;
     if (dmp_dv_pack_conv_weights(
-            conf->n_channels, conf->kx, conf->ky, conf->n_kernels,
-            quant_map, NULL, NULL, NULL, &weights_size)) {
+            weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
+            conf->quantized ? quant_map : NULL, NULL, NULL, NULL, &weights_size)) {
       ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
@@ -371,7 +375,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     LOG("Allocated %zu (%zu(+%zu random offset) requested) bytes for weights\n", dmp_dv_mem_get_size(conf->weights_mem), weights_size, conf->weights_offs);
     cmd.run[0].weight_buf.mem = conf->weights_mem;
     cmd.run[0].weight_buf.offs = conf->weights_offs;
-    cmd.run[0].weight_fmt = 3;
+    cmd.run[0].weight_fmt = conf->quantized ? 3 : 1;
 
     weights = dmp_dv_mem_map(conf->weights_mem) + conf->weights_offs;
     if (!weights) {
@@ -384,9 +388,17 @@ int test_conv(const std::vector<conv_config*>& confs) {
     }
 
     // Fill weights
+    if (!conf->quantized) {  // replace indices with values
+      const int n_weights = caffe_weights.size();
+      caffe_weights.resize(n_weights * 2);
+      uint16_t *wu16 = (uint16_t*)caffe_weights.data();
+      for (int i = n_weights - 1; i >= 0; --i) {
+        wu16[i] = quant_map[caffe_weights[i]];
+      }
+    }
     if (dmp_dv_pack_conv_weights(
-          conf->n_channels, conf->kx, conf->ky, conf->n_kernels,
-          quant_map, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size)) {
+          weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
+          conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size)) {
       ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
@@ -538,8 +550,8 @@ int test_conv(const std::vector<conv_config*>& confs) {
           }
         }
         if (failed_diff > 0.0f) {
-          ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f xy=(%d, %d) chan=%d %s\n", failed_diff, failed_diff_y, failed_diff_t,
-              failed_x, failed_y, failed_c, prefix);
+          ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f xy=(%d, %d) chan=%d %s %s\n", failed_diff, failed_diff_y, failed_diff_t,
+              failed_x, failed_y, failed_c, prefix, conf->quantized ? "Q8" : "FP16");
           goto L_EXIT;
         }
       }
@@ -617,11 +629,11 @@ int test_conv(const std::vector<conv_config*>& confs) {
   LOG("EXIT: test_conv: %d commands, %d FDs:", (int)confs.size(), n_fd);
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     conv_config *conf = *it;
-    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
-             conf->width, conf->height, conf->n_channels, conf->kx, conf->ky, conf->n_kernels,
+    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_t%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
+             conf->width, conf->height, conf->n_channels, conf->tpe, conf->kx, conf->ky, conf->n_kernels,
              conf->pad_left, conf->pad_top, conf->pad_right, conf->pad_bottom,
              conf->stride_x, conf->stride_y, conf->activation);
-    LOG(" %s", prefix);
+    LOG(" %s %s", prefix, conf->quantized ? "Q8" : "FP16");
   }
   LOG("\n");
 
@@ -666,7 +678,7 @@ int main(int argc, char **argv) {
         break;
       }
     }
-    if (sscanf(fnme, "%d%d%d", &config.width, &config.height, &config.n_channels) != 3) {
+    if (sscanf(fnme, "%d%d%d%d", &config.width, &config.height, &config.n_channels, &config.tpe) != 4) {
       continue;
     }
     snprintf(fnme, sizeof(fnme), "data/%s", dir->d_name);
@@ -698,11 +710,11 @@ int main(int argc, char **argv) {
                config.width, config.height, config.n_channels, config.kx, config.ky, config.n_kernels,
                config.pad_left, config.pad_top, config.pad_right, config.pad_bottom,
                config.stride_x, config.stride_y, config.activation);
-      /*if (strcmp(prefix, "data/11x16x65/1x1x64_pad0x0x0x0_stride1x1_act0")) {
-        continue;
-      }*/
 
       const size_t prev_size = (int)config_set->size();
+      config.quantized = true;
+      config_set->emplace(config);
+      config.quantized = false;
       config_set->emplace(config);
       const size_t this_size = (int)config_set->size();
 
@@ -730,8 +742,7 @@ int main(int argc, char **argv) {
     configs[i] = config_data.data() + i;
   }
 
-  const int seed = 1234;  // time(NULL);
-  std::mt19937 mt_rand(seed);
+  std::mt19937 mt_rand(time(NULL));
   std::uniform_int_distribution<int> rnd_offs(0, 1024);
 
   const int n_passes = 2;
