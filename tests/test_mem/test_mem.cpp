@@ -191,11 +191,24 @@ int test_mem(size_t size) {
     }
   }
 
+  int result = 0;
+
+  if (dmp_dv_mem_get_total_size() != (int64_t)dmp_dv_mem_get_size(mem)) {
+    ERR("dmp_dv_mem_get_total_size() returned different value %lld than expected %lld\n",
+        (long long)dmp_dv_mem_get_total_size(), (long long)dmp_dv_mem_get_size(mem));
+    result = -1;
+  }
+
   dmp_dv_mem_release(mem);
   dmp_dv_context_release(ctx);
 
+  if (dmp_dv_mem_get_total_size()) {
+    ERR("dmp_dv_mem_get_total_size() returned non-zero: %lld\n",
+        (long long)dmp_dv_mem_get_total_size());
+    result = -1;
+  }
+
   static int s_n_fd = -1;
-  int result = 0;
   int n_fd = 0;
   DIR *d;
   struct dirent *dir;
@@ -228,7 +241,7 @@ int test_mem(size_t size) {
     result = -1;
   }
 
-  LOG("EXIT: test_mem(%zu): %d FDs\n", size, n_fd);
+  LOG("EXIT%s: test_mem(%zu): %d FDs\n", result ? "(FAILED)" : "", size, n_fd);
   return result;
 }
 
