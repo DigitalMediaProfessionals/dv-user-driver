@@ -115,8 +115,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
     for (uint32_t topo = cmd->topo, i_run = 0; topo; topo >>= 1, ++i_run) {
       const int kx = cmd->run[i_run].p & 0xFF;
       const int ky = (cmd->run[i_run].p & 0xFF00) ? (cmd->run[i_run].p & 0xFF00) >> 8 : kx;
-      const int pad[4] = {(int)(cmd->run[i_run].conv_pad & 0xFF), (int)((cmd->run[i_run].conv_pad >> 8) & 0xFF),
-                          (int)((cmd->run[i_run].conv_pad >> 16) & 0xFF), (int)((cmd->run[i_run].conv_pad >> 24) & 0xFF)};
+      const int pad[4] = {(int)(cmd->run[i_run].conv_pad & 0x7F), (int)((cmd->run[i_run].conv_pad >> 8) & 0xFF),
+                          (int)((cmd->run[i_run].conv_pad >> 16) & 0x7F), (int)((cmd->run[i_run].conv_pad >> 24) & 0xFF)};
       const int stride[2] = {(int)(cmd->run[i_run].conv_stride & 0xFF), (int)((cmd->run[i_run].conv_stride >> 8) & 0xFF)};
       const int m = cmd->run[i_run].m;
       const int w = conv_size.w, h = conv_size.h, c = conv_size.c;
@@ -151,6 +151,27 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         SET_ERR("Depthwise convolution only supports one-to-one mapping, got c=%d m=%d",
                 c, cmd->run[i_run].m);
         return -1;
+      }
+
+      const int dil_x = cmd->run[i_run].conv_dilation & 0xFF,
+                dil_y = (cmd->run[i_run].conv_dilation >> 8) & 0xFF;
+      if ((dil_x > 1) || (dil_y > 1)) {
+        if (cmd->topo != 1) {
+          SET_ERR("Dilated convolution must be the only run, but topo=%u", cmd->topo);
+          return -1;
+        }
+        if (cmd->run[i_run].pool_enable) {
+          SET_ERR("Dilated convolution cannot be combined with pooling");
+          return -1;
+        }
+        const int kxfull = (kx - 1) * dil_x + 1,
+                  kyfull = (ky - 1) * dil_y + 1;
+        const int ox = get_conv_out_width(w, kxfull, pad[0], pad[1], 1),
+                  oy = get_conv_out_width(h, kyfull, pad[2], pad[3], 1);
+        if ((ox != w) || (oy != h)) {
+          SET_ERR("Dilated convolution only supports \"same\" padding");
+          return -1;
+        }
       }
 
       kcmd.run[i_run].actfunc = cmd->run[i_run].actfunc;
@@ -217,7 +238,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
                 (int)cmd->w, (int)cmd->h, (int)cmd->c, (int)cmd->z);
         return -1;
       }
-      int ubuf_used = ubuf_get_single_tile_usage(&kcmd);
+      int ubuf_used = ubuf_get_single_tile_usage(&kcmd, ctx_->get_ub_size());
       //fprintf(stderr, "UBUF used size for the input W=%d H=%d C=%d is %d\n",
       //        (int)cmd->w, (int)cmd->h, (int)cmd->c, ubuf_used);
       //fflush(stderr);
