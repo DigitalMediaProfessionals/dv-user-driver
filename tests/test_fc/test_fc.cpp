@@ -41,7 +41,8 @@
 
 
 /// @brief Rounds up "a" to be the multiple of "n".
-static inline int roundup(int a, int n) {
+static inline int roundup(int a) {
+  const int n = 16;
   int d = a % n;
   return d ? a + (n - d) : a;
 }
@@ -297,7 +298,7 @@ int test_fc(const std::vector<fc_config*>& confs) {
     cmd.output_size = output_size;
     cmd.actfunc = conf->activation;
 
-    conf->io_size = (roundup(input_size, 4) + roundup(output_size, 4)) * sizeof(__fp16);
+    conf->io_size = (roundup(input_size) + roundup(output_size)) * sizeof(__fp16);
     conf->io_mem = dmp_dv_mem_alloc(ctx, conf->io_offs + conf->io_size);
     if (!conf->io_mem) {
       ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", conf->io_offs + conf->io_size, dmp_dv_get_last_error_message());
@@ -307,7 +308,7 @@ int test_fc(const std::vector<fc_config*>& confs) {
     cmd.input_buf.mem = conf->io_mem;
     cmd.input_buf.offs = conf->io_offs;
     cmd.output_buf.mem = conf->io_mem;
-    cmd.output_buf.offs = conf->io_offs + roundup(input_size, 4) * sizeof(__fp16);
+    cmd.output_buf.offs = conf->io_offs + roundup(input_size) * sizeof(__fp16);
 
     weights_size = 0;
     if (dmp_dv_pack_fc_weights(
@@ -435,7 +436,7 @@ int test_fc(const std::vector<fc_config*>& confs) {
     }
 
     // Compare output with the gold one
-    const int o_offs = roundup(input_size, 4);
+    const int o_offs = roundup(input_size);
     if (conf->hash_set) {  // check hash
       uint8_t hash[32];
       SHA256_CTX sha256;

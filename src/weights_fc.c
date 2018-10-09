@@ -138,6 +138,15 @@ int dmp_dv_pack_fc_weights(
     out_offs += quant_map ? weights_size : weights_size << 1;
   }
 
+  // bias must be 16-bytes aligned
+  if (out_offs & 15) {
+    const int d = 16 - (out_offs & 15);
+    if (out_offs + d <= *packed_weights_size) {
+      memset(packed_weights + out_offs, 0, d);
+    }
+    out_offs += d;
+  }
+
   if (out_offs + output_size * 2 <= *packed_weights_size) {
     memcpy(packed_weights + out_offs, bias, output_size * 2);
   }

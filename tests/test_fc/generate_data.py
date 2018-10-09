@@ -84,7 +84,7 @@ class Main(object):
         assert len(input_shape) == 3
         assert all(x > 0 for x in input_shape)
         input_size = int(numpy.prod(input_shape))
-        if input_size > 16484 or output_size > 16484 or input_size % 16 != 0:
+        if input_size > 16384 or output_size > 16384:  # or input_size % 16 != 0:
             return
 
         try:
