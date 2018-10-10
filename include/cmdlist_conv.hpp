@@ -164,8 +164,18 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
           SET_ERR("Dilated convolution cannot be combined with pooling");
           return -1;
         }
+        if ((kx != ky) || (!(kx & 1)) || (!(ky & 1))) {
+          SET_ERR("Only odd square kernel sizes are supported for dilated convolutions, got %dx%d",
+                  kx, ky);
+          return -1;
+        }
         const int kxfull = (kx - 1) * dil_x + 1,
                   kyfull = (ky - 1) * dil_y + 1;
+        if ((w < kxfull) || (h < kyfull)) {
+          SET_ERR("Input size %dx%d is too small for convolution of size %dx%d dilated by %dx%d",
+                  w, h, kx, ky, dil_x, dil_y);
+          return -1;
+        }
         const int ox = get_conv_out_width(w, kxfull, pad[0], pad[1], 1),
                   oy = get_conv_out_width(h, kyfull, pad[2], pad[3], 1);
         if ((ox != w) || (oy != h)) {

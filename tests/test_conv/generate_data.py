@@ -19,6 +19,7 @@
 Generates data for testing convolutional layer.
 """
 import argparse
+from itertools import product
 import numpy
 import os
 
@@ -44,14 +45,13 @@ class Main(object):
         parser.add_argument("-m", "--multiple", type=int, default=1,
                             help="Force generated channels to be multiple "
                                  "of this value (default: 1)")
+        parser.add_argument("-d", "--dilated", action="store_true",
+                            help="Generate only tests for dilated convolutions")
         args = parser.parse_args()
 
-        if args.big:
-            self.generate_big(args)
-        else:
-            self.generate_small(args)
+        self.generate_tests(args)
 
-    def generate_small(self, args):
+    def generate_tests(self, args):
         if args.odd:
             kxx = (1, 3, 5, 7)
         else:
@@ -62,82 +62,29 @@ class Main(object):
             else:
                 kyy = kxx
             for ky in kyy:
-                for pad in set(((kx >> 1, ky >> 1, kx >> 1, ky >> 1),
-                                (0, 0, 0, 0))):
-                    for stride in ((1, 1),):
-                        for act in (0,):
-                            for x in (3, 17):
-                                for y in (3, 17):
-                                    for c in (3, 65):
-                                        for m in (3, 65):
-                                            for dw in (False, True):
-                                                self.generate(
-                                                    x, y,
-                                                    roundup(c, args.multiple),
-                                                    kx, ky,
-                                                    roundup(m, args.multiple),
-                                                    pad, stride, act, dw, args)
-
-    def generate_big(self, args):
-        # Generate tests without activation function
-        if args.odd:
-            kxx = (1, 3, 5, 7)
-        else:
-            kxx = (1, 2, 3, 4, 5, 6, 7)
-        for kx in kxx:
-            if args.square:
-                kyy = (kx,)
-            else:
-                kyy = kxx
-            for ky in kyy:
-                for pad in set(((kx >> 1, ky >> 1, kx >> 1, ky >> 1),
-                                (0, 0, 0, 0))):
-                    for stride in ((1, 1), (2, 2)):
-                        for act in (0,):
-                            for x in (1, 3, 5, 8, 17, 128):
-                                for y in (1, 3, 5, 8, 17, 128):
-                                    for c in (1, 3, 9, 16, 65):
-                                        for m in (1, 3, 9, 16, 65):
-                                            for dw in (False, True):
-                                                self.generate(
-                                                    x, y,
-                                                    roundup(c, args.multiple),
-                                                    kx, ky,
-                                                    roundup(m, args.multiple),
-                                                    pad, stride, act, dw, args)
-
-        # Generate tests with activation function
-        if args.odd:
-            kxx = (1, 3, 5, 7)
-        else:
-            kxx = (1, 2, 3, 4, 5, 6, 7)
-        for kx in kxx:
-            if args.square:
-                kyy = (kx,)
-            else:
-                kyy = kxx
-            for ky in kyy:
-                for pad in set(((kx >> 1, ky >> 1, kx >> 1, ky >> 1),
-                                (0, 0, 0, 0))):
-                    for stride in ((1, 1), (2, 2)):
-                        for act in (1, 3, 5):  # tanh, sigmoid, elu
-                            for x in (11, 128):
-                                for y in (11, 128):
-                                    for c in (1, 3, 9, 32):
-                                        for m in (1, 3, 9, 32):
-                                            for dw in (False, True):
-                                                self.generate(
-                                                    x, y,
-                                                    roundup(c, args.multiple),
-                                                    kx, ky,
-                                                    roundup(m, args.multiple),
-                                                    pad, stride, act, dw, args)
+                for stride, act, x, y, c, m, dw, dil in product(
+                        [(1, 1), (2, 2)][0:], [0],
+                        [5, 7, 9, 15][0:], [5, 7, 9, 15][0:],
+                        [1, 3, 9, 64, 65][0:], [1, 3, 9, 64, 65][0:],
+                        [False, True], [1, 2]):
+                    dil = max(dil, 1)
+                    kxfull = (kx - 1) * dil + 1
+                    kyfull = (ky - 1) * dil + 1
+                    pads = [(kxfull >> 1, kyfull >> 1,
+                             kxfull >> 1, kyfull >> 1)]
+                    if dil == 1 and pads[0] != (0, 0, 0, 0):
+                        pads.append((0, 0, 0, 0))
+                    for pad in pads:
+                        self.generate(
+                            x, y, roundup(c, args.multiple),
+                            kx, ky, roundup(m, args.multiple),
+                            pad, stride, act, dw, dil, args)
 
     def get_ox(self, width, kx, pad_left, pad_right, stride):
         return (pad_left + width + pad_right - kx) // stride + 1
 
     def generate(self, width, height, n_channels, kx, ky, n_kernels,
-                 pad_ltrb, stride_xy, activation, dw, args):
+                 pad_ltrb, stride_xy, activation, dw, dil, args):
         """Generates test data for convolutional layer and invokes caffe
         to generate gold output.
 
@@ -158,6 +105,17 @@ class Main(object):
         if dw and n_kernels != n_channels:  # check if dw is applicable
             return
 
+        if dw and dil > 1:
+            return
+
+        if (dil > 1 and (width < (dil * (kx - 1) + 1) or
+                         height < (dil * (ky - 1) + 1) or
+                         kx != ky or kx % 2 == 0 or ky % 2 == 0)):
+            return
+
+        if dil < 2 and args.dilated:
+            return
+
         if ((pad_ltrb[0] + width + pad_ltrb[2] < kx) or
                 (pad_ltrb[1] + height + pad_ltrb[3] < ky)):
             return
@@ -167,7 +125,7 @@ class Main(object):
         except OSError:
             pass
         s_dir = "data/%dx%dx%d_t%d" % (width, height, n_channels,
-                                       1 if dw else 0)
+                                       1 if dw else (0 if dil < 2 else dil))
         try:
             os.mkdir(s_dir)
         except OSError:
@@ -179,7 +137,7 @@ class Main(object):
         prefix = ("%s/%dx%dx%d_pad%s_stride%s_act%d" %
                   (s_dir, kx, ky, n_kernels, s_pad, s_stride, activation))
 
-        numpy.random.seed(12345)
+        numpy.random.seed(1234)
 
         if args.float:
             values = numpy.random.uniform(
@@ -252,13 +210,15 @@ layer {
   bottom: "data"
   top: "conv1"
   convolution_param {
+    dilation: %d
     num_output: %d
     %s
     %s
     %s%s
   }
 }
-""" % (n_channels, height, width, n_kernels, s_pad, s_kern, s_stride, s_dw))
+""" % (n_channels, height, width, dil, n_kernels,
+       s_pad, s_kern, s_stride, s_dw))
             if activation == 5:
                 fout.write("""
 layer {
@@ -292,7 +252,7 @@ layer {
             numpy.float32).reshape(n_kernels, weights_dim_1, ky, kx)
         del weights
         net.params["conv1"][1].data[:] = bias.astype(numpy.float32)
-        del bias
+        # del bias
 
         net.blobs["data"].data[0, :, :, :] = input.astype(
             numpy.float32).reshape(n_channels, height, width)
@@ -301,8 +261,8 @@ layer {
         results = net.forward()
         output = results["conv1"].copy()
 
-        ox = self.get_ox(width, kx, pad_ltrb[0], pad_ltrb[2], stride_xy[0])
-        oy = self.get_ox(height, ky, pad_ltrb[1], pad_ltrb[3], stride_xy[1])
+        ox = self.get_ox(width, (kx - 1) * dil + 1, pad_ltrb[0], pad_ltrb[2], stride_xy[0])
+        oy = self.get_ox(height, (ky - 1) * dil + 1, pad_ltrb[1], pad_ltrb[3], stride_xy[1])
         assert output.shape == (1, n_kernels, oy, ox)
         output.astype(numpy.float16).tofile("%s.o.bin" % prefix)
 

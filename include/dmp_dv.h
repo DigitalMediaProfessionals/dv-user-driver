@@ -279,6 +279,25 @@ int dmp_dv_pack_conv_weights(
     uint8_t *packed_weights, size_t *packed_weights_size);
 
 
+/// @brief Packs dilated convolution layer weights and biases into output array.
+/// @param n_channels Number of input channels.
+/// @param kx Kernel width.
+/// @param ky Kernel height.
+/// @param n_kernels Number of output channels.
+/// @param quant_map Quantization table for weights (but not bias), can be NULL.
+/// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format, else array of 1-byte indices.
+/// @param bias Array of half precision floating point biases of size n_kernels.
+/// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
+/// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
+/// @return 0 on success, non-zero otherwise.
+/// @details It is thread-safe.
+int dmp_dv_pack_dil_weights(
+    int n_channels, int kx, int ky, int n_kernels,
+    const uint16_t quant_map[256],
+    const void *weights, const uint16_t *bias,
+    uint8_t *packed_weights, size_t *packed_weights_size);
+
+
 /// @brief Packs fully connected layer weights and biases into output array possibly rearranging them to match input and output shapes.
 /// @param c_input Number of input channels.
 /// @param h_input Input height (set to 1 for 1D input).

@@ -41,7 +41,8 @@
 
 
 /// @brief Rounds up "a" to be the multiple of "n".
-static inline int roundup(int a, int n) {
+static inline int roundup(int a) {
+  const int n = 16;
   int d = a % n;
   return d ? a + (n - d) : a;
 }
@@ -68,7 +69,7 @@ static float g_max_diff_t[N_T] = {0, 0, 0, 0, 0, 0};
 typedef struct conv_config_impl {
   int width, height, n_channels, kx, ky, n_kernels,
       pad_left, pad_top, pad_right, pad_bottom, stride_x, stride_y, activation;
-  int tpe;  // 0 - 2D, 1 - depthwise
+  int tpe;  // 0 - 2D, 1 - depthwise, >1 - dilation
   bool quantized;
   bool hash_set;
   bool failed;
@@ -218,12 +219,15 @@ int test_conv(const std::vector<conv_config*>& confs) {
              conf->stride_x, conf->stride_y, conf->activation);
 
     const int weights_dim_1 = (conf->tpe == 1) ? 1 : conf->n_channels;
+    const int kxfull = (conf->tpe <= 1) ? conf->kx : (conf->kx - 1) * conf->tpe + 1,
+              kyfull = (conf->tpe <= 1) ? conf->ky : (conf->ky - 1) * conf->tpe + 1;  // tpe > 1 is dilation
 
     // Load quantization map
     snprintf(fnme, sizeof(fnme), "%s.q.bin", prefix);
     fin = fopen(fnme, "rb");
     if (!fin) {
       ERR("fopen() failed for %s\n", fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
     n = fread(quant_map, sizeof(quant_map[0]), sizeof(quant_map) / sizeof(quant_map[0]), fin);
@@ -231,10 +235,12 @@ int test_conv(const std::vector<conv_config*>& confs) {
     fclose(fin);
     if (n != 256) {
       ERR("fread() returned %d while expecting %d for %s\n", n, 256, fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
     if (!fend) {
       ERR("File is bigger than expected: %s\n", fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
 
@@ -243,6 +249,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     fin = fopen(fnme, "rb");
     if (!fin) {
       ERR("fopen() failed for %s\n", fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
     caffe_input.resize(conf->n_channels * conf->height * conf->width);
@@ -251,10 +258,12 @@ int test_conv(const std::vector<conv_config*>& confs) {
     fclose(fin);
     if (n != conf->n_channels * conf->height * conf->width) {
       ERR("fread() returned %d while expecting %d for %s\n", n, conf->n_channels * conf->height * conf->width, fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
     if (!fend) {
       ERR("File is bigger than expected: %s\n", fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
 
@@ -266,6 +275,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     fin = fopen(fnme, "rb");
     if (!fin) {
       ERR("fopen() failed for %s\n", fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
     caffe_weights.resize(conf->n_kernels * weights_dim_1 * conf->kx * conf->ky);
@@ -275,10 +285,12 @@ int test_conv(const std::vector<conv_config*>& confs) {
     if (n != conf->n_kernels * weights_dim_1 * conf->kx * conf->ky) {
       ERR("fread() returned %d while expecting %d for %s\n",
           n, conf->n_kernels * weights_dim_1 * conf->kx * conf->ky, fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
     if (!fend) {
       ERR("File is bigger than expected: %s\n", fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
 
@@ -287,6 +299,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     fin = fopen(fnme, "rb");
     if (!fin) {
       ERR("fopen() failed for %s\n", fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
     caffe_bias.resize(conf->n_kernels);
@@ -295,21 +308,24 @@ int test_conv(const std::vector<conv_config*>& confs) {
     fclose(fin);
     if (n != conf->n_kernels) {
       ERR("fread() returned %d while expecting %d for %s\n", n, conf->n_kernels, fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
     if (!fend) {
       ERR("File is bigger than expected: %s\n", fnme);
+      conf->failed = true;
       goto L_EXIT;
     }
 
     // Load output
-    out_width = get_conv_out_width(conf->width, conf->kx, conf->pad_left, conf->pad_right, conf->stride_x);
-    out_height = get_conv_out_width(conf->height, conf->ky, conf->pad_top, conf->pad_bottom, conf->stride_y);
+    out_width = get_conv_out_width(conf->width, kxfull, conf->pad_left, conf->pad_right, conf->stride_x);
+    out_height = get_conv_out_width(conf->height, kyfull, conf->pad_top, conf->pad_bottom, conf->stride_y);
     if (!conf->hash_set) {
       snprintf(fnme, sizeof(fnme), "%s.o.bin", prefix);
       fin = fopen(fnme, "rb");
       if (!fin) {
         ERR("fopen() failed for %s\n", fnme);
+        conf->failed = true;
         goto L_EXIT;
       }
       conf->caffe_output = (__fp16*)malloc(out_width * out_height * conf->n_kernels * sizeof(__fp16));
@@ -318,10 +334,12 @@ int test_conv(const std::vector<conv_config*>& confs) {
       fclose(fin);
       if (n != out_width * out_height * conf->n_kernels) {
         ERR("fread() returned %d while expecting %d for %s\n", n, out_width * out_height * conf->n_kernels, fnme);
+        conf->failed = true;
         goto L_EXIT;
       }
       if (!fend) {
         ERR("File is bigger than expected: %s\n", fnme);
+        conf->failed = true;
         goto L_EXIT;
       }
     }
@@ -337,6 +355,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     cmd.topo = 1;
     cmd.run[0].m = conf->n_kernels;
     cmd.run[0].conv_enable = (conf->tpe == 1 ? 3 : 1);
+    cmd.run[0].conv_dilation = (conf->tpe <= 1 ? 0 : ((conf->tpe & 0xFF) | ((conf->tpe << 8) & 0xFF00)));
     cmd.run[0].p = (uint16_t)conf->kx | (((uint16_t)conf->ky) << 8);
     if ((conf->kx == conf->ky) && (conf->io_offs & 16)) {  // some randomization over valid square kernel size representation
       cmd.run[0].p = (uint16_t)conf->kx;
@@ -347,29 +366,40 @@ int test_conv(const std::vector<conv_config*>& confs) {
     cmd.run[0].conv_stride = (uint16_t)conf->stride_x | ((uint16_t)conf->stride_y << 8);
     cmd.run[0].actfunc = conf->activation;
 
-    conf->io_size = (roundup(conf->width * conf->height * conf->n_channels, 4) + roundup(out_width * out_height * conf->n_kernels, 4)) * sizeof(__fp16);
+    conf->io_size = (roundup(conf->width * conf->height * conf->n_channels) + roundup(out_width * out_height * conf->n_kernels)) * sizeof(__fp16);
     conf->io_mem = dmp_dv_mem_alloc(ctx, conf->io_offs + conf->io_size);
     if (!conf->io_mem) {
       ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", conf->io_offs + conf->io_size, dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
     LOG("Allocated %zu (%zu(+%zu random offset) requested) bytes for input/output\n", dmp_dv_mem_get_size(conf->io_mem), conf->io_size, conf->io_offs);
     cmd.input_buf.mem = conf->io_mem;
     cmd.input_buf.offs = conf->io_offs;
     cmd.output_buf.mem = conf->io_mem;
-    cmd.output_buf.offs = conf->io_offs + roundup(conf->width * conf->height * conf->n_channels, 4) * sizeof(__fp16);
+    cmd.output_buf.offs = conf->io_offs + roundup(conf->width * conf->height * conf->n_channels) * sizeof(__fp16);
 
     weights_size = 0;
-    if (dmp_dv_pack_conv_weights(
+    if (conf->tpe < 2) {
+      n = dmp_dv_pack_conv_weights(
             weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
-            conf->quantized ? quant_map : NULL, NULL, NULL, NULL, &weights_size)) {
-      ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
+            conf->quantized ? quant_map : NULL, NULL, NULL, NULL, &weights_size);
+    }
+    else {
+      n = dmp_dv_pack_dil_weights(
+            weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
+            conf->quantized ? quant_map : NULL, NULL, NULL, NULL, &weights_size);
+    }
+    if (n) {
+      ERR("Weights packing failed: %s\n", dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
 
-    conf->weights_mem = dmp_dv_mem_alloc(ctx, conf->weights_offs + weights_size);
+    conf->weights_mem = dmp_dv_mem_alloc(ctx, (conf->weights_offs + weights_size) * 2 + 65536);
     if (!conf->weights_mem) {
       ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", conf->weights_offs + weights_size, dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
     LOG("Allocated %zu (%zu(+%zu random offset) requested) bytes for weights\n", dmp_dv_mem_get_size(conf->weights_mem), weights_size, conf->weights_offs);
@@ -377,15 +407,19 @@ int test_conv(const std::vector<conv_config*>& confs) {
     cmd.run[0].weight_buf.offs = conf->weights_offs;
     cmd.run[0].weight_fmt = conf->quantized ? 3 : 1;
 
-    weights = dmp_dv_mem_map(conf->weights_mem) + conf->weights_offs;
+    weights = dmp_dv_mem_map(conf->weights_mem);;
     if (!weights) {
       ERR("dmp_dv_mem_map() failed for weights: %s\n", dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
     if (dmp_dv_mem_sync_start(conf->weights_mem, 0, 1)) {
       ERR("dmp_dv_mem_sync_start() failed for weights: %s\n", dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
+    memset(weights, 0, dmp_dv_mem_get_size(conf->weights_mem));
+    weights += conf->weights_offs;
 
     // Fill weights
     if (!conf->quantized) {  // replace indices with values
@@ -396,28 +430,66 @@ int test_conv(const std::vector<conv_config*>& confs) {
         wu16[i] = quant_map[caffe_weights[i]];
       }
     }
-    if (dmp_dv_pack_conv_weights(
-          weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
-          conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size)) {
-      ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
+    if (conf->tpe < 2) {
+      n = dmp_dv_pack_conv_weights(
+            weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
+            conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size);
+    }
+    else {
+      n = dmp_dv_pack_dil_weights(
+            weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
+            conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size);
+    }
+    /*{
+      const int nn = 32;
+      LOG("Quantization map:\n");
+      uint8_t *q = (uint8_t*)quant_map;
+      for (int i = 0; i < 512; ++i) {
+        LOG("%02X%s", q[i], (i == 511) || ((i + 1) % nn == 0) ? "\n" : " ");
+      }
+      LOG("Caffe weights:\n");
+      for (int i = 0; i < (int)caffe_weights.size(); ++i) {
+        LOG("%02X%s", caffe_weights[i], (i == (int)caffe_weights.size() - 1) || ((i + 1) % nn == 0) ? "\n" : " ");
+      }
+      LOG("\n");
+      LOG("Caffe bias:\n");
+      uint8_t *cb = (uint8_t*)caffe_bias.data();
+      int nb = caffe_bias.size() * 2;
+      for (int i = 0; i < nb; ++i) {
+        LOG("%02X%s", cb[i], (i == nb - 1) || ((i + 1) % nn == 0) ? "\n" : " ");
+      }
+      LOG("\n");
+      LOG("DV weights:\n");
+      for (int i = 0; i < (int)weights_size; ++i) {
+        LOG("%02X%s", weights[i], (i == (int)weights_size - 1) || ((i + 1) % nn == 0) ? "\n" : " ");
+      }
+      LOG("\n");
+    }*/
+    if (n) {
+      ERR("Weights packing failed: %s\n", dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
     if (dmp_dv_mem_sync_end(conf->weights_mem)) {
       ERR("dmp_dv_mem_sync_end() failed for weights: %s\n", dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
     dmp_dv_mem_unmap(conf->weights_mem);
 
-    conf->io_ptr = (__fp16*)(dmp_dv_mem_map(conf->io_mem) + conf->io_offs);
+    conf->io_ptr = (__fp16*)dmp_dv_mem_map(conf->io_mem);
     if (!conf->io_ptr) {
       ERR("dmp_dv_mem_map() failed for input/output: %s\n", dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
     if (dmp_dv_mem_sync_start(conf->io_mem, 0, 1)) {
       ERR("dmp_dv_mem_sync_start() failed for input/output: %s\n", dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
     memset(conf->io_ptr, 0, conf->io_size);
+    conf->io_ptr += conf->io_offs >> 1;
 
     // Caffe's input is stored as channel, height, width
     // DV input should be stored as chunks by max of 8 channels as width, height, channel
@@ -435,6 +507,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     }
     if (dmp_dv_mem_sync_end(conf->io_mem)) {
       ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
 
@@ -442,12 +515,19 @@ int test_conv(const std::vector<conv_config*>& confs) {
 
     if (dmp_dv_cmdlist_add_raw(cmdlist, (dmp_dv_cmdraw*)&cmd)) {
       ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
   }
 
   if (dmp_dv_cmdlist_commit(cmdlist)) {
     ERR("dmp_dv_cmdlist_commit() failed: %s\n", dmp_dv_get_last_error_message());
+    if (confs.size() == 1) {
+      for (auto it = confs.begin(); it != confs.end(); ++it) {
+        conv_config *conf = *it;
+        conf->failed = true;
+      }
+    }
     goto L_EXIT;
   }
   LOG("Commited the command list\n");
@@ -455,6 +535,12 @@ int test_conv(const std::vector<conv_config*>& confs) {
   exec_id = dmp_dv_cmdlist_exec(cmdlist);
   if (exec_id < 0) {
     ERR("dmp_dv_cmdlist_exec() failed: %s\n", dmp_dv_get_last_error_message());
+    if (confs.size() == 1) {
+      for (auto it = confs.begin(); it != confs.end(); ++it) {
+        conv_config *conf = *it;
+        conf->failed = true;
+      }
+    }
     goto L_EXIT;
   }
   LOG("Scheduled command list for execution\n");
@@ -462,22 +548,41 @@ int test_conv(const std::vector<conv_config*>& confs) {
   LOG("Waiting for completion\n");
   if (dmp_dv_cmdlist_wait(cmdlist, exec_id)) {
     ERR("dmp_dv_sync() failed: %s\n", dmp_dv_get_last_error_message());
+    if (confs.size() == 1) {
+      for (auto it = confs.begin(); it != confs.end(); ++it) {
+        conv_config *conf = *it;
+        conf->failed = true;
+      }
+    }
     goto L_EXIT;
   }
   LOG("Execution has completed\n");
 
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     conv_config *conf = *it;
+    const int kxfull = (conf->tpe <= 1) ? conf->kx : (conf->kx - 1) * conf->tpe + 1,
+              kyfull = (conf->tpe <= 1) ? conf->ky : (conf->ky - 1) * conf->tpe + 1;  // tpe > 1 is dilation
 
     if (dmp_dv_mem_sync_start(conf->io_mem, 1, 0)) {
       ERR("dmp_dv_mem_sync_start() failed for input/output: %s\n", dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
 
     // Compare output with the gold one
-    out_width = get_conv_out_width(conf->width, conf->kx, conf->pad_left, conf->pad_right, conf->stride_x);
-    out_height = get_conv_out_width(conf->height, conf->ky, conf->pad_top, conf->pad_bottom, conf->stride_y);
-    const int o_offs = roundup(conf->width * conf->height * conf->n_channels, 4);
+    out_width = get_conv_out_width(conf->width, kxfull, conf->pad_left, conf->pad_right, conf->stride_x);
+    out_height = get_conv_out_width(conf->height, kyfull, conf->pad_top, conf->pad_bottom, conf->stride_y);
+    const int o_offs = roundup(conf->width * conf->height * conf->n_channels);
+    FILE *fout = fopen("/tmp/out.bin", "wb");
+    if (fout) {
+      if ((int)fwrite(conf->io_ptr + o_offs, 2, out_height * out_width * conf->n_kernels, fout) != out_height * out_width * conf->n_kernels) {
+        ERR("fwrite() failed for /tmp/out.bin\n");
+      }
+      fclose(fout);
+    }
+    else {
+      ERR("fopen() failed for /tmp/out.bin\n");
+    }
     if (conf->hash_set) {  // check hash
       uint8_t hash[32];
       SHA256_CTX sha256;
@@ -486,6 +591,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
       SHA256_Final(hash, &sha256);
       if (memcmp(conf->hash, hash, 32)) {
         ERR("Hash differs\n");
+        conf->failed = true;
         goto L_EXIT;
       }
     }
@@ -538,9 +644,11 @@ int test_conv(const std::vector<conv_config*>& confs) {
           }
         }
         LOG("caffe: [%.6f, %.6f] dv: [%.6f, %.6f]\n", caffe_a, caffe_b, dv_a, dv_b);
-        for (int i = 0; i < N_T; ++i) {
-          LOG("t <= %.1f: max_diff=%.6f on y=%.6f and t=%.6f\n",
-              g_max_diff_bounds[i], max_diff[i], max_diff_y[i], max_diff_t[i]);
+        if (!conf->pure_ints) {
+          for (int i = 0; i < N_T; ++i) {
+            LOG("t <= %.1f: max_diff=%.6f on y=%.6f and t=%.6f\n",
+                g_max_diff_bounds[i], max_diff[i], max_diff_y[i], max_diff_t[i]);
+          }
         }
         for (int i = 0; i < N_T; ++i) {
           if (max_diff[i] > g_max_diff[i]) {
@@ -552,6 +660,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
         if (failed_diff > 0.0f) {
           ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f xy=(%d, %d) chan=%d %s %s\n", failed_diff, failed_diff_y, failed_diff_t,
               failed_x, failed_y, failed_c, prefix, conf->quantized ? "Q8" : "FP16");
+          conf->failed = true;
           goto L_EXIT;
         }
       }
@@ -570,6 +679,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     }
     if (dmp_dv_mem_sync_end(conf->io_mem)) {
       ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
+      conf->failed = true;
       goto L_EXIT;
     }
   }
@@ -759,7 +869,7 @@ int main(int argc, char **argv) {
     configs[i] = config_data.data() + i;
   }
 
-  std::mt19937 mt_rand(time(NULL));
+  std::mt19937 mt_rand(1234/*time(NULL)*/);
   std::uniform_int_distribution<int> rnd_offs(0, 1024);
 
   const int n_passes = 2;
