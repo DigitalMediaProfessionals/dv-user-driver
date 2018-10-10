@@ -164,8 +164,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
           SET_ERR("Dilated convolution cannot be combined with pooling");
           return -1;
         }
-        if ((kx != ky) || (!(kx & 1)) || (!(ky & 1))) {
-          SET_ERR("Only odd square kernel sizes are supported for dilated convolutions, got %dx%d",
+        if ((!(kx & 1)) || (!(ky & 1))) {
+          SET_ERR("Only odd kernel sizes are supported for dilated convolutions, got %dx%d",
                   kx, ky);
           return -1;
         }

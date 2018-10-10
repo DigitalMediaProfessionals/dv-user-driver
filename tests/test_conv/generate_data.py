@@ -110,7 +110,7 @@ class Main(object):
 
         if (dil > 1 and (width < (dil * (kx - 1) + 1) or
                          height < (dil * (ky - 1) + 1) or
-                         kx != ky or kx % 2 == 0 or ky % 2 == 0)):
+                         kx % 2 == 0 or ky % 2 == 0)):
             return
 
         if dil < 2 and args.dilated:
