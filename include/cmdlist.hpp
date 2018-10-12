@@ -28,14 +28,6 @@
 #include "dmp_dv_cmdraw_v0.h"
 
 
-/// @brief Forward reference for CDMPDVCmdListDeviceHelper.
-class CDMPDVCmdListDeviceHelper;
-
-
-/// @brief Typedef for creator for CDMPDVCmdListDeviceHelper.
-typedef CDMPDVCmdListDeviceHelper* (*f_device_helper_creator)(CDMPDVContext *ctx);
-
-
 /// @brief Helper object work working with command list specific to the device type (CONV or FC).
 class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
  public:
@@ -62,16 +54,16 @@ class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
   ///          as well as reference counters on the returned memory handles will be incremented later
   ///          outside of this function.
   ///          It is safe to extend input_bufs/output_bufs and return the error.
-  virtual int CheckRaw(dmp_dv_cmdraw *cmd,
-                       std::vector<std::pair<dmp_dv_buf, uint64_t> >& input_bufs,
-                       std::vector<std::pair<dmp_dv_buf, uint64_t> >& output_bufs) = 0;
+  virtual int CheckRaw(struct dmp_dv_cmdraw *cmd,
+                       std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& input_bufs,
+                       std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& output_bufs) = 0;
 
   /// @brief Fills command in the format suitable for later execution on the device.
   /// @param kcmd Buffer to hold kernel command, can be NULL to get only size.
   /// @param cmd Command to execute (user-space format).
   /// @param size On enter must contain available space in bytes in the kcmd buffer, on exit will contain used or required space.
   /// @return 0 on success, non-zero on error.
-  virtual int FillKCommand(uint8_t *kcmd, dmp_dv_cmdraw *cmd, uint32_t& size) = 0;
+  virtual int FillKCommand(uint8_t *kcmd, struct dmp_dv_cmdraw *cmd, uint32_t& size) = 0;
 
   /// @brief Commits command list, e.g. issues ioctl to kernel module.
   /// @param kcmdlist Command list to commit.
@@ -127,7 +119,7 @@ class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
   bool commited_;
 
   /// @brief Creators for the specific device types.
-  static f_device_helper_creator creators_[DMP_DV_DEV_COUNT];
+  static CDMPDVCmdListDeviceHelper* (*creators_[DMP_DV_DEV_COUNT])(CDMPDVContext *ctx);
 };
 
 
@@ -187,7 +179,7 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
       return -1;
     }
     if (exec_id < 0) {
-      SET_ERR("ioctl(%s) on %s hasn't returned unexpected/hasn't updated exec_id=%lld",
+      SET_ERR("ioctl(%s) on %s succeded returning invalid exec_id=%lld",
               "DMP_DV_IOC_RUN", fnme_acc_, (long long)exec_id);
       return -1;
     }
@@ -196,6 +188,10 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
 
   /// @brief Waits for scheduled command to be completed.
   virtual int Wait(int64_t exec_id) {
+    if (exec_id < 0) {
+      SET_ERR("Invalid argument: exec_id = %lld", (long long)exec_id);
+      return EINVAL;
+    }
     for (;;) {
       int res = ioctl(fd_acc_, DMP_DV_IOC_WAIT, &exec_id);
       if (!res) {
@@ -231,6 +227,14 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
 };
 
 
+/// @brief Command in command list.
+struct DMPDVCommand {
+  std::vector<uint8_t> cmd;  // raw command
+  CDMPDVCmdListDeviceHelper *device_helper;  // pointer to device helper for convenience
+  std::vector<std::pair<struct dmp_dv_buf, uint64_t> > input_bufs, output_bufs;  // buffers used during this command
+};
+
+
 /// @brief Implementation of dmp_dv_cmdlist.
 class CDMPDVCmdList : public CDMPDVBase {
  public:
@@ -262,9 +266,13 @@ class CDMPDVCmdList : public CDMPDVBase {
   }
 
   /// @brief Adds raw structure describing the command.
-  int AddRaw(dmp_dv_cmdraw *cmd) {
+  int AddRaw(struct dmp_dv_cmdraw *cmd) {
     if (commited_) {
       SET_ERR("Command list is already in commited state");
+      return -1;
+    }
+    if (!cmd) {
+      SET_ERR("Invalid argument: cmd is NULL");
       return -1;
     }
     if (cmd->size < 8) {
@@ -290,7 +298,7 @@ class CDMPDVCmdList : public CDMPDVBase {
       device_helpers_[cmd->device_type] = helper;
     }
 
-    Command command;
+    DMPDVCommand command;
     command.cmd.resize(cmd->size);
     memcpy(command.cmd.data(), cmd, cmd->size);
     command.device_helper = device_helpers_[cmd->device_type];
@@ -419,7 +427,7 @@ class CDMPDVCmdList : public CDMPDVBase {
   }
 
   /// @brief Validates buffer.
-  int ValidateBuffer(dmp_dv_buf& buf, uint64_t size) {
+  int ValidateBuffer(struct dmp_dv_buf& buf, uint64_t size) {
     if (!size) {
       SET_LOGIC_ERR();
       return -1;
@@ -500,13 +508,6 @@ class CDMPDVCmdList : public CDMPDVBase {
     return res;
   }
 
-  /// @brief Command in command list.
-  struct Command {
-    std::vector<uint8_t> cmd;  // raw command
-    CDMPDVCmdListDeviceHelper *device_helper;  // pointer to device helper for convenience
-    std::vector<std::pair<dmp_dv_buf, uint64_t> > input_bufs, output_bufs;  // buffers used during this command
-  };
-
   /// @brief Reference to device context.
   CDMPDVContext *ctx_;
 
@@ -517,7 +518,7 @@ class CDMPDVCmdList : public CDMPDVBase {
   CDMPDVCmdListDeviceHelper *device_helpers_[DMP_DV_DEV_COUNT];
 
   /// @brief Commands.
-  std::vector<Command> commands_;
+  std::vector<DMPDVCommand> commands_;
 
   /// @brief When the command list comntains the single device, this variable is assigned to it.
   CDMPDVCmdListDeviceHelper *single_device_;

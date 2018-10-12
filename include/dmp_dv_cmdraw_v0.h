@@ -23,8 +23,9 @@
 
 /// @brief Convolution layer runs.
 /// @details Members within structure are rearranged by size to avoid requirements for 64-bits padding in the middle.
-typedef struct dmp_dv_cmdraw_conv_v0_run_impl {
-  dmp_dv_buf weight_buf;    // Buffer with packed weights
+struct dmp_dv_cmdraw_conv_v0_run {
+  struct dmp_dv_buf weight_buf;  // Buffer with packed weights
+
   uint32_t conv_pad;        // Bits [6:0] = left padding, bits [15:8] = right padding, bits [22:16] = top padding, bits [31:24] = bottom padding
   uint32_t pool_pad;        // Bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
   uint16_t m;               // Number of Output Channels
@@ -43,34 +44,36 @@ typedef struct dmp_dv_cmdraw_conv_v0_run_impl {
   uint16_t rectifi_en;      // Rectification, i.e. max(0, x) (NOTE: Can be applied after non-ReLU activation function)
   uint16_t lrn;             // Bits [0]: 1 = LRN enable, 0 = LRN disable, [1]: 1 = incl. power func, 0 = excl., [8:11]: x^2 scale factor log2
   uint16_t rsvd;            // padding to 64-bit size
-} dmp_dv_cmdraw_conv_v0_run;
+};
 
 
 /// @brief Raw command for convolutional block version 0.
-typedef struct dmp_dv_cmdraw_conv_v0_impl {
-  dmp_dv_cmdraw header;               // General structure information
+struct dmp_dv_cmdraw_conv_v0 {
+  struct dmp_dv_cmdraw header;  // General structure information
 
-  dmp_dv_buf input_buf;               // Input buffer
-  dmp_dv_buf output_buf;              // Output buffer
-  dmp_dv_buf eltwise_buf;             // Buffer for elementwise add (0 = UBUF Input Buffer)
-  uint32_t topo;                      // [31:0] Output Destination of each run, 0 = UBUF, 1 = EXTMEM
-  uint16_t w;                         // Input Width
-  uint16_t h;                         // Input Height
-  uint16_t z;                         // Input Depth
-  uint16_t c;                         // Input Channels
-  uint16_t input_circular_offset;     // Input Depth circular offset
-  uint16_t output_mode;               // 0 = concat, 1 = elementwise add
-  dmp_dv_cmdraw_conv_v0_run run[32];  // description of each run
-} dmp_dv_cmdraw_conv_v0;
+  struct dmp_dv_buf input_buf;    // Input buffer
+  struct dmp_dv_buf output_buf;   // Output buffer
+  struct dmp_dv_buf eltwise_buf;  // Buffer for elementwise add (0 = UBUF Input Buffer)
+
+  uint32_t topo;                   // [31:0] Output Destination of each run, 0 = UBUF, 1 = EXTMEM
+  uint16_t w;                      // Input Width
+  uint16_t h;                      // Input Height
+  uint16_t z;                      // Input Depth
+  uint16_t c;                      // Input Channels
+  uint16_t input_circular_offset;  // Input Depth circular offset
+  uint16_t output_mode;            // 0 = concat, 1 = elementwise add
+
+  struct dmp_dv_cmdraw_conv_v0_run run[32];  // description of each run
+};
 
 
 /// @brief Raw command for fully connected block version 0.
-typedef struct dmp_dv_cmdraw_fc_v0_impl {
-  dmp_dv_cmdraw header;    // General structure information
+struct dmp_dv_cmdraw_fc_v0 {
+  struct dmp_dv_cmdraw header;   // General structure information
 
-  dmp_dv_buf weight_buf;   // Buffer with packed weights
-  dmp_dv_buf input_buf;    // Input buffer
-  dmp_dv_buf output_buf;   // Output buffer
+  struct dmp_dv_buf weight_buf;  // Buffer with packed weights
+  struct dmp_dv_buf input_buf;   // Input buffer
+  struct dmp_dv_buf output_buf;  // Output buffer
 
   uint16_t input_size;     // Size of the input in elements
   uint16_t output_size;    // Size of the output in elements
@@ -80,4 +83,4 @@ typedef struct dmp_dv_cmdraw_fc_v0_impl {
   uint16_t actfunc;        // Activation Function: 0 = None, 1 = ReLU, 2 = Tanh, 3 = Leaky ReLU, 4 = Sigmoid, 5 = PReLU (PReLU must be used with POST-OP=1)
   uint16_t actfunc_param;  // Leaky ReLU parameter (in FP16 format), 0 = non-leaky
   uint16_t rsvd[3];        // padding to 64-bit size
-} dmp_dv_cmdraw_fc_v0;
+};

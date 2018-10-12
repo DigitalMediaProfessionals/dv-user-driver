@@ -33,49 +33,49 @@ extern "C" {
 
 
 /// @brief Device execution context.
-typedef struct dmp_dv_context_impl dmp_dv_context;
+typedef struct dmp_dv_context_impl *dmp_dv_context;
 
 /// @brief Device-accessible memory allocation.
-typedef struct dmp_dv_mem_impl dmp_dv_mem;
+typedef struct dmp_dv_mem_impl *dmp_dv_mem;
 
 /// @brief Command list for execution.
 /// @details Contains prepacked in device specific format commands for execution,
 ///          thus reducing argument packing overhead.
-typedef struct dmp_dv_cmdlist_impl dmp_dv_cmdlist;
+typedef struct dmp_dv_cmdlist_impl *dmp_dv_cmdlist;
 
 
 /// @brief Returns version string of the driver interface.
 /// @details Starts with MAJOR.MINOR.SUB for example "0.1.0 Initial release."
 ///          It is thread-safe.
-const char* dmp_dv_get_version_string();
+const char *dmp_dv_get_version_string();
 
 
 /// @brief Returns last error message.
 /// @details It might return garbage if several functions will fail from multiple threads
 ///          simultaneously during this function call.
-const char* dmp_dv_get_last_error_message();
+const char *dmp_dv_get_last_error_message();
 
 
 /// @brief Creates context for working with DV accelerator.
 /// @return Non-NULL on success, NULL on error.
 /// @details It is thread-safe.
-dmp_dv_context* dmp_dv_context_create();
+dmp_dv_context dmp_dv_context_create();
 
 
 /// @brief Returns information about context as human-readable string.
 /// @details It is thread-safe.
-const char *dmp_dv_context_get_info_string(dmp_dv_context* ctx);
+const char *dmp_dv_context_get_info_string(dmp_dv_context ctx);
 
 
 /// @brief Structure with information about the context.
-typedef struct dmp_dv_info_impl {
+struct dmp_dv_info {
   uint32_t size;            // size of this structure
   uint32_t version;         // version of this structure
-} dmp_dv_info;
+};
 
 
 /// @brief Structure with information about the context (version 0).
-typedef struct dmp_dv_info_v0_impl {
+struct dmp_dv_info_v0 {
   uint32_t size;               // size of this structure
   uint32_t version;            // version of this structure (set to 0)
   int32_t ub_size;             // unified buffer size
@@ -84,7 +84,7 @@ typedef struct dmp_dv_info_v0_impl {
   int32_t fc_freq;             // fully connected block frequency in MHz
   int32_t max_fc_vector_size;  // fully connected block maximum input vector size in elements
   int32_t rsvd;                // padding to 64-bits
-} dmp_dv_info_v0;
+};
 
 
 /// @brief Fills structure with information about the context.
@@ -94,20 +94,20 @@ typedef struct dmp_dv_info_v0_impl {
 /// @details On return, the version field will be set to maximum supported version less or equal to the requested,
 ///          the fields of the corresponding structure will be set only if the size is enough.
 ///          It is thread-safe.
-int dmp_dv_context_get_info(dmp_dv_context* ctx, dmp_dv_info *info);
+int dmp_dv_context_get_info(dmp_dv_context ctx, struct dmp_dv_info *info);
 
 
 /// @brief Releases context for working with DV accelerator (decreases reference counter).
 /// @param ctx Context for working with DV accelerator, when NULL it is ignored.
 /// @details Call this when "ctx" is no longer needed.
 ///          It is thread-safe.
-void dmp_dv_context_release(dmp_dv_context *ctx);
+void dmp_dv_context_release(dmp_dv_context ctx);
 
 
 /// @brief Retains context for working with DV accelerator (increases reference counter).
 /// @param ctx Context for working with DV accelerator, when NULL it is ignored.
 /// @details It is thread-safe.
-void dmp_dv_context_retain(dmp_dv_context *ctx);
+void dmp_dv_context_retain(dmp_dv_context ctx);
 
 
 /// @brief Allocates physically continuous chunk of memory.
@@ -116,7 +116,7 @@ void dmp_dv_context_retain(dmp_dv_context *ctx);
 /// @return Handle for the allocated memory or NULL on error.
 /// @details Memory is allocated using ION with CMA and is not yet mapped to user or kernel address space.
 ///          It is thread-safe.
-dmp_dv_mem* dmp_dv_mem_alloc(dmp_dv_context *ctx, size_t size);
+dmp_dv_mem dmp_dv_mem_alloc(dmp_dv_context ctx, size_t size);
 
 
 /// @brief Releases allocated memory (decreses reference counter).
@@ -124,13 +124,13 @@ dmp_dv_mem* dmp_dv_mem_alloc(dmp_dv_context *ctx, size_t size);
 /// @details Call this when "mem" is no longer needed.
 ///          dmp_dv_mem_unmap() will be called automatically before the memory is returned to the system.
 ///          It is thread-safe.
-void dmp_dv_mem_release(dmp_dv_mem *mem);
+void dmp_dv_mem_release(dmp_dv_mem mem);
 
 
 /// @brief Retains allocated memory (increases reference counter).
 /// @param mem Handle for the allocated memory, when NULL it is ignored.
 /// @details It is thread-safe.
-void dmp_dv_mem_retain(dmp_dv_mem *mem);
+void dmp_dv_mem_retain(dmp_dv_mem mem);
 
 
 /// @brief Maps previously allocated memory to the user address space.
@@ -139,7 +139,7 @@ void dmp_dv_mem_retain(dmp_dv_mem *mem);
 /// @details Retuned memory can be read or written, executable flag is not set.
 ///          If the memory was already mapped, the same pointer will be returned.
 ///          It is thread-safe only on different memory handles.
-uint8_t *dmp_dv_mem_map(dmp_dv_mem *mem);
+uint8_t *dmp_dv_mem_map(dmp_dv_mem mem);
 
 
 /// @brief Unmaps previously allocated and mapped memory from the user address space.
@@ -147,7 +147,7 @@ uint8_t *dmp_dv_mem_map(dmp_dv_mem *mem);
 /// @details Function can be called repeatedly.
 ///          dmp_dv_mem_sync_end() will be called automatically before unmapping.
 ///          It is thread-safe only on different memory handles.
-void dmp_dv_mem_unmap(dmp_dv_mem *mem);
+void dmp_dv_mem_unmap(dmp_dv_mem mem);
 
 
 /// @brief Starts Device <-> CPU synchronization of the memory buffer.
@@ -157,7 +157,7 @@ void dmp_dv_mem_unmap(dmp_dv_mem *mem);
 /// @return 0 on success, non-zero otherwise.
 /// @details When called multiple times with the same or less flags rd | wr, the function does nothing.
 ///          It is thread-safe only on different memory handles.
-int dmp_dv_mem_sync_start(dmp_dv_mem *mem, int rd, int wr);
+int dmp_dv_mem_sync_start(dmp_dv_mem mem, int rd, int wr);
 
 
 /// @brief Finishes the last started Device <-> CPU synchronization.
@@ -165,14 +165,14 @@ int dmp_dv_mem_sync_start(dmp_dv_mem *mem, int rd, int wr);
 /// @return 0 on success, non-zero otherwise.
 /// @details When calling second time before next call to dmp_dv_mem_sync_start(), the function does nothing.
 ///          It is thread-safe only on different memory handles.
-int dmp_dv_mem_sync_end(dmp_dv_mem *mem);
+int dmp_dv_mem_sync_end(dmp_dv_mem mem);
 
 
 /// @brief Returns allocated size in bytes for the provided memory handle.
 /// @param mem Handle to the allocated memory, when NULL the function will return 0.
 /// @return Size in bytes (can be greater than requested in dmp_dv_mem_alloc()) or 0 if mem is NULL.
 /// @details It is thread-safe.
-size_t dmp_dv_mem_get_size(dmp_dv_mem *mem);
+size_t dmp_dv_mem_get_size(dmp_dv_mem mem);
 
 
 /// @brief Returns total per-process allocated size in bytes.
@@ -184,27 +184,27 @@ int64_t dmp_dv_mem_get_total_size();
 /// @param ctx Context for working with DV accelerator, when NULL the error is returned.
 /// @return Handle to command list or NULL on error.
 /// @details It is thread-safe.
-dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx);
+dmp_dv_cmdlist dmp_dv_cmdlist_create(dmp_dv_context ctx);
 
 
 /// @brief Releases the command list (decreases reference counter).
 /// @param cmdlist Handle to command list, when NULL it is ignored.
 /// @details Call this when "cmdlist" is no longer needed.
 ///          It is thread-safe.
-void dmp_dv_cmdlist_release(dmp_dv_cmdlist *cmdlist);
+void dmp_dv_cmdlist_release(dmp_dv_cmdlist cmdlist);
 
 
 /// @brief Retains the command list (increases reference counter).
 /// @param cmdlist Handle to command list, when NULL it is ignored.
 /// @details It is thread-safe.
-void dmp_dv_cmdlist_retain(dmp_dv_cmdlist *cmdlist);
+void dmp_dv_cmdlist_retain(dmp_dv_cmdlist cmdlist);
 
 
 /// @brief Commits the command list, preparing device-specific structures for further execution.
 /// @param cmdlist Handle to command list, when NULL the error is returned.
 /// @return 0 on success, non-zero otherwise.
 /// @details It is thread-safe only on different command lists.
-int dmp_dv_cmdlist_commit(dmp_dv_cmdlist *cmdlist);
+int dmp_dv_cmdlist_commit(dmp_dv_cmdlist cmdlist);
 
 
 /// @brief Schedules command list for execution.
@@ -212,7 +212,7 @@ int dmp_dv_cmdlist_commit(dmp_dv_cmdlist *cmdlist);
 /// @return exec_id >= 0 for this execution on success, < 0 on error.
 /// @details Each context is associated with a single execution queue.
 ///          It is thread-safe.
-int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist);
+int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist cmdlist);
 
 
 /// @brief Waits for the specific scheduled command to be completed.
@@ -220,17 +220,17 @@ int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist);
 /// @param exec_id Id of the scheduled command to wait for completion.
 /// @return 0 on success, non-zero otherwise.
 /// @details It is thread-safe.
-int dmp_dv_cmdlist_wait(dmp_dv_cmdlist *cmdlist, int64_t exec_id);
+int dmp_dv_cmdlist_wait(dmp_dv_cmdlist cmdlist, int64_t exec_id);
 
 
 /// @brief Memory buffer specification.
-typedef struct dmp_dmp_dv_buf_impl {
+struct dmp_dv_buf {
   union {
-    dmp_dv_mem *mem;  // memory handle
-    uint64_t rsvd;    // padding to 64-bit size
+    dmp_dv_mem mem;  // memory handle
+    uint64_t rsvd;   // padding to 64-bit size
   };
-  uint64_t offs;      // offset from the start of the buffer, must be 16-bit aligned
-} dmp_dv_buf;
+  uint64_t offs;  // offset from the start of the buffer, must be 16-bytes aligned
+};
 
 /// @brief Convolutional device type id.
 #define DMP_DV_DEV_CONV 1
@@ -242,12 +242,12 @@ typedef struct dmp_dmp_dv_buf_impl {
 #define DMP_DV_DEV_COUNT 3
 
 /// @brief Raw command for execution.
-typedef struct dmp_dmp_dv_cmdraw_impl {
+struct dmp_dv_cmdraw {
   uint32_t size;        // size of this structure
   uint8_t device_type;  // device type
   uint8_t version;      // version of this structure
   uint8_t rsvd[2];      // padding to 64-bit size
-} dmp_dv_cmdraw;
+};
 
 
 /// @brief Adds raw command to the command list.
@@ -257,7 +257,7 @@ typedef struct dmp_dmp_dv_cmdraw_impl {
 ///         EINVAL - invalid argument such as structure size,
 ///         ENOTSUP - raw command version is not supported.
 /// @details It is thread-safe only on different command lists.
-int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd);
+int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd);
 
 
 /// @brief Packs convolution layer weights and biases into output array.

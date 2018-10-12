@@ -26,7 +26,7 @@
 
 
 /// @brief Creators for the specific device types.
-f_device_helper_creator CDMPDVCmdListDeviceHelper::creators_[DMP_DV_DEV_COUNT] = {
+CDMPDVCmdListDeviceHelper* (*CDMPDVCmdListDeviceHelper::creators_[DMP_DV_DEV_COUNT])(CDMPDVContext *ctx) = {
     NULL,
     CDMPDVCmdListConvHelper::Create,
     CDMPDVCmdListFCHelper::Create
@@ -50,11 +50,11 @@ const char *dmp_dv_get_last_error_message() {
 
 
 const char *dmp_dv_get_version_string() {
-  return "0.1.0 Initial release.";
+  return "0.2.0 20181011";
 }
 
 
-dmp_dv_context* dmp_dv_context_create() {
+dmp_dv_context dmp_dv_context_create() {
   CDMPDVContext *ctx = new CDMPDVContext();
   if (!ctx) {
     SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDMPDVContext));
@@ -64,11 +64,11 @@ dmp_dv_context* dmp_dv_context_create() {
     delete ctx;
     return NULL;
   }
-  return (dmp_dv_context*)ctx;
+  return (dmp_dv_context)ctx;
 }
 
 
-const char *dmp_dv_context_get_info_string(dmp_dv_context* ctx) {
+const char *dmp_dv_context_get_info_string(dmp_dv_context ctx) {
   if (!ctx) {
     SET_ERR("Invalid argument: ctx is NULL");
     return "";
@@ -77,7 +77,7 @@ const char *dmp_dv_context_get_info_string(dmp_dv_context* ctx) {
 }
 
 
-int dmp_dv_context_get_info(dmp_dv_context* ctx, dmp_dv_info *info) {
+int dmp_dv_context_get_info(dmp_dv_context ctx, struct dmp_dv_info *info) {
   if (!ctx) {
     SET_ERR("Invalid argument: ctx is NULL");
     return EINVAL;
@@ -86,7 +86,7 @@ int dmp_dv_context_get_info(dmp_dv_context* ctx, dmp_dv_info *info) {
 }
 
 
-void dmp_dv_context_release(dmp_dv_context *ctx) {
+void dmp_dv_context_release(dmp_dv_context ctx) {
   if (!ctx) {
     return;
   }
@@ -94,7 +94,7 @@ void dmp_dv_context_release(dmp_dv_context *ctx) {
 }
 
 
-void dmp_dv_context_retain(dmp_dv_context *ctx) {
+void dmp_dv_context_retain(dmp_dv_context ctx) {
   if (!ctx) {
     return;
   }
@@ -102,7 +102,7 @@ void dmp_dv_context_retain(dmp_dv_context *ctx) {
 }
 
 
-dmp_dv_mem* dmp_dv_mem_alloc(dmp_dv_context *ctx, size_t size) {
+dmp_dv_mem dmp_dv_mem_alloc(dmp_dv_context ctx, size_t size) {
   CDMPDVMem *mem = new CDMPDVMem();
   if (!mem) {
     SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDMPDVMem));
@@ -113,11 +113,11 @@ dmp_dv_mem* dmp_dv_mem_alloc(dmp_dv_context *ctx, size_t size) {
     return NULL;
   }
 
-  return (dmp_dv_mem*)mem;
+  return (dmp_dv_mem)mem;
 }
 
 
-void dmp_dv_mem_release(dmp_dv_mem *mem) {
+void dmp_dv_mem_release(dmp_dv_mem mem) {
   if (!mem) {
     return;
   }
@@ -125,7 +125,7 @@ void dmp_dv_mem_release(dmp_dv_mem *mem) {
 }
 
 
-void dmp_dv_mem_retain(dmp_dv_mem *mem) {
+void dmp_dv_mem_retain(dmp_dv_mem mem) {
   if (!mem) {
     return;
   }
@@ -133,7 +133,7 @@ void dmp_dv_mem_retain(dmp_dv_mem *mem) {
 }
 
 
-uint8_t *dmp_dv_mem_map(dmp_dv_mem *mem) {
+uint8_t *dmp_dv_mem_map(dmp_dv_mem mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return NULL;
@@ -142,7 +142,7 @@ uint8_t *dmp_dv_mem_map(dmp_dv_mem *mem) {
 }
 
 
-void dmp_dv_mem_unmap(dmp_dv_mem *mem) {
+void dmp_dv_mem_unmap(dmp_dv_mem mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return;
@@ -151,7 +151,7 @@ void dmp_dv_mem_unmap(dmp_dv_mem *mem) {
 }
 
 
-int dmp_dv_mem_sync_start(dmp_dv_mem *mem, int rd, int wr) {
+int dmp_dv_mem_sync_start(dmp_dv_mem mem, int rd, int wr) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return EINVAL;
@@ -160,7 +160,7 @@ int dmp_dv_mem_sync_start(dmp_dv_mem *mem, int rd, int wr) {
 }
 
 
-int dmp_dv_mem_sync_end(dmp_dv_mem *mem) {
+int dmp_dv_mem_sync_end(dmp_dv_mem mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return EINVAL;
@@ -169,7 +169,7 @@ int dmp_dv_mem_sync_end(dmp_dv_mem *mem) {
 }
 
 
-size_t dmp_dv_mem_get_size(dmp_dv_mem *mem) {
+size_t dmp_dv_mem_get_size(dmp_dv_mem mem) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return 0;
@@ -183,7 +183,7 @@ int64_t dmp_dv_mem_get_total_size() {
 }
 
 
-dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx) {
+dmp_dv_cmdlist dmp_dv_cmdlist_create(dmp_dv_context ctx) {
   CDMPDVCmdList *cmdlist = new CDMPDVCmdList();
   if (!cmdlist) {
     SET_ERR("Failed to allocate %zu bytes of memory", sizeof(CDMPDVCmdList));
@@ -193,11 +193,11 @@ dmp_dv_cmdlist *dmp_dv_cmdlist_create(dmp_dv_context *ctx) {
     cmdlist->Release();
     return NULL;
   }
-  return (dmp_dv_cmdlist*)cmdlist;
+  return (dmp_dv_cmdlist)cmdlist;
 }
 
 
-void dmp_dv_cmdlist_release(dmp_dv_cmdlist *cmdlist) {
+void dmp_dv_cmdlist_release(dmp_dv_cmdlist cmdlist) {
   if (!cmdlist) {
     return;
   }
@@ -205,7 +205,7 @@ void dmp_dv_cmdlist_release(dmp_dv_cmdlist *cmdlist) {
 }
 
 
-void dmp_dv_cmdlist_retain(dmp_dv_cmdlist *cmdlist) {
+void dmp_dv_cmdlist_retain(dmp_dv_cmdlist cmdlist) {
   if (!cmdlist) {
     return;
   }
@@ -213,7 +213,7 @@ void dmp_dv_cmdlist_retain(dmp_dv_cmdlist *cmdlist) {
 }
 
 
-int dmp_dv_cmdlist_commit(dmp_dv_cmdlist *cmdlist) {
+int dmp_dv_cmdlist_commit(dmp_dv_cmdlist cmdlist) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return EINVAL;
@@ -222,7 +222,7 @@ int dmp_dv_cmdlist_commit(dmp_dv_cmdlist *cmdlist) {
 }
 
 
-int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist) {
+int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist cmdlist) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return EINVAL;
@@ -231,7 +231,7 @@ int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist *cmdlist) {
 }
 
 
-int dmp_dv_cmdlist_wait(dmp_dv_cmdlist *cmdlist, int64_t exec_id) {
+int dmp_dv_cmdlist_wait(dmp_dv_cmdlist cmdlist, int64_t exec_id) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return EINVAL;
@@ -240,7 +240,7 @@ int dmp_dv_cmdlist_wait(dmp_dv_cmdlist *cmdlist, int64_t exec_id) {
 }
 
 
-int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist *cmdlist, dmp_dv_cmdraw *cmd) {
+int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return EINVAL;

@@ -170,7 +170,7 @@ class CDMPDVMem : public CDMPDVBase {
   }
 
   /// @brief Returns file descriptor from memory handle or -1 when memory handle is NULL.
-  static inline int get_fd(dmp_dv_mem *mem) {
+  static inline int get_fd(dmp_dv_mem mem) {
     return mem ? ((CDMPDVMem*)mem)->fd_mem_ : -1;
   }
 

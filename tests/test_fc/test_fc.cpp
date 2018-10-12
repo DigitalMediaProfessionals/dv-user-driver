@@ -72,7 +72,7 @@ typedef struct fc_config_impl {
   bool hash_set;
   bool failed;
   uint8_t hash[32];
-  dmp_dv_mem *io_mem, *weights_mem;
+  dmp_dv_mem io_mem, weights_mem;
   size_t io_size, io_offs, weights_offs;
   __fp16 *io_ptr;
   __fp16 *caffe_output;
@@ -141,15 +141,15 @@ int test_fc(const std::vector<fc_config*>& confs) {
   LOG("\n");
 
   int result = -1;
-  dmp_dv_context *ctx = NULL;
-  dmp_dv_cmdlist *cmdlist = NULL;
+  dmp_dv_context ctx = NULL;
+  dmp_dv_cmdlist cmdlist = NULL;
   uint8_t *weights;
   size_t weights_size;
   float failed_diff = 0, failed_diff_y = 0, failed_diff_t = 0;
   int failed_i = -1;
   float caffe_a = std::numeric_limits<float>::max(), caffe_b = std::numeric_limits<float>::lowest();
   float dv_a = std::numeric_limits<float>::max(), dv_b = std::numeric_limits<float>::lowest();
-  dmp_dv_cmdraw_fc_v0 cmd;
+  struct dmp_dv_cmdraw_fc_v0 cmd;
   char fnme[512];
   uint16_t quant_map[256];
   FILE *fin;

@@ -169,14 +169,14 @@ class CDMPDVContext : public CDMPDVBase {
     return ub_size_;
   }
 
-  int GetInfo(dmp_dv_info *p_info) {
+  int GetInfo(struct dmp_dv_info *p_info) {
     if (p_info->size < 8) {
       SET_ERR("Invalid argument: info->size is too small: %u", p_info->size);
       return -1;
     }
     p_info->version = 0;
-    if (p_info->size >= sizeof(dmp_dv_info_v0)) {
-      dmp_dv_info_v0 *info = (dmp_dv_info_v0*)p_info;
+    if (p_info->size >= sizeof(struct dmp_dv_info_v0)) {
+      struct dmp_dv_info_v0 *info = (struct dmp_dv_info_v0*)p_info;
       info->ub_size = ub_size_;
       info->max_kernel_size = max_kernel_size_;
       info->conv_freq = conv_freq_;

@@ -46,14 +46,14 @@ inline uint32_t xorshift32(uint32_t state[1]) {
 int test_mem(size_t size) {
   LOG("ENTER: test_mem(%zu)\n", size);
 
-  dmp_dv_context *ctx = dmp_dv_context_create();
+  dmp_dv_context ctx = dmp_dv_context_create();
   if (!ctx) {
     ERR("dmp_dv_context_create() failed: %s\n", dmp_dv_get_last_error_message());
     return -1;
   }
   LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
 
-  dmp_dv_mem *mem = dmp_dv_mem_alloc(ctx, size);
+  dmp_dv_mem mem = dmp_dv_mem_alloc(ctx, size);
   if (!mem) {
     ERR("dmp_dv_mem_alloc() failed: %s\n", dmp_dv_get_last_error_message());
     dmp_dv_context_release(ctx);

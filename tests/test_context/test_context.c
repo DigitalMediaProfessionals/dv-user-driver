@@ -33,46 +33,47 @@
 #define ERR(...) fprintf(stderr, __VA_ARGS__); fflush(stderr)
 #define CHECK_SIZEOF(name, got, expected) if (got != expected) { ERR("sizeof(%s) is %zu while expecting %d\n", name, got, expected); return -1; }
 
+
 int test_context() {
   LOG("ENTER: test_context\n");
   LOG("dmp_dv_get_version_string(): %s\n", dmp_dv_get_version_string());
 
-  if ((sizeof(dmp_dv_info_v0) & 7) || (sizeof(dmp_dv_buf) & 7) || (sizeof(dmp_dv_cmdraw) & 7) ||
-      (sizeof(dmp_dv_cmdraw_conv_v0_run) & 7) || (sizeof(dmp_dv_cmdraw_conv_v0) & 7) ||
-      (sizeof(dmp_dv_cmdraw_fc_v0) & 7)) {
+  if ((sizeof(struct dmp_dv_info_v0) & 7) || (sizeof(struct dmp_dv_buf) & 7) || (sizeof(struct dmp_dv_cmdraw) & 7) ||
+      (sizeof(struct dmp_dv_cmdraw_conv_v0_run) & 7) || (sizeof(struct dmp_dv_cmdraw_conv_v0) & 7) ||
+      (sizeof(struct dmp_dv_cmdraw_fc_v0) & 7)) {
     ERR("Detected structure with size not multiple of 8\n");
     return -1;
   }
 
-  if ((sizeof(dmp_dv_kbuf) & 7) ||
-      (sizeof(dmp_dv_kcmdraw_conv_v0_run) & 7) || (sizeof(dmp_dv_kcmdraw_conv_v0) & 7) ||
-      (sizeof(dmp_dv_kcmdraw_fc_v0) & 7)) {
+  if ((sizeof(struct dmp_dv_kbuf) & 7) ||
+      (sizeof(struct dmp_dv_kcmdraw_conv_v0_run) & 7) || (sizeof(struct dmp_dv_kcmdraw_conv_v0) & 7) ||
+      (sizeof(struct dmp_dv_kcmdraw_fc_v0) & 7)) {
     ERR("Detected structure for communication with kernel module with size not multiple of 8\n");
     return -1;
   }
 
   CHECK_SIZEOF("__fp16", sizeof(__fp16),  2);
 
-  CHECK_SIZEOF("dmp_dv_info_v0", sizeof(dmp_dv_info_v0), 32);
-  CHECK_SIZEOF("dmp_dv_buf", sizeof(dmp_dv_buf), 16);
-  CHECK_SIZEOF("dmp_dv_cmdraw", sizeof(dmp_dv_cmdraw), 8);
-  CHECK_SIZEOF("dmp_dv_cmdraw_conv_v0_run", sizeof(dmp_dv_cmdraw_conv_v0_run), 56);
-  CHECK_SIZEOF("dmp_dv_cmdraw_conv_v0", sizeof(dmp_dv_cmdraw_conv_v0), 1864);
-  CHECK_SIZEOF("dmp_dv_cmdraw_fc_v0", sizeof(dmp_dv_cmdraw_fc_v0), 72);
+  CHECK_SIZEOF("dmp_dv_info_v0", sizeof(struct dmp_dv_info_v0), 32);
+  CHECK_SIZEOF("dmp_dv_buf", sizeof(struct dmp_dv_buf), 16);
+  CHECK_SIZEOF("dmp_dv_cmdraw", sizeof(struct dmp_dv_cmdraw), 8);
+  CHECK_SIZEOF("dmp_dv_cmdraw_conv_v0_run", sizeof(struct dmp_dv_cmdraw_conv_v0_run), 56);
+  CHECK_SIZEOF("dmp_dv_cmdraw_conv_v0", sizeof(struct dmp_dv_cmdraw_conv_v0), 1864);
+  CHECK_SIZEOF("dmp_dv_cmdraw_fc_v0", sizeof(struct dmp_dv_cmdraw_fc_v0), 72);
 
-  CHECK_SIZEOF("dmp_dv_kbuf", sizeof(dmp_dv_kbuf), 16);
-  CHECK_SIZEOF("dmp_dv_kcmdraw_conv_v0_run", sizeof(dmp_dv_kcmdraw_conv_v0_run), 56);
-  CHECK_SIZEOF("dmp_dv_kcmdraw_conv_v0", sizeof(dmp_dv_kcmdraw_conv_v0), 1864);
-  CHECK_SIZEOF("dmp_dv_kcmdraw_fc_v0", sizeof(dmp_dv_kcmdraw_fc_v0), 72);
+  CHECK_SIZEOF("dmp_dv_kbuf", sizeof(struct dmp_dv_kbuf), 16);
+  CHECK_SIZEOF("dmp_dv_kcmdraw_conv_v0_run", sizeof(struct dmp_dv_kcmdraw_conv_v0_run), 56);
+  CHECK_SIZEOF("dmp_dv_kcmdraw_conv_v0", sizeof(struct dmp_dv_kcmdraw_conv_v0), 1864);
+  CHECK_SIZEOF("dmp_dv_kcmdraw_fc_v0", sizeof(struct dmp_dv_kcmdraw_fc_v0), 72);
 
-  dmp_dv_context *ctx = dmp_dv_context_create();
+  dmp_dv_context ctx = dmp_dv_context_create();
   if (!ctx) {
     ERR("dmp_dv_context_create() failed: %s\n", dmp_dv_get_last_error_message());
     return -1;
   }
   LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
 
-  dmp_dv_info_v0 info;
+  struct dmp_dv_info_v0 info;
   info.size = sizeof(info);
   info.version = 0;
   info.ub_size = -1;
@@ -80,7 +81,7 @@ int test_context() {
   info.conv_freq = -1;
   info.fc_freq = -1;
   info.max_fc_vector_size = -1;
-  if (dmp_dv_context_get_info(ctx, (dmp_dv_info*)&info)) {
+  if (dmp_dv_context_get_info(ctx, (struct dmp_dv_info*)&info)) {
     ERR("dmp_dv_context_get_info() failed: %s\n", dmp_dv_get_last_error_message());
     dmp_dv_context_release(ctx);
     return -1;
@@ -110,12 +111,12 @@ int test_context() {
   }
   while ((dir = readdir(d))) {
     char *fnme = dir->d_name;
-    bool num = true;
+    int num = 1;
     for (; *fnme; ++fnme) {
       if ((*fnme >= '0') && (*fnme <= '9')) {
         continue;
       }
-      num = false;
+      num = 0;
       break;
     }
     if (num) {
