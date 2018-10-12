@@ -76,8 +76,7 @@ struct dmp_dv_info {
 
 /// @brief Structure with information about the context (version 0).
 struct dmp_dv_info_v0 {
-  uint32_t size;               // size of this structure
-  uint32_t version;            // version of this structure (set to 0)
+  struct dmp_dv_info header;   // general structure information
   int32_t ub_size;             // unified buffer size
   int32_t max_kernel_size;     // maximum supported convolutional kernel size
   int32_t conv_freq;           // convolutional block frequency in MHz

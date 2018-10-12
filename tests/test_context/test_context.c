@@ -74,8 +74,8 @@ int test_context() {
   LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
 
   struct dmp_dv_info_v0 info;
-  info.size = sizeof(info);
-  info.version = 0;
+  info.header.size = sizeof(info);
+  info.header.version = 0;
   info.ub_size = -1;
   info.max_kernel_size = -1;
   info.conv_freq = -1;
