@@ -1,4 +1,4 @@
-.PHONY:	all clean tests test_context test_mem test_weights test_conv test_fc
+.PHONY:	all clean tests test_context test_mem test_weights test_conv test_fc test_lrn test_pool test_multirun
 
 all:	tests
 
@@ -17,7 +17,16 @@ test_conv:
 test_fc:
 	$(MAKE) -C test_fc $@
 
-tests:	test_context test_mem test_weights test_conv test_fc
+test_lrn:
+	$(MAKE) -C test_lrn $@
+
+test_pool:
+	$(MAKE) -C test_pool $@
+
+test_multirun:
+	$(MAKE) -C test_multirun $@
+
+tests:	test_context test_mem test_weights test_conv test_fc test_lrn test_pool test_multirun
 
 clean:
 	$(MAKE) -C test_context $@
@@ -25,3 +34,6 @@ clean:
 	$(MAKE) -C test_weights $@
 	$(MAKE) -C test_conv $@
 	$(MAKE) -C test_fc $@
+	$(MAKE) -C test_lrn $@
+	$(MAKE) -C test_pool $@
+	$(MAKE) -C test_multirun $@
