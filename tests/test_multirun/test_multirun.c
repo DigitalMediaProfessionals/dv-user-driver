@@ -96,6 +96,7 @@ static int fill_mem(dmp_dv_mem mem, uint32_t state[4]) {
   for (int i = 0; i < n; ++i) {
     ptr[i] = valid_floats[xorshift128(state) >> 24];
   }
+  ptr[0] = 0;  // first element in quantization table should be zero
 
   if (dmp_dv_mem_sync_end(mem)) {
     ERR("dmp_dv_mem_sync_end() failed: %s\n", dmp_dv_get_last_error_message());
@@ -106,8 +107,10 @@ static int fill_mem(dmp_dv_mem mem, uint32_t state[4]) {
 }
 
 
-int test_multirun() {
-  LOG("ENTER: test_multirun\n");
+int test_multirun(int quantized) {
+  LOG("ENTER: test_multirun: %s\n", quantized ? "Q8" : "FP16");
+
+  const int wfmt = quantized ? 3 : 1;
 
   int result = -1;
   dmp_dv_context ctx = dmp_dv_context_create();
@@ -171,7 +174,7 @@ int test_multirun() {
   conf.run[0].pz = 1;  // Filter Depth
   conf.run[0].weight_buf.mem = weights_mem;
   conf.run[0].weight_buf.offs = 0;
-  conf.run[0].weight_fmt = 3;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
+  conf.run[0].weight_fmt = wfmt;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
   conf.run[0].conv_pad = 0x0;  // bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
   conf.run[0].conv_stride = 0x101;  // bits [7:0] = X stride, bits [15:8] = Y stride
   conf.run[0].conv_dilation = 0x0;  // bits [7:0] = X dilation, bits [15:8] = Y dilation
@@ -195,7 +198,7 @@ int test_multirun() {
   conf.run[1].pz = 1;  // Filter Depth
   conf.run[1].weight_buf.mem = weights_mem;
   conf.run[1].weight_buf.offs = 0;
-  conf.run[1].weight_fmt = 3;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
+  conf.run[1].weight_fmt = wfmt;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
   conf.run[1].conv_pad = 0x0;  // bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
   conf.run[1].conv_stride = 0x101;  // bits [7:0] = X stride, bits [15:8] = Y stride
   conf.run[1].conv_dilation = 0x0;  // bits [7:0] = X dilation, bits [15:8] = Y dilation
@@ -220,7 +223,7 @@ int test_multirun() {
   conf.run[2].pz = 1;  // Filter Depth
   conf.run[2].weight_buf.mem = weights_mem;
   conf.run[2].weight_buf.offs = 0;
-  conf.run[2].weight_fmt = 3;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
+  conf.run[2].weight_fmt = wfmt;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
   conf.run[2].conv_pad = 0x1010101;  // bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
   conf.run[2].conv_stride = 0x101;  // bits [7:0] = X stride, bits [15:8] = Y stride
   conf.run[2].conv_dilation = 0x0;  // bits [7:0] = X dilation, bits [15:8] = Y dilation
@@ -244,7 +247,7 @@ int test_multirun() {
   conf.run[3].pz = 1;  // Filter Depth
   conf.run[3].weight_buf.mem = weights_mem;
   conf.run[3].weight_buf.offs = 0;
-  conf.run[3].weight_fmt = 3;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
+  conf.run[3].weight_fmt = wfmt;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
   conf.run[3].conv_pad = 0x0;  // bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
   conf.run[3].conv_stride = 0x101;  // bits [7:0] = X stride, bits [15:8] = Y stride
   conf.run[3].conv_dilation = 0x0;  // bits [7:0] = X dilation, bits [15:8] = Y dilation
@@ -269,7 +272,7 @@ int test_multirun() {
   conf.run[4].pz = 1;  // Filter Depth
   conf.run[4].weight_buf.mem = weights_mem;
   conf.run[4].weight_buf.offs = 0;
-  conf.run[4].weight_fmt = 3;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
+  conf.run[4].weight_fmt = wfmt;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
   conf.run[4].conv_pad = 0x2020202;  // bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
   conf.run[4].conv_stride = 0x101;  // bits [7:0] = X stride, bits [15:8] = Y stride
   conf.run[4].conv_dilation = 0x0;  // bits [7:0] = X dilation, bits [15:8] = Y dilation
@@ -317,7 +320,7 @@ int test_multirun() {
   conf.run[6].pz = 1;  // Filter Depth
   conf.run[6].weight_buf.mem = weights_mem;
   conf.run[6].weight_buf.offs = 0;
-  conf.run[6].weight_fmt = 3;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
+  conf.run[6].weight_fmt = wfmt;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
   conf.run[6].conv_pad = 0x0;  // bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
   conf.run[6].conv_stride = 0x101;  // bits [7:0] = X stride, bits [15:8] = Y stride
   conf.run[6].conv_dilation = 0x0;  // bits [7:0] = X dilation, bits [15:8] = Y dilation
@@ -402,18 +405,20 @@ int test_multirun() {
     result = -1;
   }
 
-  LOG("EXIT%s: test_context: %d FDs\n", result ? "(FAILED)" : "", n_fd);
+  LOG("EXIT%s: test_context: %d FDs: %s\n", result ? "(FAILED)" : "", n_fd, quantized ? "Q8" : "FP16");
   return result;
 }
 
 
 int main(int argc, char **argv) {
+  const int quantized = ((argc > 1) && (argv[1][0] == 'N')) ? 0 : 1;
+
   int n_ok = 0;
   int n_err = 0;
   int res = 0;
 
   for (int i = 0; i < 3; ++i) {
-    res = test_multirun();
+    res = test_multirun(quantized);
     if (res) {
       ++n_err;
       break;  // we are testing FPGA hanging, so exit on first failure
