@@ -107,37 +107,151 @@ static int fill_mem(dmp_dv_mem mem, uint32_t state[4]) {
 }
 
 
-int test_multirun(int quantized) {
-  LOG("ENTER: test_multirun: %s\n", quantized ? "Q8" : "FP16");
-
-  const int wfmt = quantized ? 3 : 1;
-
-  int result = -1;
-  dmp_dv_context ctx = dmp_dv_context_create();
-  dmp_dv_mem weights_mem = NULL, io_mem = NULL;
+int exec_command(dmp_dv_context ctx, struct dmp_dv_cmdraw_conv_v0 *conf_ptr) {
   dmp_dv_cmdlist cmdlist = NULL;
+  int result = -1;
+
+  cmdlist = dmp_dv_cmdlist_create(ctx);
+  if (!cmdlist) {
+    ERR("dmp_dv_cmdlist_create() failed: %s\n", dmp_dv_get_last_error_message());
+    goto L_EXIT;
+  }
+
+  if (dmp_dv_cmdlist_add_raw(cmdlist, (struct dmp_dv_cmdraw*)conf_ptr)) {
+    ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
+    goto L_EXIT;
+  }
+
+  if (dmp_dv_cmdlist_commit(cmdlist)) {
+    ERR("dmp_dv_cmdlist_commit() failed: %s\n", dmp_dv_get_last_error_message());
+    goto L_EXIT;
+  }
+
+  int64_t exec_id = dmp_dv_cmdlist_exec(cmdlist);
+  if (exec_id < 0) {
+    ERR("dmp_dv_cmdlist_exec() failed: %s\n", dmp_dv_get_last_error_message());
+    goto L_EXIT;
+  }
+
+  if (dmp_dv_cmdlist_wait(cmdlist, exec_id)) {
+    ERR("dmp_dv_cmdlist_wait() failed: %s\n", dmp_dv_get_last_error_message());
+    goto L_EXIT;
+  }
+
+  result = 0;
+
+  L_EXIT:
+
+  dmp_dv_cmdlist_release(cmdlist);
+
+  return result;
+}
+
+
+int run_conf_squeezenet(dmp_dv_context ctx, dmp_dv_mem weights_mem, dmp_dv_mem io_mem, uint16_t wfmt) {
+  LOG("Testing SqueezeNet layer config\n");
+
   struct dmp_dv_cmdraw_conv_v0 conf;
-  int64_t exec_id;
-  uint32_t state[4] = {1, 2, 3, 4};
-
-  if (!ctx) {
-    ERR("dmp_dv_context_create() failed: %s\n", dmp_dv_get_last_error_message());
-    goto L_EXIT;
-  }
-  LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
-
-  weights_mem = dmp_dv_mem_alloc(ctx, 8 * 1024 * 1024);
-  io_mem = dmp_dv_mem_alloc(ctx, 8 * 1024 * 1024);
-  if ((!weights_mem) || (!io_mem)) {
-    ERR("dmp_dv_mem_alloc() failed: %s\n", dmp_dv_get_last_error_message());
-    goto L_EXIT;
-  }
-
-  if ((fill_mem(weights_mem, state)) || (fill_mem(io_mem, state))) {
-    goto L_EXIT;
-  }
-
   memset(&conf, 0, sizeof(conf));
+
+  conf.header.size = sizeof(conf);
+  conf.header.device_type = DMP_DV_DEV_CONV;
+  conf.header.version = 0;
+  // Topo: 00000000000000000000000000000011
+  conf.topo = 0x3;  // [31:0] Output Destination of each run, 0 = UBUF, 1 = EXTMEM
+
+  // Input Configuration:
+  conf.w = 56;  // Input Width
+  conf.h = 56;  // Input Height
+  conf.z = 1;  // Input Depth
+  conf.c = 16;  // Input Channels
+  conf.input_buf.mem = io_mem;
+  conf.input_buf.offs = 0;
+
+  // Output Configuration:
+  conf.output_buf.mem = io_mem;
+  conf.output_buf.offs = 0;
+
+  conf.eltwise_buf.mem = NULL;
+  conf.eltwise_buf.offs = 0;  // Input byte address for elementwise add (0 = UBUF Input Buffer)
+  conf.output_mode = 0;  // 0 = concat, 1 = eltwise add
+
+  // Runs Configuration:
+  // ->2 run(s)
+  //--------------------------------------------------
+  //RUN : 0
+  //--------------------------------------------------
+  //->: fire3/expand1x1
+  //->: fire3/relu_expand1x1
+  //->: pool3
+  conf.run[0].m = 64;  // Output Channels
+  conf.run[0].conv_enable = 1;  // 1 = Enabled, 0 = Disabled
+  conf.run[0].p = 1;  // Filter Width and Height
+  conf.run[0].pz = 1;  // Filter Depth
+  conf.run[0].weight_buf.mem = weights_mem;
+  conf.run[0].weight_buf.offs = 0;
+  conf.run[0].weight_fmt = 3;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
+  conf.run[0].conv_pad = 0x0;  // bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
+  conf.run[0].conv_stride = 0x101;  // bits [7:0] = X stride, bits [15:8] = Y stride
+  conf.run[0].conv_dilation = 0x0;  // bits [7:0] = X dilation, bits [15:8] = Y dilation
+  conf.run[0].pool_enable = 1;  // 0 = disabled, 1 = max pooling, 2 = average pooling
+  conf.run[0].pool_size = 0x303;  // bits [7:0] = width, bits [15:8] = height
+  conf.run[0].pool_stride = 0x202;  // bits [7:0] = X stride, bits [15:8] = Y stride
+  conf.run[0].pool_pad = 0x0;  // bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
+  conf.run[0].pool_avg_param = 0x0;  // Usually set to 1/pool_size^2 in FP16 format when using average pooling (average pooling assumes square size)
+  conf.run[0].actfunc = 2;  // Activation Function: 0 = None, 1 = Tanh, 2 = Leaky ReLU, 3 = Sigmoid, 4 = PReLU, 5 = ELU, 6 = ReLU6
+  conf.run[0].actfunc_param = 0x0;  // Leaky ReLU parameter (NOTE: 0x2E66 is 0.1 in FP16)
+  conf.run[0].rectifi_en = 0;  // Rectification, i.e. max(0, x) (NOTE: Can be applied after non-ReLU activation function)
+  conf.run[0].lrn = 0x0;  // [0] : 1 = LRN enable, 0 = LRN disable, [1] : 1 = incl. power func, 0 = excl., [8:11] = x^2 scale factor log2
+  //--------------------------------------------------
+  //RUN : 1
+  //--------------------------------------------------
+  //->: fire3/expand3x3
+  //->: fire3/relu_expand3x3
+  //->: pool3
+  conf.run[1].m = 64;  // Output Channels
+  conf.run[1].conv_enable = 1;  // 1 = Enabled, 0 = Disabled
+  conf.run[1].p = 3;  // Filter Width and Height
+  conf.run[1].pz = 1;  // Filter Depth
+  conf.run[1].weight_buf.mem = weights_mem;
+  conf.run[1].weight_buf.offs = 0;
+  conf.run[1].weight_fmt = 3;  // Weight format (0 = random access blocks, 1 = compact stream, 3 = 8-bit qunatized stream)
+  conf.run[1].conv_pad = 0x1010101;  // bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
+  conf.run[1].conv_stride = 0x101;  // bits [7:0] = X stride, bits [15:8] = Y stride
+  conf.run[1].conv_dilation = 0x0;  // bits [7:0] = X dilation, bits [15:8] = Y dilation
+  conf.run[1].pool_enable = 1;  // 0 = disabled, 1 = max pooling, 2 = average pooling
+  conf.run[1].pool_size = 0x303;  // bits [7:0] = width, bits [15:8] = height
+  conf.run[1].pool_stride = 0x202;  // bits [7:0] = X stride, bits [15:8] = Y stride
+  conf.run[1].pool_pad = 0x0;  // bits [7:0] = left padding, bits [15:8] = right padding, bits [23:16] = top padding, bits [31:24] = bottom padding
+  conf.run[1].pool_avg_param = 0x0;  // Usually set to 1/pool_size^2 in FP16 format when using average pooling (average pooling assumes square size)
+  conf.run[1].actfunc = 2;  // Activation Function: 0 = None, 1 = Tanh, 2 = Leaky ReLU, 3 = Sigmoid, 4 = PReLU, 5 = ELU, 6 = ReLU6
+  conf.run[1].actfunc_param = 0x0;  // Leaky ReLU parameter (NOTE: 0x2E66 is 0.1 in FP16)
+  conf.run[1].rectifi_en = 0;  // Rectification, i.e. max(0, x) (NOTE: Can be applied after non-ReLU activation function)
+  conf.run[1].lrn = 0x0;  // [0] : 1 = LRN enable, 0 = LRN disable, [1] : 1 = incl. power func, 0 = excl., [8:11] = x^2 scale factor log2
+
+  return exec_command(ctx, &conf);
+}
+
+
+int run_conf_googlenet(dmp_dv_context ctx, dmp_dv_mem weights_mem, dmp_dv_mem io_mem, uint16_t wfmt) {
+  LOG("Testing GoogleNet layer config\n");
+
+  struct dmp_dv_info_v0 info;
+  memset(&info, 0, sizeof(info));
+  info.header.size = sizeof(info);
+  info.header.version = 0;
+  if (dmp_dv_context_get_info(ctx, (struct dmp_dv_info*)&info)) {
+    ERR("dmp_dv_context_get_info() failed: %s\n", dmp_dv_get_last_error_message());
+    return -1;
+  }
+  if (info.ub_size < 618272) {  // configuration cannot be run
+    LOG("Unified buffer is too small to run this test\n");
+    return 0;
+  }
+
+  struct dmp_dv_cmdraw_conv_v0 conf;
+  memset(&conf, 0, sizeof(conf));
+
   conf.header.size = sizeof(conf);
   conf.header.device_type = DMP_DV_DEV_CONV;
   conf.header.version = 0;
@@ -334,40 +448,45 @@ int test_multirun(int quantized) {
   conf.run[6].rectifi_en = 0;  // Rectification, i.e. max(0, x) (NOTE: Can be applied after non-ReLU activation function)
   conf.run[6].lrn = 0x0;  // [0] : 1 = LRN enable, 0 = LRN disable, [1] : 1 = incl. power func, 0 = excl., [8:11] = x^2 scale factor log2
 
-  cmdlist = dmp_dv_cmdlist_create(ctx);
-  if (!cmdlist) {
-    ERR("dmp_dv_cmdlist_create() failed: %s\n", dmp_dv_get_last_error_message());
+  return exec_command(ctx, &conf);
+}
+
+
+int test_multirun(int quantized) {
+  LOG("ENTER: test_multirun: %s\n", quantized ? "Q8" : "FP16");
+
+  const int wfmt = quantized ? 3 : 1;
+
+  int result = -1;
+  dmp_dv_context ctx = dmp_dv_context_create();
+  dmp_dv_mem weights_mem = NULL, io_mem = NULL;
+  uint32_t state[4] = {1, 2, 3, 4};
+
+  if (!ctx) {
+    ERR("dmp_dv_context_create() failed: %s\n", dmp_dv_get_last_error_message());
+    goto L_EXIT;
+  }
+  LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
+
+  weights_mem = dmp_dv_mem_alloc(ctx, 8 * 1024 * 1024);
+  io_mem = dmp_dv_mem_alloc(ctx, 8 * 1024 * 1024);
+  if ((!weights_mem) || (!io_mem)) {
+    ERR("dmp_dv_mem_alloc() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
 
-  if (dmp_dv_cmdlist_add_raw(cmdlist, (struct dmp_dv_cmdraw*)&conf)) {
-    ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
+  if ((fill_mem(weights_mem, state)) || (fill_mem(io_mem, state))) {
     goto L_EXIT;
   }
 
-  if (dmp_dv_cmdlist_commit(cmdlist)) {
-    ERR("dmp_dv_cmdlist_commit() failed: %s\n", dmp_dv_get_last_error_message());
-    goto L_EXIT;
-  }
+  int res = 0;
+  res = run_conf_squeezenet(ctx, weights_mem, io_mem, wfmt) ? -1 : res;
+  res = run_conf_googlenet(ctx, weights_mem, io_mem, wfmt) ? -1 : res;
 
-  exec_id = dmp_dv_cmdlist_exec(cmdlist);
-  if (exec_id < 0) {
-    ERR("dmp_dv_cmdlist_exec() failed: %s\n", dmp_dv_get_last_error_message());
-    goto L_EXIT;
-  }
-
-  if (dmp_dv_cmdlist_wait(cmdlist, exec_id)) {
-    ERR("dmp_dv_cmdlist_wait() failed: %s\n", dmp_dv_get_last_error_message());
-    goto L_EXIT;
-  }
-
-  LOG("SUCCEEDED\n");
-
-  result = 0;
+  result = res;
 
   L_EXIT:
 
-  dmp_dv_cmdlist_release(cmdlist);
   dmp_dv_mem_release(io_mem);
   dmp_dv_mem_release(weights_mem);
   dmp_dv_context_release(ctx);
@@ -405,26 +524,29 @@ int test_multirun(int quantized) {
     result = -1;
   }
 
-  LOG("EXIT%s: test_context: %d FDs: %s\n", result ? "(FAILED)" : "", n_fd, quantized ? "Q8" : "FP16");
+  LOG("EXIT%s: test_multirun: %d FDs: %s\n", result ? "(FAILED)" : "", n_fd, quantized ? "Q8" : "FP16");
   return result;
 }
 
 
 int main(int argc, char **argv) {
-  const int quantized = ((argc > 1) && (argv[1][0] == 'N')) ? 0 : 1;
-
   int n_ok = 0;
   int n_err = 0;
   int res = 0;
 
   for (int i = 0; i < 3; ++i) {
-    res = test_multirun(quantized);
-    if (res) {
-      ++n_err;
-      break;  // we are testing FPGA hanging, so exit on first failure
+    for (int quantized = 0; quantized < 2; ++quantized) {
+      res = test_multirun(quantized);
+      if (res) {
+        ++n_err;
+        break;  // we are testing FPGA hanging, so exit on first failure
+      }
+      else {
+        ++n_ok;
+      }
     }
-    else {
-      ++n_ok;
+    if (res) {
+      break;
     }
   }
 
