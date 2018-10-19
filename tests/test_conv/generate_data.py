@@ -46,7 +46,8 @@ class Main(object):
                             help="Force generated channels to be multiple "
                                  "of this value (default: 1)")
         parser.add_argument("-d", "--dilated", action="store_true",
-                            help="Generate only tests for dilated convolutions")
+                            help="Generate only tests for dilated "
+                            "convolutions")
         args = parser.parse_args()
 
         self.generate_tests(args)
@@ -63,9 +64,31 @@ class Main(object):
                 kyy = kxx
             for ky in kyy:
                 for stride, act, x, y, c, m, dw, dil in product(
-                        [(1, 1), (2, 2)][0:], [0],
-                        [5, 7, 9, 15][0:], [5, 7, 9, 15][0:],
-                        [1, 3, 9, 64, 65][0:], [1, 3, 9, 64, 65][0:],
+                        [(1, 1), (2, 2)], [0],
+                        [1, 9, 15], [1, 9, 15],
+                        [1, 3, 9, 64, 65], [1, 3, 9, 64, 65],
+                        [False, True], [1, 2]):
+                    dil = max(dil, 1)
+                    kxfull = (kx - 1) * dil + 1
+                    kyfull = (ky - 1) * dil + 1
+                    pads = [(kxfull >> 1, kyfull >> 1,
+                             kxfull >> 1, kyfull >> 1)]
+                    if dil == 1 and pads[0] != (0, 0, 0, 0):
+                        pads.append((0, 0, 0, 0))
+                    for pad in pads:
+                        self.generate(
+                            x, y, roundup(c, args.multiple),
+                            kx, ky, roundup(m, args.multiple),
+                            pad, stride, act, dw, dil, args)
+
+        # Test activations
+        for kx in (1, 3, 5, 7):
+            kyy = (kx,)
+            for ky in kyy:
+                for stride, act, x, y, c, m, dw, dil in product(
+                        [(1, 1), (2, 2)], [1, 3, 5],
+                        [1, 9, 15], [1, 9, 15],
+                        [1, 65], [1, 65],
                         [False, True], [1, 2]):
                     dil = max(dil, 1)
                     kxfull = (kx - 1) * dil + 1
@@ -186,7 +209,7 @@ class Main(object):
         s_dw = "\n    group: %d" % n_channels if dw else ""
 
         with open("data/test.prototxt", "w") as fout:
-            fout.write("""name: "Test"
+            s = """name: "Test"
 state {
   phase: TEST
   level: 0
@@ -217,8 +240,10 @@ layer {
     %s%s
   }
 }
-""" % (n_channels, height, width, dil, n_kernels,
-       s_pad, s_kern, s_stride, s_dw))
+"""
+            fout.write(s % (n_channels, height, width, dil, n_kernels,
+                            s_pad, s_kern, s_stride, s_dw))
+
             if activation == 5:
                 fout.write("""
 layer {
@@ -261,8 +286,10 @@ layer {
         results = net.forward()
         output = results["conv1"].copy()
 
-        ox = self.get_ox(width, (kx - 1) * dil + 1, pad_ltrb[0], pad_ltrb[2], stride_xy[0])
-        oy = self.get_ox(height, (ky - 1) * dil + 1, pad_ltrb[1], pad_ltrb[3], stride_xy[1])
+        ox = self.get_ox(width, (kx - 1) * dil + 1,
+                         pad_ltrb[0], pad_ltrb[2], stride_xy[0])
+        oy = self.get_ox(height, (ky - 1) * dil + 1,
+                         pad_ltrb[1], pad_ltrb[3], stride_xy[1])
         assert output.shape == (1, n_kernels, oy, ox)
         output.astype(numpy.float16).tofile("%s.o.bin" % prefix)
 
