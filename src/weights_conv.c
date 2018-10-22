@@ -90,6 +90,10 @@ int dmp_dv_pack_conv_weights(
     SET_ERR("packed_weights is NULL but *packed_weights_size is non-zero");
     return -1;
   }
+  if ((packed_weights) && (((size_t)packed_weights) & 15)) {
+    SET_ERR("packed_weights must be 16-bytes aligned");
+    return EINVAL;
+  }
 
   int retval = 0;
 
@@ -355,6 +359,14 @@ int dmp_dv_pack_conv_weights(
       SET_ERR("Unsupported kernel configuration %dx%d", kx, ky);
       return -1;
     }
+  }
+
+  if (out_offs & 15) {  // zero-pad output to 16-bytes
+    const int d = 16 - (out_offs & 15);
+    if (out_offs + d <= *packed_weights_size) {
+      memset(packed_weights + out_offs, 0, d);
+    }
+    out_offs += d;
   }
 
   if ((!retval) && (*packed_weights_size) && (*packed_weights_size < out_offs)) {

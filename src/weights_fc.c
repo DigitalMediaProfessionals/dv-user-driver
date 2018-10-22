@@ -57,6 +57,10 @@ int dmp_dv_pack_fc_weights(
     SET_ERR("packed_weights is NULL but *packed_weights_size is non-zero");
     return EINVAL;
   }
+  if ((packed_weights) && (((size_t)packed_weights) & 15)) {
+    SET_ERR("packed_weights must be 16-bytes aligned");
+    return EINVAL;
+  }
 
   size_t out_offs = 0;
   if (quant_map) {
@@ -151,6 +155,14 @@ int dmp_dv_pack_fc_weights(
     memcpy(packed_weights + out_offs, bias, output_size * 2);
   }
   out_offs += output_size * 2;
+
+  if (out_offs & 15) {  // zero-pad output to 16-bytes
+    const int d = 16 - (out_offs & 15);
+    if (out_offs + d <= *packed_weights_size) {
+      memset(packed_weights + out_offs, 0, d);
+    }
+    out_offs += d;
+  }
 
   int res = 0;
   if ((*packed_weights_size) && (*packed_weights_size < out_offs)) {
