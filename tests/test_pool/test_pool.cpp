@@ -380,7 +380,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
         goto L_EXIT;
       }
     }
-    LOG("Not memory overwriting outside of the output detected\n");
+    LOG("No memory overwriting outside of the output detected\n");
 
     // Compare output with the gold one
     const int o_offs = roundup(conf->width * conf->height * conf->n_channels);

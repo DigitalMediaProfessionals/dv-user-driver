@@ -95,6 +95,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       return -1;
     }
 
+    const int max_kernel_size = ctx_->get_max_kernel_size();
+
     const uint64_t input_size = (uint64_t)cmd->w * cmd->h * cmd->c * cmd->z;
     input_bufs.push_back(std::make_pair(cmd->input_buf, input_size));
 
@@ -113,12 +115,18 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
     kcmd.output_mode = cmd->output_mode;
     uint64_t output_size = 0;
     bool valid_multi_run = true;
+
     for (uint32_t topo = cmd->topo, i_run = 0; topo; topo >>= 1, ++i_run) {
       const int kx = cmd->run[i_run].p & 0xFF;
       const int ky = (cmd->run[i_run].p & 0xFF00) ? (cmd->run[i_run].p & 0xFF00) >> 8 : kx;
       const int pad[4] = {(int)(cmd->run[i_run].conv_pad & 0x7F), (int)((cmd->run[i_run].conv_pad >> 8) & 0xFF),
                           (int)((cmd->run[i_run].conv_pad >> 16) & 0x7F), (int)((cmd->run[i_run].conv_pad >> 24) & 0xFF)};
       const int stride[2] = {(int)(cmd->run[i_run].conv_stride & 0xFF), (int)((cmd->run[i_run].conv_stride >> 8) & 0xFF)};
+      const int pool_kx = cmd->run[i_run].pool_size & 0xFF;
+      const int pool_ky = (cmd->run[i_run].pool_size >> 8) & 0xFF;
+      const int pool_pad[4] = {(int)(cmd->run[i_run].pool_pad & 0x7F), (int)((cmd->run[i_run].pool_pad >> 8) & 0xFF),
+                               (int)((cmd->run[i_run].pool_pad >> 16) & 0x7F), (int)((cmd->run[i_run].pool_pad >> 24) & 0xFF)};
+      const int pool_stride[2] = {(int)(cmd->run[i_run].pool_stride & 0xFF), (int)((cmd->run[i_run].pool_stride >> 8) & 0xFF)};
       const int m = cmd->run[i_run].m;
       const int w = conv_size.w, h = conv_size.h, c = conv_size.c;
 
@@ -132,7 +140,6 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         return -1;
       }
       if (cmd->run[i_run].conv_enable == 1) {
-        const int max_kernel_size = ctx_->get_max_kernel_size();
         if ((kx < 1) || (kx > max_kernel_size) || (ky < 1) || (ky > max_kernel_size)) {
           SET_ERR("Unsupported convolutional kernel size %dx%d, only sizes from 1 to %d are supported",
                   kx, ky, max_kernel_size);
@@ -152,6 +159,36 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         SET_ERR("Depthwise convolution only supports one-to-one mapping, got c=%d m=%d",
                 c, cmd->run[i_run].m);
         return -1;
+      }
+      switch (cmd->run[i_run].pool_enable) {
+        case 0:
+          break;
+        case 1:
+        case 2:
+        {
+          if ((pool_kx < 1) || (pool_kx > max_kernel_size) || (pool_ky < 1) || (pool_ky > max_kernel_size)) {
+            SET_ERR("Unsupported pooling size %dx%d, only sizes from 1 to %d are supported",
+                    pool_kx, pool_ky, max_kernel_size);
+            return -1;
+          }
+          if ((pool_stride[0] < 1) || (pool_stride[1] < 1)) {
+            SET_ERR("Stride of pooling must be greater than 0, got %dx%d", pool_stride[0], pool_stride[1]);
+            return -1;
+          }
+          if ((pool_kx > pool_pad[0] + cmd->w + pool_pad[1]) || (pool_ky > pool_pad[2] + cmd->h + pool_pad[3])) {
+            // TODO: make proper pooling size check with respect to previous convolution.
+            SET_ERR("Input (%d, %d) with padding L=%d, R=%d, T=%d, B=%d is too small for pooling of size (%d, %d)",
+                    (int)cmd->w, (int)cmd->h, pool_pad[0], pool_pad[1], pool_pad[2], pool_pad[3], pool_kx, pool_ky);
+            return -1;
+          }
+          break;
+        }
+        case 4:
+          // Upsampling is always 2x2
+          break;
+        default:
+          SET_ERR("Unsupported cmd->run[%d].pool_enable=%d", i_run, cmd->run[i_run].pool_enable);
+          return -1;
       }
 
       const int dil_x = cmd->run[i_run].conv_dilation & 0xFF,

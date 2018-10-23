@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from __future__ import division, print_function
 """
     Copyright 2018 Digital Media Professionals Inc.
 
@@ -38,6 +39,12 @@ class Main(object):
         args = parser.parse_args()
         self.generate(7, 7, 1024,
                       2, (7, 7), (1, 1), (0, 0, 0, 0), args)
+        self.generate(960 // 4, 384 // 4, 16,
+                      1, (2, 2), (2, 2), (0, 0, 0, 0), args)
+        self.generate(960 // 2, 384 // 2, 16,
+                      1, (2, 2), (2, 2), (0, 0, 0, 0), args)
+        self.generate(960, 384, 16,
+                      1, (2, 2), (2, 2), (0, 0, 0, 0), args)
 
     def generate(self, width, height, n_channels,
                  pool_type, pool_size, pool_stride, pool_pad, args):
@@ -83,6 +90,11 @@ class Main(object):
         caffe.set_mode_cpu()
 
         with open("data/test.prototxt", "w") as fout:
+            fmt = (n_channels, height, width,
+                   "AVE" if pool_type == 2 else "MAX",
+                   pool_size[1], pool_size[0],
+                   pool_stride[1], pool_stride[0],
+                   pool_pad[2], pool_pad[0])
             fout.write("""name: "Test"
 state {
   phase: TEST
@@ -116,11 +128,7 @@ layer {
     pad_w: %d
   }
 }
-""" % (n_channels, height, width,
-       "AVE" if pool_type == 2 else "MAX",
-       pool_size[1], pool_size[0],
-       pool_stride[1], pool_stride[0],
-       pool_pad[2], pool_pad[0]))
+""" % fmt)
 
         net = caffe.Net("data/test.prototxt", caffe.TEST)
 
