@@ -149,9 +149,9 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
           SET_ERR("Stride of convolution must be greater than 0, got %dx%d", stride[0], stride[1]);
           return -1;
         }
-        if ((kx > pad[0] + cmd->w + pad[1]) || (ky > pad[2] + cmd->h + pad[3])) {
+        if ((kx > pad[0] + w + pad[1]) || (ky > pad[2] + h + pad[3])) {
           SET_ERR("Input (%d, %d) with padding L=%d, R=%d, T=%d, B=%d is too small for convolution of size (%d, %d)",
-                  (int)cmd->w, (int)cmd->h, pad[0], pad[1], pad[2], pad[3], kx, ky);
+                  w, h, pad[0], pad[1], pad[2], pad[3], kx, ky);
           return -1;
         }
       }
@@ -175,8 +175,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
             SET_ERR("Stride of pooling must be greater than 0, got %dx%d", pool_stride[0], pool_stride[1]);
             return -1;
           }
-          if ((pool_kx > pool_pad[0] + cmd->w + pool_pad[1]) || (pool_ky > pool_pad[2] + cmd->h + pool_pad[3])) {
-            // TODO: make proper pooling size check with respect to previous convolution.
+          if ((pool_kx > pool_pad[0] + w + pool_pad[1]) || (pool_ky > pool_pad[2] + h + pool_pad[3])) {
             SET_ERR("Input (%d, %d) with padding L=%d, R=%d, T=%d, B=%d is too small for pooling of size (%d, %d)",
                     (int)cmd->w, (int)cmd->h, pool_pad[0], pool_pad[1], pool_pad[2], pool_pad[3], pool_kx, pool_ky);
             return -1;
@@ -189,6 +188,12 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         default:
           SET_ERR("Unsupported cmd->run[%d].pool_enable=%d", i_run, cmd->run[i_run].pool_enable);
           return -1;
+      }
+      if (cmd->run[i_run].lrn & 1) {
+        if (c & 15) {
+          SET_ERR("Unsupported number of channels for LRN layer, must be multiple of 16, got %d", c);
+          return -1;
+        }
       }
 
       const int dil_x = cmd->run[i_run].conv_dilation & 0xFF,
