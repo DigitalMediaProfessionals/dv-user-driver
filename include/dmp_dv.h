@@ -320,6 +320,15 @@ int dmp_dv_pack_fc_weights(
     const void *weights, const uint16_t *bias,
     uint8_t *packed_weights, size_t *packed_weights_size);
 
+// image format
+#define DMP_DV_RGBA8888	0	//<! RGBA8888 image format
+#define DMP_DV_RGB888	1	//<! RGB888 image format
+#define DMP_DV_RGBFP16	2	//<! RGBFP16 image format
+#define DMP_DV_LUT		7	//<! palette texture image format
+
+// uint8_t to fp16 conversion rule for IPU
+#define DMP_DV_CNV_FP16_SUB			0
+#define DMP_DV_CNV_FP16_DIV_255		1
 
 #ifdef __GNUC__
 #pragma GCC visibility pop
