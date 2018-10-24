@@ -30,6 +30,7 @@ CDMPDVCmdListDeviceHelper* (*CDMPDVCmdListDeviceHelper::creators_[DMP_DV_DEV_COU
     NULL,
     CDMPDVCmdListConvHelper::Create,
     CDMPDVCmdListFCHelper::Create
+    CDMPDVCmdListIPUHelper::Create
 };
 
 
