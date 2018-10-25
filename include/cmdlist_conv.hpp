@@ -318,10 +318,25 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       return -1;
     }
 
-    size_t req_size = sizeof(*kcmd) - sizeof(kcmd->run);
+    int n_run = 0;
+    for (uint32_t topo = cmd->topo; topo; topo >>= 1) {
+      ++n_run;
+    }
+    if (!n_run) {
+      SET_ERR("CONV command should have at least one run");
+      return -1;
+    }
 
-    if (size >= req_size) {
-      kcmd->header.size = sizeof(dmp_dv_kcmdraw_conv_v0);
+    uint32_t req_size = sizeof(*kcmd) - sizeof(kcmd->run) + n_run * sizeof(kcmd->run[0]);
+
+    if ((kcmd) && (size < req_size)) {
+      SET_ERR("Not enough buffer size for the CONV kernel command: %u < %u",
+              size, req_size);
+      return -1;
+    }
+
+    if (kcmd) {
+      kcmd->header.size = req_size;
       kcmd->header.version = 0;
 
       kcmd->input_buf.fd = CDMPDVMem::get_fd(cmd->input_buf.mem);
@@ -343,12 +358,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       kcmd->c = cmd->c;
       kcmd->input_circular_offset = cmd->input_circular_offset;
       kcmd->output_mode = cmd->output_mode;
-    }
 
-    const int n_run = 32;  // TODO: use adaptive count here after debugging full count.
-    for (int i_run = 0; i_run < n_run; ++i_run) {
-      req_size += sizeof(kcmd->run[i_run]);
-      if (size >= req_size) {
+      for (int i_run = 0; i_run < n_run; ++i_run) {
         kcmd->run[i_run].weight_buf.fd = CDMPDVMem::get_fd(cmd->run[i_run].weight_buf.mem);
         kcmd->run[i_run].weight_buf.rsvd = 0;
         kcmd->run[i_run].weight_buf.offs = cmd->run[i_run].weight_buf.offs;
