@@ -40,9 +40,6 @@
 #include "dmp_dv_cmdraw_v0.h"
 
 
-static int g_sleep = 0;
-
-
 /// @brief Rounds up "a" to be the multiple of "n".
 static inline int roundup(int a) {
   const int n = 64;
@@ -113,8 +110,10 @@ void print_cmd(dmp_dv_cmdraw_conv_v0& cmd) {
 /// @param conf Executed convolutional configuration.
 /// @return 0 if error is acceptable, non-zero otherwise.
 int check_err(float y, float t, conv_config *conf) {
-  const float diff = std::abs(y - t);
-  return diff < 0.1f ? 0 : -1;
+  if (std::abs(t) < 0.1f) {
+    return std::abs(y - t) < 0.001f ? 0 : -1;
+  }
+  return std::abs(y / t - 1.0f) < 0.01f ? 0 : -1;
 }
 
 
@@ -239,7 +238,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
     cmd.run[0].conv_pad = 0;
     cmd.run[0].conv_stride = 0x0101;
     cmd.run[0].actfunc = 0;
-    cmd.run[0].lrn = 0x403;
+    cmd.run[0].lrn = 0x503;
 
     conf->io_offs = 4096;
     conf->io_size = (roundup(conf->width * conf->height * conf->n_channels) + roundup(conf->width * conf->height * conf->n_channels) + 2048) * sizeof(__fp16);
@@ -316,9 +315,6 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
     goto L_EXIT;
   }
   LOG("Execution has completed\n");
-  if (g_sleep > 0) {
-    usleep(g_sleep);
-  }
 
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     conv_config *conf = *it;
@@ -349,7 +345,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
         goto L_EXIT;
       }
     }
-    LOG("Not memory overwriting outside of the output detected\n");
+    LOG("No memory overwriting outside of the output detected\n");
 
     // Compare output with the gold one
     const int o_offs = roundup(conf->width * conf->height * conf->n_channels);
@@ -543,14 +539,6 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  if (argc > 2) {
-    g_sleep = atoi(argv[2]);
-  }
-  else {
-    g_sleep = 0;
-  }
-  LOG("Will add delay of %d usec\n", g_sleep);
-
   int n_ok = 0;
   int n_err = 0;
   int res = 0;
@@ -634,18 +622,18 @@ int main(int argc, char **argv) {
     configs[i] = config_data.data() + i;
   }
 
-  const int seed = 1234;  // time(NULL);
+  const int seed = time(NULL);
   std::mt19937 mt_rand(seed);
   std::uniform_int_distribution<int> rnd_offs(0, 1024);
 
-  const int n_passes = 1;
+  const int n_passes = 2;
   for (int i_pass = 0; i_pass < n_passes; ++i_pass) {
     // Randomize configrations order
     std::shuffle(configs.begin(), configs.end(), mt_rand);
 
     // Execute configurations in different chunk sizes
     const size_t pack_sizes[2] = {1, 50};
-    const int n_packs = 1;
+    const int n_packs = 2;
     for (int i_pack = 0; i_pack < n_packs; ++i_pack) {
       std::vector<conv_config*> confs;
       int i_config = 0;
