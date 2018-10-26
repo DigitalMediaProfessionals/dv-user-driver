@@ -144,17 +144,3 @@ struct dmp_dv_cmdraw_ipu_v0 {
 	uint8_t rsvd[1]; 			// padding to 64-bit size
 };
 
-
-/// @brief Raw command for maximizer version 0.
-struct dmp_dv_cmdraw_maximizer_v0 {
-	struct dmp_dv_cmdraw header;   // general structure information 
-
-	struct dmp_dv_buf input_buf;   // input buffer
-	struct dmp_dv_buf output_buf;  // output buffer with size of width x height
-
-	uint16_t width;         // width of input
-	uint16_t height;        // height of input
-	uint16_t nclass;        // # of classes 
-
-	uint16_t rsvd[1];		// padding to 64-bit size
-};
