@@ -110,7 +110,8 @@ struct dmp_dv_cmdraw_ipu_v0 {
 	int32_t stride_rd;  	  	// stride for read buffer
 	int32_t stride_wr;  	  	// stride for write buffer
 	
-	struct dmp_dv_buf lut;		      	// look up table for texture of DMP_DV_LUT. If lut.mem == NULL, the look up table used at the last time is used.
+	struct dmp_dv_buf lut;		// look up table for texture of DMP_DV_LUT. If lut.mem == NULL, the look up table used at the last time is used.
+	uint8_t ncolor_lut;			// number of color in lut
 
 	uint8_t alpha;  	      	// alpha value for blending
 
@@ -140,7 +141,5 @@ struct dmp_dv_cmdraw_ipu_v0 {
 	 */
 	uint8_t cnv_type;       	// conversion type
 	uint8_t cnv_param[3];   	// conversion parameter
-
-	uint8_t rsvd[1]; 			// padding to 64-bit size
 };
 

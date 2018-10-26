@@ -73,13 +73,151 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
   int CheckRaw_v0(struct dmp_dv_cmdraw_ipu_v0 *cmd,
                   std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& input_bufs,
                   std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& output_bufs) {
-	  //TODO: implement
-	  assert(0);
+	  if (cmd->header.size != sizeof(struct dmp_dv_cmdraw_fc_v0)) {
+		  SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
+				  (int)cmd->header.size, (int)cmd->header.version);
+		  return -1;
+	  }
+
+	  // check wr
+	  if (!cmd->wr.mem) {
+		  SET_ERR("Invalid argument: cmd->wr.mem is NULL");
+		  return -1;
+	  }
+	  if (cmd->fmt_wr != DMP_DV_RGBA8888 &&
+				  cmd->fmt_wr != DMP_DV_RGB888 &&
+				  cmd->fmt_wr != DMP_DV_RGBFP16) {
+		  SET_ERR("Invalid argument: cmd->fmt_wr must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_RGBFP16");
+		  return -1;
+	  }
+	  if (cmd->rect_width == 0) {
+		  SET_ERR("Invalid argument: cmd->rect_width is 0");
+		  return -1;
+	  }
+	  if (cmd->rect_height == 0) {
+		  SET_ERR("Invalid argument: cmd->rect_height is 0");
+		  return -1;
+	  }
+
+	  if (!cmd->use_texture && !cmd->use_rd) {
+		  SET_ERR("Invalid argument: at least one of cmd->use_texture and cmd->use_rd must be non-zero");
+		  return -1;
+	  }
+	  // check tex
+	  if (cmd->use_texture) {
+		  if(!cmd->tex.mem){
+			  SET_ERR("Invalid argument: cmd->tex.mem is NULL");
+			  return -1;
+		  }
+		  if(cmd->tex_width == 0){
+			  SET_ERR("Invalid argument: cmd->tex_width is 0");
+			  return -1;
+		  }
+		  if(cmd->tex_height == 0){
+			  SET_ERR("Invalid argument: cmd->tex_height is 0");
+			  return -1;
+		  }
+
+		  // format related check
+		  if (cmd->fmt_tex == DMP_DV_RGBA8888) {
+			  int ret = _SwizzleCheck(3, cmd);
+			  if(ret != 0) {
+				  return ret;
+			  }
+		  } else if (cmd->fmt_tex == DMP_DV_RGB888) {
+			  int ret = _SwizzleCheck(2, cmd);
+			  if(ret != 0) {
+				  return ret;
+			  }
+		  } else if (cmd->fmt_tex == DMP_DV_LUT) {
+			  int ret = _SwizzleCheck(3, cmd);
+			  if(ret != 0) {
+				  return ret;
+			  }
+		  } else {
+			  SET_ERR("Invalid argument: cmd->fmt_wr must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_RGBLUT");
+			  return -1;
+		  }
+
+		  // conversion check
+		  if(cmd->cnv_type != DMP_DV_CNV_FP16_SUB &&
+				  cmd->cnv_type != DMP_DV_CNV_FP16_DIV_255){
+			  SET_ERR("Invalid argument: cmd->cnv_type must be DMP_DV_CNV_FP16_DIV_255 or DMP_DV_CNV_FP16_SUB");
+			  return -1;
+		  }
+	  }
+	  // check rd
+	  if (cmd->use_rd) {
+		  if (!cmd->rd.mem) {
+			  SET_ERR("Invalid argument: cmd->rd.mem is NULL");
+			  return -1;
+		  }
+		  if (cmd->fmt_rd != DMP_DV_RGBA8888 &&
+				  cmd->fmt_rd != DMP_DV_RGB888) {
+			  SET_ERR("Invalid argument: cmd->fmt_rd must be DMP_DV_RGBA8888 or DMP_DV_RGB888");
+			  return -1;
+		  }
+	  }
+
+	  // register buffers
+	  uint64_t size = cmd->rect_width * cmd->rect_width * _GetPixelSize(cmd->fmt_wr);
+	  output_bufs.push_back(std::make_pair(cmd->wr, size));
+	  if (cmd->use_rd) {
+		  size = cmd->rect_width * cmd->rect_width * _GetPixelSize(cmd->fmt_rd);
+		  input_bufs.push_back(std::make_pair(cmd->rd, size));
+	  }
+	  if (cmd->use_texture) {
+		  size = cmd->tex_width * cmd->tex_width * _GetPixelSize(cmd->fmt_tex);
+		  input_bufs.push_back(std::make_pair(cmd->tex, size);
+	  }
+	  if (cmd->tex_fmt == DMP_DV_LUT && cmd->lut.mem != NULL) {
+		  size = cmd->ncolor_lut * _GetPixelSize(DMP_DV_RGBA8888);
+		  input_bufs.push_back(std::make_pair(cmd->lut, size);
+	  }
+
+	  return 0;
   }
 
   /// @brief Fills command of version 0 in the format suitable for later execution on the device.
   int FillKCommand_v0(struct dmp_dv_kcmdraw_ipu_v0 *kcmd, struct dmp_dv_cmdraw_ipu_v0 *cmd, uint32_t& size) {
 	  //TODO: implement
 	  assert(0);
+  }
+
+  /// @brief auxiliary function for CheckRaw_v0
+  static int _SwizzleCheck (int max_idx, const struct dmp_dv_cmdraw_ipu_v0 const * cmd) {
+	  int8_t indices [] = [cmd->ridx, cmd->gidx, cmd->bidx, cmd->aidx];
+	  char* index_names[] = ["cmd->ridx", "cmd->gidx", "cmd->bidx", "cmd->aidx"];
+	  int _range[4] = {};  // store which cmd->*idx has the index
+	  assert(max_idx <= sizeof(_range)/sizeof(_range[0]));
+	  for(int i = 0; i <= max_idx; i++) {
+		  if(indices[i] < 0 || max_idx < indices[i]) { 
+			  SET_ERR("Invalid argument: %s is %d", index_names[i], indices[i]);
+			  return -1;
+		  }
+		  if(_range[indices[i]]){
+			  SET_ERR("Invalid argument: %s and %s has the same value '%d'", index_names[_range[indices[i]] - 1], index_names[i], indices[i]);
+			  return -1;
+		  } else {
+			  _range[indices[i]] = i + 1;
+		  }
+	  }
+	  return 0;
+  };
+
+  /// @brief auxiliary function for CheckRaw_v0
+  static int _GetPixelSize(int img_fmt){
+	  switch(img_fmt) {
+		  case DMP_DV_RGB888:
+			  return 3;
+		  case DMP_DV_RGBA8888:
+			  return 4;
+		  case DMP_DV_RGBFP16;
+			  return 6;
+		  case DMP_DV_RGBLUT:
+			  return 1;
+		  default:
+			  -1;
+	  }
   }
 }
