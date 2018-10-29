@@ -58,6 +58,7 @@ static inline void write_bias(int m_start, int m_stop, size_t *out_offs, size_t 
 /// @param quant_map Quantization table for weights (but not bias), can be NULL.
 /// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format, else array of 1-byte indices.
 /// @param bias Array of half precision floating point biases of size n_kernels.
+/// @param prelu Array of half precision floating point values for PReLU activation of size n_kernels, can be NULL.
 /// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
 /// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
 /// @return 0 on success, non-zero otherwise.
@@ -65,7 +66,7 @@ static inline void write_bias(int m_start, int m_stop, size_t *out_offs, size_t 
 int dmp_dv_pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],
-    const void *weights, const uint16_t *bias,
+    const void *weights, const uint16_t *bias, const uint16_t *prelu,
     uint8_t *packed_weights, size_t *packed_weights_size) {
 
   const int p = imax(kx, ky) | 1;  // next odd number
@@ -135,6 +136,9 @@ int dmp_dv_pack_conv_weights(
         const int m_stop = imin(m_start + 8, n_kernels);
 
         write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, bias);  // write bias values for a specific chunk with zero padding to 8
+        if (prelu) {
+          write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, prelu);  // write PReLU values for a specific chunk with zero padding to 8
+        }
 
         for (int c_start = 0; c_start < n_channels; c_start += 8) {  // loop by input channels (chunks of size 8)
           const int c_stop = imin(c_start + 8, n_channels);
@@ -195,6 +199,9 @@ int dmp_dv_pack_conv_weights(
         const int m_stop = imin(m_start + 8, n_kernels);
 
         write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, bias);
+        if (prelu) {
+          write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, prelu);
+        }
 
         for (int c_start = 0; c_start < n_channels; c_start += 8) {
           const int c_stop = imin(c_start + 8, n_channels);
@@ -256,6 +263,9 @@ int dmp_dv_pack_conv_weights(
         const int m_stop = imin(m_start + 8, n_kernels);
 
         write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, bias);
+        if (prelu) {
+          write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, prelu);
+        }
 
         for (int c_start = 0; c_start < n_channels; c_start += 8) {
           const int c_stop = imin(c_start + 8, n_channels);
@@ -311,6 +321,9 @@ int dmp_dv_pack_conv_weights(
         const int m_stop = imin(m_start + 8, n_kernels);
 
         write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, bias);
+        if (prelu) {
+          write_bias(m_start, m_stop, &out_offs, packed_weights_size, packed_weights, prelu);
+        }
 
         for (int c_start = 0; c_start < n_channels; c_start += 64) {
           const int c_stop = imin(c_start + 64, n_channels);

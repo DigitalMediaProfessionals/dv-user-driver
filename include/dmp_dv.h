@@ -45,7 +45,7 @@ typedef struct dmp_dv_cmdlist_impl *dmp_dv_cmdlist;
 
 
 /// @brief Returns version string of the driver interface.
-/// @details Starts with MAJOR.MINOR.SUB for example "0.1.0 Initial release."
+/// @details Starts with MAJOR.MINOR.SUB YYYYMMDD for example "0.3.0 20181029"
 ///          It is thread-safe.
 const char *dmp_dv_get_version_string();
 
@@ -267,6 +267,7 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd);
 /// @param quant_map Quantization table for weights (but not bias), 256 elements, can be NULL.
 /// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format, else array of 1-byte indices.
 /// @param bias Array of half precision floating point biases of size n_kernels.
+/// @param prelu Array of half precision floating point values for PReLU activation of size n_kernels, can be NULL.
 /// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
 /// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
 /// @return 0 on success, non-zero otherwise.
@@ -274,7 +275,7 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd);
 int dmp_dv_pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],
-    const void *weights, const uint16_t *bias,
+    const void *weights, const uint16_t *bias, const uint16_t *prelu,
     uint8_t *packed_weights, size_t *packed_weights_size);
 
 
@@ -286,6 +287,7 @@ int dmp_dv_pack_conv_weights(
 /// @param quant_map Quantization table for weights (but not bias), can be NULL.
 /// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format, else array of 1-byte indices.
 /// @param bias Array of half precision floating point biases of size n_kernels.
+/// @param prelu Array of half precision floating point values for PReLU activation of size n_kernels, can be NULL.
 /// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
 /// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
 /// @return 0 on success, non-zero otherwise.
@@ -293,7 +295,7 @@ int dmp_dv_pack_conv_weights(
 int dmp_dv_pack_dil_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],
-    const void *weights, const uint16_t *bias,
+    const void *weights, const uint16_t *bias, const uint16_t *prelu,
     uint8_t *packed_weights, size_t *packed_weights_size);
 
 

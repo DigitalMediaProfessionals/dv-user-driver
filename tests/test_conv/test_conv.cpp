@@ -383,12 +383,12 @@ int test_conv(const std::vector<conv_config*>& confs) {
     if (conf->tpe < 2) {
       n = dmp_dv_pack_conv_weights(
             weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
-            conf->quantized ? quant_map : NULL, NULL, NULL, NULL, &weights_size);
+            conf->quantized ? quant_map : NULL, NULL, NULL, NULL, NULL, &weights_size);
     }
     else {
       n = dmp_dv_pack_dil_weights(
             weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
-            conf->quantized ? quant_map : NULL, NULL, NULL, NULL, &weights_size);
+            conf->quantized ? quant_map : NULL, NULL, NULL, NULL, NULL, &weights_size);
     }
     if (n) {
       ERR("Weights packing failed: %s\n", dmp_dv_get_last_error_message());
@@ -433,12 +433,12 @@ int test_conv(const std::vector<conv_config*>& confs) {
     if (conf->tpe < 2) {
       n = dmp_dv_pack_conv_weights(
             weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
-            conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size);
+            conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), NULL, weights, &weights_size);
     }
     else {
       n = dmp_dv_pack_dil_weights(
             weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
-            conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), weights, &weights_size);
+            conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), NULL, weights, &weights_size);
     }
     /*{
       const int nn = 32;

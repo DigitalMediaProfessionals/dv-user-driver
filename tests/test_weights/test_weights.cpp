@@ -94,7 +94,8 @@ static const uint16_t valid_floats[256] = {
 
 
 int test_weights(uint32_t state[4], const char *s_gold_hash,
-                 const uint16_t quant_map[256], int n_channels, int kx, int ky, int n_kernels) {
+                 const uint16_t quant_map[256], int n_channels, int kx, int ky, int n_kernels,
+                 int prelu) {
   int result = -1;
   char prefix[64];
   snprintf(prefix, sizeof(prefix), "(%d, %d, %d, %d)", n_kernels, n_channels, ky, kx);
@@ -112,8 +113,16 @@ int test_weights(uint32_t state[4], const char *s_gold_hash,
   std::vector<uint16_t> bias;
   bias.resize(n_kernels);
 
+  std::vector<uint16_t> prelu_vals;
+  prelu_vals.resize(n_kernels);
+
   for (int i = 0; i < n_kernels; ++i) {
     bias[i] = valid_floats[xorshift128(state) >> 24];
+  }
+  if (prelu) {
+    for (int i = 0; i < n_kernels; ++i) {
+      prelu_vals[i] = valid_floats[xorshift128(state) >> 24];
+    }
   }
   const int n_caffe_weights = n_kernels * n_channels * ky * kx;
   if (quant_map) {
@@ -132,12 +141,12 @@ int test_weights(uint32_t state[4], const char *s_gold_hash,
 
   if (dmp_dv_pack_conv_weights(
         n_channels, kx, ky, n_kernels,
-        quant_map, NULL, NULL, NULL, &weights_size)) {
+        quant_map, NULL, NULL, prelu ? prelu_vals.data() : NULL, NULL, &weights_size)) {
     ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   LOG("Required %zu bytes for weights\n", weights_size);
-  kweights_size = get_weight_size(n_channels, n_kernels, std::max(kx, ky) | 1, quant_map ? 1 : 0, 0);
+  kweights_size = get_weight_size(n_channels, n_kernels, std::max(kx, ky) | 1, quant_map ? 1 : 0, 0, prelu);
   if (kweights_size != weights_size) {
     ERR("Kernel module function get_weight_size() returned %zu while user-space function dmp_dv_pack_conv_weights() returned %zu\n",
         kweights_size, weights_size);
@@ -155,7 +164,7 @@ int test_weights(uint32_t state[4], const char *s_gold_hash,
     if (dmp_dv_pack_conv_weights(
           n_channels, kx, ky, n_kernels,
           quant_map, quant_map ? caffe_weights8.data() : (uint8_t*)caffe_weights16.data(),
-          bias.data(), weights.data(), &weights_size)) {
+          bias.data(), prelu ? prelu_vals.data() : NULL, weights.data(), &weights_size)) {
       ERR("dmp_dv_pack_conv_weights() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
@@ -246,35 +255,55 @@ int main(int argc, char **argv) {
   int n_err = 0;
   int res = 0;
 
-  #define N_CONFIGS 16
+  #define N_CONFIGS 32
   struct config {
     const uint16_t *quant_map;
     uint32_t state[4];
     const char *s_gold_hash;
     int n_channels, kx, ky, n_kernels;
+    int prelu;
   } configs[N_CONFIGS] = {
-      {valid_floats, {1, 2, 3, 4}, "3781796B12E74C43C2313DC74D3EA4C25D0F3D19AB8FBAA64BB17362F9080A79", 256, 1, 1, 512},
-      {valid_floats, {1, 2, 3, 4}, "21CC18D3A0183D383C8E0E5EDEBC6693A4F8F9C7F625C5ED34596AA6637EA93B", 128, 3, 3, 256},
-      {valid_floats, {1, 2, 3, 4}, "98E85214A6BA955B4699693EFBCE1DFE2A1A549C4217E5DACD1FE5F45790CA46", 64, 5, 5, 128},
-      {valid_floats, {1, 2, 3, 4}, "D54DB09C1F722255470D8E546F378CB7BCFE1C240BFEF6A7EE39CE1A6FC759CF", 64, 7, 7, 128},
-      {valid_floats, {1, 2, 3, 4}, "C220BF05D85BB7C0B5D1CDD7EDF614796F297EFD7BE4CFB63E51D93009C37C21", 260, 1, 1, 510},
-      {valid_floats, {1, 2, 3, 4}, "4BAE08599903424BE6634F3EDC0804E78328DBE961014CB608EDB13B704D66ED", 70, 3, 3, 130},
-      {valid_floats, {1, 2, 3, 4}, "8AF1E3CAA7BA35BC009C8B79520E1F0EA33C5F9469FD2FD25DC617A505AADF69", 70, 5, 5, 130},
-      {valid_floats, {1, 2, 3, 4}, "934AE39C6401F631F28C746E2047C9A69890C8D36E0085ABA93B7556A9E17BB4", 70, 7, 7, 130},
+      {valid_floats, {1, 2, 3, 4}, "3781796B12E74C43C2313DC74D3EA4C25D0F3D19AB8FBAA64BB17362F9080A79", 256, 1, 1, 512, 0},
+      {valid_floats, {1, 2, 3, 4}, "21CC18D3A0183D383C8E0E5EDEBC6693A4F8F9C7F625C5ED34596AA6637EA93B", 128, 3, 3, 256, 0},
+      {valid_floats, {1, 2, 3, 4}, "98E85214A6BA955B4699693EFBCE1DFE2A1A549C4217E5DACD1FE5F45790CA46", 64, 5, 5, 128, 0},
+      {valid_floats, {1, 2, 3, 4}, "D54DB09C1F722255470D8E546F378CB7BCFE1C240BFEF6A7EE39CE1A6FC759CF", 64, 7, 7, 128, 0},
+      {valid_floats, {1, 2, 3, 4}, "C220BF05D85BB7C0B5D1CDD7EDF614796F297EFD7BE4CFB63E51D93009C37C21", 260, 1, 1, 510, 0},
+      {valid_floats, {1, 2, 3, 4}, "4BAE08599903424BE6634F3EDC0804E78328DBE961014CB608EDB13B704D66ED", 70, 3, 3, 130, 0},
+      {valid_floats, {1, 2, 3, 4}, "8AF1E3CAA7BA35BC009C8B79520E1F0EA33C5F9469FD2FD25DC617A505AADF69", 70, 5, 5, 130, 0},
+      {valid_floats, {1, 2, 3, 4}, "934AE39C6401F631F28C746E2047C9A69890C8D36E0085ABA93B7556A9E17BB4", 70, 7, 7, 130, 0},
 
-      {NULL, {1, 2, 3, 4}, "B9CC04250D601B1699D88E20BBC665DE1D34A440734812F403B2FDA18713C954", 256, 1, 1, 512},
-      {NULL, {1, 2, 3, 4}, "0D15B90F0B236F73532965A79329CC367E8FB21B48A7E29A9D49A78C122D968F", 128, 3, 3, 256},
-      {NULL, {1, 2, 3, 4}, "786D1ACE1DF3DA407100EA1E6944D8A3A838524FF9A38C7EF4514A9F88619B25", 64, 5, 5, 128},
-      {NULL, {1, 2, 3, 4}, "AD19782CEAA632C68ADD811AB651E93CCB7F6719FCAA9BB0B993DC364AB1BD52", 64, 7, 7, 128},
-      {NULL, {1, 2, 3, 4}, "C9115AB33F0E31FA0E4DD6C040AA851AB27D1330EDEF0E18CAA711C5FF27B3F7", 260, 1, 1, 510},
-      {NULL, {1, 2, 3, 4}, "6B5DDACE58F9BCB3DC39556976813CA4AAB70A63E3DD4233556439158BA94A8D", 70, 3, 3, 130},
-      {NULL, {1, 2, 3, 4}, "6620E41CE8B6828F4200BBE87AD03C3C8E5CF59AAB858DF03EF6D992FBE2A2B0", 70, 5, 5, 130},
-      {NULL, {1, 2, 3, 4}, "33F10592BB98FA01E5918BABE4B1C23C19B5895DDF99B660C8413FD46D5F0DC1", 70, 7, 7, 130},
+      {NULL, {1, 2, 3, 4}, "B9CC04250D601B1699D88E20BBC665DE1D34A440734812F403B2FDA18713C954", 256, 1, 1, 512, 0},
+      {NULL, {1, 2, 3, 4}, "0D15B90F0B236F73532965A79329CC367E8FB21B48A7E29A9D49A78C122D968F", 128, 3, 3, 256, 0},
+      {NULL, {1, 2, 3, 4}, "786D1ACE1DF3DA407100EA1E6944D8A3A838524FF9A38C7EF4514A9F88619B25", 64, 5, 5, 128, 0},
+      {NULL, {1, 2, 3, 4}, "AD19782CEAA632C68ADD811AB651E93CCB7F6719FCAA9BB0B993DC364AB1BD52", 64, 7, 7, 128, 0},
+      {NULL, {1, 2, 3, 4}, "C9115AB33F0E31FA0E4DD6C040AA851AB27D1330EDEF0E18CAA711C5FF27B3F7", 260, 1, 1, 510, 0},
+      {NULL, {1, 2, 3, 4}, "6B5DDACE58F9BCB3DC39556976813CA4AAB70A63E3DD4233556439158BA94A8D", 70, 3, 3, 130, 0},
+      {NULL, {1, 2, 3, 4}, "6620E41CE8B6828F4200BBE87AD03C3C8E5CF59AAB858DF03EF6D992FBE2A2B0", 70, 5, 5, 130, 0},
+      {NULL, {1, 2, 3, 4}, "33F10592BB98FA01E5918BABE4B1C23C19B5895DDF99B660C8413FD46D5F0DC1", 70, 7, 7, 130, 0},
+
+      {valid_floats, {1, 2, 3, 4}, "5C91C8EEE9D70BAB9F7F5BAEFF7B64ED6E318D180667E3BBECE45BB565FDB32F", 256, 1, 1, 512, 1},
+      {valid_floats, {1, 2, 3, 4}, "98AEDB4E7308537BC5BFF055F5D979C73BD7A6EFA7D5D36F0F69A02800A2889A", 128, 3, 3, 256, 1},
+      {valid_floats, {1, 2, 3, 4}, "59488B6F6BD41C89D0680F41F36CBC054E4B2F720DBB63BD7862427D2E9B788A", 64, 5, 5, 128, 1},
+      {valid_floats, {1, 2, 3, 4}, "44C1DA142CBDF30BCC87C7ED3C2E9498FF2922256BF323C5BDBF89D535ABC3B2", 64, 7, 7, 128, 1},
+      {valid_floats, {1, 2, 3, 4}, "1D5CDB91C50B90BA2F7A426A89C26642C5415361B9ECE17896CCD3CE39080E2F", 260, 1, 1, 510, 1},
+      {valid_floats, {1, 2, 3, 4}, "CF7F7FB9F7C166ED8DF513841E34E6FA3579E19699CE6687EFED6B993E75BC71", 70, 3, 3, 130, 1},
+      {valid_floats, {1, 2, 3, 4}, "723E66992EB07DC62FA70A639BDC98F2626EC1203C79699B0A7A9B413AEC4AD4", 70, 5, 5, 130, 1},
+      {valid_floats, {1, 2, 3, 4}, "4DEFF737F144151C43D2D0274BD25477D9A3DC1552859D1E0368EE1EB6359800", 70, 7, 7, 130, 1},
+
+      {NULL, {1, 2, 3, 4}, "176F2CA4A15B6C3AB0B637EA1E7EB11B4A352027C362874A3D0404B903C242F2", 256, 1, 1, 512, 1},
+      {NULL, {1, 2, 3, 4}, "38F2F4826D216F4F71F265AB39770ED9C43ACEF07C80AA0ECF23ECD30287C28D", 128, 3, 3, 256, 1},
+      {NULL, {1, 2, 3, 4}, "E53FC40659C422169560A1DF5460A02155D41CFDE1ADEEE34B8FAC34A27C9FF8", 64, 5, 5, 128, 1},
+      {NULL, {1, 2, 3, 4}, "A19879EE2681EAA36614CF70B4F1ABE3A18626177A17EDE0C469D83DCA43249D", 64, 7, 7, 128, 1},
+      {NULL, {1, 2, 3, 4}, "F3152CCA0B2D5F67001389BA9588887A922C9458A52911E1E98DE96EE4A3004E", 260, 1, 1, 510, 1},
+      {NULL, {1, 2, 3, 4}, "FDED78999ED1F3C1CCD89CB63164CED4B90FF00994E8E5B852CF2C7FBC80E8A5", 70, 3, 3, 130, 1},
+      {NULL, {1, 2, 3, 4}, "E77264BFB5D5EB95A91A7DE71AB591C0F10173F916F56207887C37FE672ADEA6", 70, 5, 5, 130, 1},
+      {NULL, {1, 2, 3, 4}, "B1DDB1FB9FE4F57788E13E1451330D75E50359A34C541C3C3DFD2130EC812254", 70, 7, 7, 130, 1},
   };
 
   for (int i = 0; i < N_CONFIGS; ++i) {
     res = test_weights(configs[i].state, configs[i].s_gold_hash,
-                       configs[i].quant_map, configs[i].n_channels, configs[i].kx, configs[i].ky, configs[i].n_kernels);
+                       configs[i].quant_map, configs[i].n_channels, configs[i].kx, configs[i].ky, configs[i].n_kernels,
+                       configs[i].prelu);
     if (res) {
       ++n_err;
     }

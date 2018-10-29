@@ -50,7 +50,7 @@ const char *dmp_dv_get_last_error_message() {
 
 
 const char *dmp_dv_get_version_string() {
-  return "0.2.0 20181011";
+  return "0.3.0 20181029";
 }
 
 
