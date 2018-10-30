@@ -578,16 +578,6 @@ int test_conv(const std::vector<conv_config*>& confs) {
     out_width = get_conv_out_width(conf->width, kxfull, conf->pad_left, conf->pad_right, conf->stride_x);
     out_height = get_conv_out_width(conf->height, kyfull, conf->pad_top, conf->pad_bottom, conf->stride_y);
     const int o_offs = roundup(conf->width * conf->height * conf->n_channels);
-    FILE *fout = fopen("/tmp/out.bin", "wb");
-    if (fout) {
-      if ((int)fwrite(conf->io_ptr + o_offs, 2, out_height * out_width * conf->n_kernels, fout) != out_height * out_width * conf->n_kernels) {
-        ERR("fwrite() failed for /tmp/out.bin\n");
-      }
-      fclose(fout);
-    }
-    else {
-      ERR("fopen() failed for /tmp/out.bin\n");
-    }
     if (conf->hash_set) {  // check hash
       uint8_t hash[32];
       SHA256_CTX sha256;
