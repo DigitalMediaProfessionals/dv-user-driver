@@ -86,7 +86,7 @@ class Main(object):
             kyy = (kx,)
             for ky in kyy:
                 for stride, act, x, y, c, m, dw, dil in product(
-                        [(1, 1), (2, 2)], [1, 3, 5],
+                        [(1, 1), (2, 2)], [1, 3, 4, 5],
                         [1, 9, 15], [1, 9, 15],
                         [1, 65], [1, 65],
                         [False, True], [1, 2]):
@@ -122,13 +122,15 @@ class Main(object):
             pad_ltrb: padding (left, top, right, bottom).
             stride_xy: stride (x, y).
             activation: activation function (0 - none, 1 - tanh,
-                        3 - sigmoid, 5 - elu).
+                        3 - sigmoid, 4 - prelu, 5 - elu).
             dw: use depth-wise (caffe's group=n_channels == n_kernels).
         """
+        dil = max(1, dil)
+
         if dw and n_kernels != n_channels:  # check if dw is applicable
             return
 
-        if dw and dil > 1:
+        if dil > 1 and (dw or activation == 4):  # check dilated limitations
             return
 
         if (dil > 1 and (width < (dil * (kx - 1) + 1) or
@@ -172,6 +174,8 @@ class Main(object):
         bias = numpy.random.choice(values, n_kernels).astype(numpy.float16)
         bias.tofile("%s.b.bin" % prefix)
 
+        prelu = numpy.random.choice(values, n_kernels).astype(numpy.float16)
+
         input = numpy.random.choice(
             values, width * height * n_channels).astype(numpy.float16)
         input.tofile("%s.i.bin" % prefix)
@@ -207,6 +211,7 @@ class Main(object):
                     else "stride_w: %d\n    stride_h: %d" % stride_xy)
 
         s_dw = "\n    group: %d" % n_channels if dw else ""
+        s_dil = "\n    dilation: %d" % dil if dil > 1 else ""
 
         with open("data/test.prototxt", "w") as fout:
             s = """name: "Test"
@@ -233,22 +238,30 @@ layer {
   bottom: "data"
   top: "conv1"
   convolution_param {
-    dilation: %d
     num_output: %d
     %s
     %s
-    %s%s
+    %s%s%s
   }
 }
 """
-            fout.write(s % (n_channels, height, width, dil, n_kernels,
-                            s_pad, s_kern, s_stride, s_dw))
+            fout.write(s % (n_channels, height, width, n_kernels,
+                            s_pad, s_kern, s_stride, s_dw, s_dil))
 
             if activation == 5:
                 fout.write("""
 layer {
   name: "conv1/ELU"
   type: "ELU"
+  bottom: "conv1"
+  top: "conv1"
+}
+""")
+            if activation == 4:
+                fout.write("""
+layer {
+  name: "conv1/PReLU"
+  type: "PReLU"
   bottom: "conv1"
   top: "conv1"
 }
@@ -277,7 +290,10 @@ layer {
             numpy.float32).reshape(n_kernels, weights_dim_1, ky, kx)
         del weights
         net.params["conv1"][1].data[:] = bias.astype(numpy.float32)
-        # del bias
+        del bias
+        if activation == 4:
+            net.params["conv1/PReLU"][0].data[:] = prelu.astype(numpy.float32)
+            prelu.tofile("%s.prelu.bin" % prefix)
 
         net.blobs["data"].data[0, :, :, :] = input.astype(
             numpy.float32).reshape(n_channels, height, width)

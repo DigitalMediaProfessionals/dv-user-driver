@@ -190,6 +190,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
   std::vector<__fp16> caffe_input;
   std::vector<uint8_t> caffe_weights;
   std::vector<__fp16> caffe_bias;
+  std::vector<__fp16> caffe_prelu;
   int n;
   char c;
   int out_width, out_height;
@@ -317,6 +318,31 @@ int test_conv(const std::vector<conv_config*>& confs) {
       goto L_EXIT;
     }
 
+    // Load PReLU
+    if (conf->activation == 4) {
+      snprintf(fnme, sizeof(fnme), "%s.prelu.bin", prefix);
+      fin = fopen(fnme, "rb");
+      if (!fin) {
+        ERR("fopen() failed for %s\n", fnme);
+        conf->failed = true;
+        goto L_EXIT;
+      }
+      caffe_prelu.resize(conf->n_kernels);
+      n = fread(caffe_prelu.data(), sizeof(caffe_prelu[0]), caffe_prelu.size(), fin);
+      fend = feof(fin) || ((fread(&c, 1, 1, fin) == 0) && (feof(fin)));
+      fclose(fin);
+      if (n != conf->n_kernels) {
+        ERR("fread() returned %d while expecting %d for %s\n", n, conf->n_kernels, fnme);
+        conf->failed = true;
+        goto L_EXIT;
+      }
+      if (!fend) {
+        ERR("File is bigger than expected: %s\n", fnme);
+        conf->failed = true;
+        goto L_EXIT;
+      }
+    }
+
     // Load output
     out_width = get_conv_out_width(conf->width, kxfull, conf->pad_left, conf->pad_right, conf->stride_x);
     out_height = get_conv_out_width(conf->height, kyfull, conf->pad_top, conf->pad_bottom, conf->stride_y);
@@ -383,12 +409,14 @@ int test_conv(const std::vector<conv_config*>& confs) {
     if (conf->tpe < 2) {
       n = dmp_dv_pack_conv_weights(
             weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
-            conf->quantized ? quant_map : NULL, NULL, NULL, NULL, NULL, &weights_size);
+            conf->quantized ? quant_map : NULL, NULL, NULL,
+            conf->activation == 4 ? (uint16_t*)caffe_prelu.data() : NULL, NULL, &weights_size);
     }
     else {
       n = dmp_dv_pack_dil_weights(
             weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
-            conf->quantized ? quant_map : NULL, NULL, NULL, NULL, NULL, &weights_size);
+            conf->quantized ? quant_map : NULL, NULL, NULL,
+            conf->activation == 4 ? (uint16_t*)caffe_prelu.data() : NULL, NULL, &weights_size);
     }
     if (n) {
       ERR("Weights packing failed: %s\n", dmp_dv_get_last_error_message());
@@ -433,38 +461,15 @@ int test_conv(const std::vector<conv_config*>& confs) {
     if (conf->tpe < 2) {
       n = dmp_dv_pack_conv_weights(
             weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
-            conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), NULL, weights, &weights_size);
+            conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(),
+            conf->activation == 4 ? (uint16_t*)caffe_prelu.data() : NULL, weights, &weights_size);
     }
     else {
       n = dmp_dv_pack_dil_weights(
             weights_dim_1, conf->kx, conf->ky, conf->n_kernels,
-            conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(), NULL, weights, &weights_size);
+            conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(),
+            conf->activation == 4 ? (uint16_t*)caffe_prelu.data() : NULL, weights, &weights_size);
     }
-    /*{
-      const int nn = 32;
-      LOG("Quantization map:\n");
-      uint8_t *q = (uint8_t*)quant_map;
-      for (int i = 0; i < 512; ++i) {
-        LOG("%02X%s", q[i], (i == 511) || ((i + 1) % nn == 0) ? "\n" : " ");
-      }
-      LOG("Caffe weights:\n");
-      for (int i = 0; i < (int)caffe_weights.size(); ++i) {
-        LOG("%02X%s", caffe_weights[i], (i == (int)caffe_weights.size() - 1) || ((i + 1) % nn == 0) ? "\n" : " ");
-      }
-      LOG("\n");
-      LOG("Caffe bias:\n");
-      uint8_t *cb = (uint8_t*)caffe_bias.data();
-      int nb = caffe_bias.size() * 2;
-      for (int i = 0; i < nb; ++i) {
-        LOG("%02X%s", cb[i], (i == nb - 1) || ((i + 1) % nn == 0) ? "\n" : " ");
-      }
-      LOG("\n");
-      LOG("DV weights:\n");
-      for (int i = 0; i < (int)weights_size; ++i) {
-        LOG("%02X%s", weights[i], (i == (int)weights_size - 1) || ((i + 1) % nn == 0) ? "\n" : " ");
-      }
-      LOG("\n");
-    }*/
     if (n) {
       ERR("Weights packing failed: %s\n", dmp_dv_get_last_error_message());
       conf->failed = true;
@@ -832,6 +837,10 @@ int main(int argc, char **argv) {
         continue;
       }
 
+      if ((config.tpe > 1) && (config.activation == 4)) {  // PReLU limitation
+        continue;
+      }
+
       char prefix[256];
       snprintf(prefix, sizeof(prefix), "data/%dx%dx%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
                config.width, config.height, config.n_channels, config.kx, config.ky, config.n_kernels,
@@ -839,8 +848,10 @@ int main(int argc, char **argv) {
                config.stride_x, config.stride_y, config.activation);
 
       const size_t prev_size = (int)config_set->size();
-      config.quantized = true;
-      config_set->emplace(config);
+      if (config.activation != 4) {  // PReLU limitation
+        config.quantized = true;
+        config_set->emplace(config);
+      }
       config.quantized = false;
       config_set->emplace(config);
       const size_t this_size = (int)config_set->size();

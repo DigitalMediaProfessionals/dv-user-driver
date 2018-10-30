@@ -225,6 +225,14 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
           SET_ERR("Dilated convolution only supports \"same\" padding");
           return -1;
         }
+        if (cmd->run[i_run].actfunc == 4) {
+          SET_ERR("Dilated convolution and PReLU activation cannot be used together");
+          return -1;
+        }
+      }
+      if ((cmd->run[i_run].actfunc == 4) && (cmd->run[i_run].conv_enable) && (cmd->run[i_run].weight_fmt == 3)) {
+        SET_ERR("Quantized weights and PReLU activation cannot be used together");
+        return -1;
       }
 
       kcmd.run[i_run].actfunc = cmd->run[i_run].actfunc;
