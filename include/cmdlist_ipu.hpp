@@ -180,8 +180,57 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 
   /// @brief Fills command of version 0 in the format suitable for later execution on the device.
   int FillKCommand_v0(struct dmp_dv_kcmdraw_ipu_v0 *kcmd, struct dmp_dv_cmdraw_ipu_v0 *cmd, uint32_t& size) {
-	  //TODO: implement
-	  assert(0);
+    if (cmd->header.size != sizeof(*kcmd)) {
+      SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
+              (int)cmd->header.size, (int)cmd->header.version);
+      return -1;
+    }
+
+    size_t req_size = sizeof(*kcmd);
+
+    if (size >= req_size) {
+      kcmd->header.size = sizeof(struct dmp_dv_kcmdraw_fc_v0);
+      kcmd->header.version = 0;
+
+      kcmd->tex.fd = CDMPDVMem::get_fd(cmd->tex.mem);
+      kcmd->tex.rsvd = 0;
+      kcmd->tex.offs = cmd->tex.offs;
+      kcmd->rd.fd = CDMPDVMem::get_fd(cmd->rd.mem);
+      kcmd->rd.rsvd = 0;
+      kcmd->rd.offs = cmd->rd.offs;
+      kcmd->wr.fd = CDMPDVMem::get_fd(cmd->wr.mem);
+      kcmd->wr.rsvd = 0;
+      kcmd->wr.offs = cmd->wr.offs;
+      kcmd->lut.fd = CDMPDVMem::get_fd(cmd->lut.mem);
+      kcmd->lut.rsvd = 0;
+      kcmd->lut.offs = cmd->lut.offs;
+
+      kcmd->fmt_tex = cmd->fmt_tex;
+      kcmd->fmt_rd = cmd->fmt_rd;
+      kcmd->fmt_wr = cmd->fmt_wr;
+      kcmd->tex_width = cmd->tex_width;
+      kcmd->tex_height = cmd->tex_height;
+      kcmd->rect_width = cmd->rect_width;
+      kcmd->rect_height = cmd->rect_height;
+      kcmd->stride_rd = cmd->stride_rd;
+      kcmd->stride_wr = cmd->stride_wr;
+      kcmd->ncolor_lut = cmd->ncolor_lut;
+      kcmd->alpha = cmd->alpha;
+      kcmd->transpose = cmd->transpose;
+      kcmd->use_const_alpha = cmd->use_const_alpha;
+      kcmd->use_texture = cmd->use_texture;
+      kcmd->use_rd = cmd->use_rd;
+      kcmd->BLF = cmd->BLF;
+      kcmd->ridx = cmd->ridx;
+      kcmd->gidx = cmd->gidx;
+      kcmd->aidx = cmd->aidx;
+      kcmd->cnv_type = cmd->cnv_type;
+      kcmd->cnv_param[0] = cmd->cnv_param[0];
+      kcmd->cnv_param[1] = cmd->cnv_param[1];
+      kcmd->cnv_param[2] = cmd->cnv_param[2];
+    }
+    size = req_size;
+    return 0;
   }
 
   /// @brief auxiliary function for CheckRaw_v0
