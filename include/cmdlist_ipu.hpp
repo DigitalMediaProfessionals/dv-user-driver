@@ -99,12 +99,12 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 		  return -1;
 	  }
 
-	  if (!cmd->use_texture && !cmd->use_rd) {
-		  SET_ERR("Invalid argument: at least one of cmd->use_texture and cmd->use_rd must be non-zero");
+	  if (!cmd->use_tex && !cmd->use_rd) {
+		  SET_ERR("Invalid argument: at least one of cmd->use_tex and cmd->use_rd must be non-zero");
 		  return -1;
 	  }
 	  // check tex
-	  if (cmd->use_texture) {
+	  if (cmd->use_tex) {
 		  if(!cmd->tex.mem){
 			  SET_ERR("Invalid argument: cmd->tex.mem is NULL");
 			  return -1;
@@ -166,7 +166,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 		  size = cmd->rect_width * cmd->rect_width * _GetPixelSize(cmd->fmt_rd);
 		  input_bufs.push_back(std::make_pair(cmd->rd, size));
 	  }
-	  if (cmd->use_texture) {
+	  if (cmd->use_tex) {
 		  size = cmd->tex_width * cmd->tex_width * _GetPixelSize(cmd->fmt_tex);
 		  input_bufs.push_back(std::make_pair(cmd->tex, size);
 	  }
@@ -218,7 +218,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
       kcmd->alpha = cmd->alpha;
       kcmd->transpose = cmd->transpose;
       kcmd->use_const_alpha = cmd->use_const_alpha;
-      kcmd->use_texture = cmd->use_texture;
+      kcmd->use_tex = cmd->use_tex;
       kcmd->use_rd = cmd->use_rd;
       kcmd->BLF = cmd->BLF;
       kcmd->ridx = cmd->ridx;

@@ -118,7 +118,7 @@ struct dmp_dv_cmdraw_ipu_v0 {
 	/* operation flags */
 	uint8_t transpose;  	  	// exchange x-y axis of texture
 	uint8_t use_const_alpha;	// use alpha in this structure for blending
-	uint8_t use_texture;  		// use texture in this structure
+	uint8_t use_tex;  		// use texture in this structure
 	uint8_t use_rd;  	      	// use rd in this structure
 	uint8_t BLF;  		      	// apply bilinear filter
 
