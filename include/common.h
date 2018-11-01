@@ -52,7 +52,7 @@ extern char s_last_error_message[256];
 
 
 /// @brief Helper to set the last error message for ioctl call.
-#define SET_IOCTL_ERR(dev, cmd) SET_ERR("ioctl(%s) failed for %s", cmd, dev)
+#define SET_IOCTL_ERR(retval, dev, cmd) SET_ERR("ioctl(%s) returned %d for %s with errno=%d: %s", cmd, retval, dev, errno, strerror(errno))
 
 
 /// @brief Helper to set the last error message on implementation logic error.

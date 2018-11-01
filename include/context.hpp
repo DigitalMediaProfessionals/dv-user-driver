@@ -71,7 +71,7 @@ class CDMPDVContext : public CDMPDVBase {
     memset(&query, 0, sizeof(query));
     int res = ioctl(fd_ion_, ION_IOC_HEAP_QUERY, &query);
     if (res < 0) {
-      SET_IOCTL_ERR("/dev/ion", "ION_IOC_HEAP_QUERY");
+      SET_IOCTL_ERR(res, "/dev/ion", "ION_IOC_HEAP_QUERY");
       return false;
     }
     const int n = query.cnt;
@@ -86,7 +86,7 @@ class CDMPDVContext : public CDMPDVBase {
     query.heaps = (size_t)&heaps[0];
     res = ioctl(fd_ion_, ION_IOC_HEAP_QUERY, &query);
     if (res < 0) {
-      SET_IOCTL_ERR("/dev/ion", "ION_IOC_HEAP_QUERY");
+      SET_IOCTL_ERR(res, "/dev/ion", "ION_IOC_HEAP_QUERY");
       return false;
     }
     for (int i = 0; i < n; ++i) {

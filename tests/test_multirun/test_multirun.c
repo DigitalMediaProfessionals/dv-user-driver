@@ -122,17 +122,20 @@ int exec_command(dmp_dv_context ctx, struct dmp_dv_cmdraw_conv_v0 *conf_ptr) {
     goto L_EXIT;
   }
 
+  LOG("Commiting command list...\n");
   if (dmp_dv_cmdlist_commit(cmdlist)) {
     ERR("dmp_dv_cmdlist_commit() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
 
+  LOG("Executing command list...\n");
   int64_t exec_id = dmp_dv_cmdlist_exec(cmdlist);
   if (exec_id < 0) {
     ERR("dmp_dv_cmdlist_exec() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
 
+  LOG("Waiting for the result...\n");
   if (dmp_dv_cmdlist_wait(cmdlist, exec_id)) {
     ERR("dmp_dv_cmdlist_wait() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
@@ -145,6 +148,50 @@ int exec_command(dmp_dv_context ctx, struct dmp_dv_cmdraw_conv_v0 *conf_ptr) {
   dmp_dv_cmdlist_release(cmdlist);
 
   return result;
+}
+
+
+int run_conf_lrn(dmp_dv_context ctx, dmp_dv_mem weights_mem, dmp_dv_mem io_mem, uint16_t wfmt) {
+  LOG("Testing LRN layer config\n");
+
+  struct dmp_dv_cmdraw_conv_v0 conf;
+  memset(&conf, 0, sizeof(conf));
+
+  conf.input_buf.mem = io_mem;
+  conf.input_buf.offs = 0;
+
+  conf.output_buf.mem = io_mem;
+  conf.output_buf.offs = 0;
+
+  conf.header.size = sizeof(conf);
+  conf.header.device_type = DMP_DV_DEV_CONV;
+  conf.header.version = 0;
+  conf.topo = 1;
+  conf.w = 56;
+  conf.h = 56;
+  conf.z = 1;
+  conf.c = 192;
+  conf.input_circular_offset = 0;
+  conf.output_mode = 0;
+  conf.run[0].conv_pad = 0x00000000;
+  conf.run[0].pool_pad = 0x00000000;
+  conf.run[0].m = 192;
+  conf.run[0].conv_enable = 0;
+  conf.run[0].p = 0x0101;
+  conf.run[0].pz = 1;
+  conf.run[0].conv_stride = 0x0101;
+  conf.run[0].conv_dilation = 0x0000;
+  conf.run[0].weight_fmt = 0;
+  conf.run[0].pool_enable = 0;
+  conf.run[0].pool_avg_param = 0;
+  conf.run[0].pool_size = 0x0000;
+  conf.run[0].pool_stride = 0x0101;
+  conf.run[0].actfunc = 0;
+  conf.run[0].actfunc_param = 0;
+  conf.run[0].rectifi_en = 0;
+  conf.run[0].lrn = 0x503;
+
+  return exec_command(ctx, &conf);
 }
 
 
@@ -480,6 +527,7 @@ int test_multirun(int quantized) {
   }
 
   int res = 0;
+  res = run_conf_lrn(ctx, weights_mem, io_mem, wfmt) ? -1 : res;
   res = run_conf_squeezenet(ctx, weights_mem, io_mem, wfmt) ? -1 : res;
   res = run_conf_googlenet(ctx, weights_mem, io_mem, wfmt) ? -1 : res;
 

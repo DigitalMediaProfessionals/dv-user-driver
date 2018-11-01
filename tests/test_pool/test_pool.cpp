@@ -403,8 +403,6 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
       memset(max_diff_y, 0, sizeof(max_diff_y));
       memset(max_diff_t, 0, sizeof(max_diff_t));
       int oo_offs = o_offs;
-      std::vector<float> outp;
-      outp.resize(conf->out_width * conf->out_height * conf->n_channels);
       std::set<int> offsets;
       for (int chan_group = 0; chan_group < conf->n_channels; chan_group += 8) {
         const int last_chan = std::min(chan_group + 8, conf->n_channels);
@@ -414,7 +412,6 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
               const int i_offs = k * conf->out_width * conf->out_height + j * conf->out_width + i;
               const __fp16 vle = conf->caffe_output[i_offs];
               const float y = (float)conf->io_ptr[oo_offs], t = (float)vle;
-              outp[i_offs] = y;
               offsets.insert(i_offs);
               caffe_a = std::min(caffe_a, t);
               caffe_b = std::max(caffe_b, t);
@@ -460,22 +457,6 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
           g_max_diff_y[i] = max_diff_y[i];
           g_max_diff_t[i] = max_diff_t[i];
         }
-      }
-      snprintf(fnme, sizeof(fnme), "%s.y.bin", prefix);
-      FILE *fout = fopen(fnme, "wb");
-      if (fout) {
-        fwrite(outp.data(), 4, outp.size(), fout);
-        fclose(fout);
-        LOG("Saved real output to %s\n", fnme);
-        for (int i = 0; i < (int)outp.size(); ++i) {
-          if (offsets.find(i) == offsets.end()) {
-            ERR("Offset %d is missing\n", i);
-            break;
-          }
-        }
-      }
-      else {
-        ERR("fopen() failed for %s\n", fnme);
       }
       if (failed_diff > 0.0f) {
         ERR("FAILED: failed_diff=%.6f on y=%.6f and t=%.6f xy=(%d, %d) chan=%d %s\n", failed_diff, failed_diff_y, failed_diff_t,

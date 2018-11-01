@@ -74,6 +74,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
   int CheckRaw_v0(struct dmp_dv_cmdraw_conv_v0 *cmd,
                   std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& input_bufs,
                   std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& output_bufs) {
+
     if (cmd->header.size != sizeof(struct dmp_dv_cmdraw_conv_v0)) {
       SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
               (int)cmd->header.size, (int)cmd->header.version);
@@ -194,6 +195,10 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
           SET_ERR("Unsupported number of channels for LRN layer, must be multiple of 16, got %d", c);
           return -1;
         }
+        if ((cmd->run[i_run].conv_enable) || (cmd->run[i_run].pool_enable) || (cmd->topo != 1)) {
+          SET_ERR("LRN must be a standalone layer");
+          return -1;
+        }
       }
 
       const int dil_x = cmd->run[i_run].conv_dilation & 0xFF,
@@ -260,9 +265,23 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       }
 
       int tiles = 1;
-      if (is_conv_2d_v0(&kcmd.run[i_run])) {
-        tiles = get_conv_2d_tiles(w, h, c, kx, ky, m,
-                                  pad, stride, ctx_->get_ub_size());
+      if (kcmd.run[i_run].lrn & 1) {
+        tiles = calc_num_tiles_lrn(w, h, c, ctx_->get_ub_size() >> 10);
+      }
+      else if (!is_conv_2d_v0(&kcmd.run[i_run])) {
+        if (kcmd.run[i_run].pool_enable) {
+          tiles = calc_num_tiles_pool(w, h, c);
+        }
+      }
+      else {
+        tiles = calc_num_tiles_conv(
+            w, h, c, m, (kx > ky ? kx : ky) | 1,
+            pad[0], pad[1], pad[2], pad[3],
+            stride[0], stride[1], ctx_->get_ub_size() >> 10);
+      }
+      if (tiles < 1) {
+        SET_ERR("Could not calculate number of tiles for cmd->run[%d]", i_run);
+        return -1;
       }
 
       if ((kcmd.z > 1) || (kcmd.run[i_run].pz > 1) ||

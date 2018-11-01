@@ -159,7 +159,7 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
 
     int res = ioctl(fd_acc_, DMP_DV_IOC_APPEND_CMD, &dv_cmd);
     if (res < 0) {
-      SET_IOCTL_ERR(fnme_acc_, "DMP_DV_IOC_APPEND_CMD");
+      SET_IOCTL_ERR(res, fnme_acc_, "DMP_DV_IOC_APPEND_CMD");
       res = -1;
     }
     else {
@@ -175,7 +175,7 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
     int64_t exec_id = -1;
     int res = ioctl(fd_acc_, DMP_DV_IOC_RUN, &exec_id);
     if (res < 0) {
-      SET_IOCTL_ERR(fnme_acc_, "DMP_DV_IOC_RUN");
+      SET_IOCTL_ERR(res, fnme_acc_, "DMP_DV_IOC_RUN");
       return -1;
     }
     if (exec_id < 0) {
@@ -203,7 +203,7 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
           continue;  // repeat ioctl
 
         default:
-          SET_IOCTL_ERR(fnme_acc_, "DMP_DV_IOC_WAIT");
+          SET_IOCTL_ERR(res, fnme_acc_, "DMP_DV_IOC_WAIT");
           return res;
       }
     }
