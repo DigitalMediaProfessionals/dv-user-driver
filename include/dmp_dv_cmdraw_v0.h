@@ -106,12 +106,15 @@ struct dmp_dv_cmdraw_ipu_v0 {
 	uint16_t rect_width;	  	// width of rendering rectangle
 	uint16_t rect_height;	  	// height of rendering rectangle
 
+	uint32_t scale_width;		// must be (1/(tex_height)) in FP24 format
+	uint32_t scale_height;		// must be (1/(tex_height)) in FP24 format
+
 	/* stride */
 	int32_t stride_rd;  	  	// stride for read buffer
 	int32_t stride_wr;  	  	// stride for write buffer
 	
-	struct dmp_dv_buf lut;		// look up table for texture of DMP_DV_LUT. If lut.mem == NULL, the look up table used at the last time is used.
-	uint8_t ncolor_lut;			// number of color in lut
+	uint32_t lut[32];			// look up table for texture of DMP_DV_LUT.
+	uint8_t ncolor_lut;			// number of color in lut.  If 0, the look up table used at the last time is used.
 
 	uint8_t alpha;  	      	// alpha value for blending
 

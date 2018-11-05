@@ -81,7 +81,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
   int CheckRaw_v0(struct dmp_dv_cmdraw_ipu_v0 *cmd,
                   std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& input_bufs,
                   std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& output_bufs) {
-	  if (cmd->header.size != sizeof(struct dmp_dv_cmdraw_fc_v0)) {
+	  if (cmd->header.size != sizeof(struct dmp_dv_cmdraw_ipu_v0)) {
 		  SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
 				  (int)cmd->header.size, (int)cmd->header.version);
 		  return -1;
@@ -149,6 +149,22 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 			  SET_ERR("Invalid argument: cmd->tex_height is higher than %u", TEX_HEIGHT_MAX);
 			  return -1;
 		  }
+		  if(cmd->scale_width == 0){
+			  SET_ERR("Invalid argument: cmd->scale_width is 0");
+			  return -1;
+		  }
+		  if(cmd->scale_height == 0){
+			  SET_ERR("Invalid argument: cmd->scale_height is 0");
+			  return -1;
+		  }
+		  if(cmd->scale_width & (0xff << 24)){
+			  SET_ERR("Invalid argument: cmd->scale_width is not in FP24 format");
+			  return -1;
+		  }
+		  if(cmd->scale_height & (0xff << 24)){
+			  SET_ERR("Invalid argument: cmd->scale_height is not in FP24 format");
+			  return -1;
+		  }
 
 		  // format related check
 		  if (cmd->fmt_tex == DMP_DV_RGBA8888) {
@@ -214,10 +230,6 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 		  size = cmd->tex_width * cmd->tex_width * _GetPixelSize(cmd->fmt_tex);
 		  input_bufs.push_back(std::make_pair(cmd->tex, size);
 	  }
-	  if (cmd->tex_fmt == DMP_DV_LUT && cmd->lut.mem != NULL) {
-		  size = cmd->ncolor_lut * _GetPixelSize(DMP_DV_RGBA8888);
-		  input_bufs.push_back(std::make_pair(cmd->lut, size);
-	  }
 
 	  return 0;
   }
@@ -233,45 +245,47 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
     size_t req_size = sizeof(*kcmd);
 
     if (size >= req_size) {
-      kcmd->header.size = sizeof(struct dmp_dv_kcmdraw_fc_v0);
+      kcmd->header.size = sizeof(struct dmp_dv_kcmdraw_ipu_v0);
       kcmd->header.version = 0;
 
-      kcmd->tex.fd = CDMPDVMem::get_fd(cmd->tex.mem);
+      kcmd->tex.fd   = CDMPDVMem::get_fd(cmd->tex.mem);
       kcmd->tex.rsvd = 0;
       kcmd->tex.offs = cmd->tex.offs;
-      kcmd->rd.fd = CDMPDVMem::get_fd(cmd->rd.mem);
-      kcmd->rd.rsvd = 0;
-      kcmd->rd.offs = cmd->rd.offs;
-      kcmd->wr.fd = CDMPDVMem::get_fd(cmd->wr.mem);
-      kcmd->wr.rsvd = 0;
-      kcmd->wr.offs = cmd->wr.offs;
-      kcmd->lut.fd = CDMPDVMem::get_fd(cmd->lut.mem);
-      kcmd->lut.rsvd = 0;
-      kcmd->lut.offs = cmd->lut.offs;
+      kcmd->rd.fd    = CDMPDVMem::get_fd(cmd->rd.mem);
+      kcmd->rd.rsvd  = 0;
+      kcmd->rd.offs  = cmd->rd.offs;
+      kcmd->wr.fd    = CDMPDVMem::get_fd(cmd->wr.mem);
+      kcmd->wr.rsvd  = 0;
+      kcmd->wr.offs  = cmd->wr.offs;
 
-      kcmd->fmt_tex = cmd->fmt_tex;
-      kcmd->fmt_rd = cmd->fmt_rd;
-      kcmd->fmt_wr = cmd->fmt_wr;
-      kcmd->tex_width = cmd->tex_width;
-      kcmd->tex_height = cmd->tex_height;
-      kcmd->rect_width = cmd->rect_width;
-      kcmd->rect_height = cmd->rect_height;
-      kcmd->stride_rd = cmd->stride_rd;
-      kcmd->stride_wr = cmd->stride_wr;
-      kcmd->ncolor_lut = cmd->ncolor_lut;
-      kcmd->alpha = cmd->alpha;
-      kcmd->transpose = cmd->transpose;
+      kcmd->fmt_tex      = cmd->fmt_tex;
+      kcmd->fmt_rd       = cmd->fmt_rd;
+      kcmd->fmt_wr       = cmd->fmt_wr;
+      kcmd->tex_width    = cmd->tex_width;
+      kcmd->tex_height   = cmd->tex_height;
+      kcmd->rect_width   = cmd->rect_width;
+      kcmd->rect_height  = cmd->rect_height;
+      kcmd->scale_width  = cmd->scale_width;
+      kcmd->scale_height = cmd->scale_height;
+      kcmd->stride_rd    = cmd->stride_rd;
+      kcmd->stride_wr    = cmd->stride_wr;
+	  for(int i = 0; i < sizeof(cmd->lut)/(sizeof(cmd->lut[0]); i++){
+		  kcmd->lut[i] = cmd->lut[i];
+	  }
+      kcmd->ncolor_lut      = cmd->ncolor_lut;
+      kcmd->alpha           = cmd->alpha;
+      kcmd->transpose       = cmd->transpose;
       kcmd->use_const_alpha = cmd->use_const_alpha;
-      kcmd->use_tex = cmd->use_tex;
-      kcmd->use_rd = cmd->use_rd;
-      kcmd->BLF = cmd->BLF;
-      kcmd->ridx = cmd->ridx;
-      kcmd->gidx = cmd->gidx;
-      kcmd->aidx = cmd->aidx;
-      kcmd->cnv_type = cmd->cnv_type;
-      kcmd->cnv_param[0] = cmd->cnv_param[0];
-      kcmd->cnv_param[1] = cmd->cnv_param[1];
-      kcmd->cnv_param[2] = cmd->cnv_param[2];
+      kcmd->use_tex         = cmd->use_tex;
+      kcmd->use_rd          = cmd->use_rd;
+      kcmd->BLF             = cmd->BLF;
+      kcmd->ridx            = cmd->ridx;
+      kcmd->gidx            = cmd->gidx;
+      kcmd->aidx            = cmd->aidx;
+      kcmd->cnv_type        = cmd->cnv_type;
+      kcmd->cnv_param[0]    = cmd->cnv_param[0];
+      kcmd->cnv_param[1]    = cmd->cnv_param[1];
+      kcmd->cnv_param[2]    = cmd->cnv_param[2];
     }
     size = req_size;
     return 0;
