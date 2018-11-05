@@ -20,9 +20,17 @@
 
 #include "cmdlist.hpp"
 
-
 /// @brief Helper object work working with command list for IPU
 class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
+  static const int32_t  CDMPDVCmdListIPUHelper::STRIDE_WR_MIN;
+  static const int32_t  CDMPDVCmdListIPUHelper::STRIDE_WR_MAX;
+  static const int32_t  CDMPDVCmdListIPUHelper::STRIDE_RD_MIN;
+  static const int32_t  CDMPDVCmdListIPUHelper::STRIDE_RD_MAX;
+  static const uint32_t CDMPDVCmdListIPUHelper::RECT_WIDTH_MAX;
+  static const uint32_t CDMPDVCmdListIPUHelper::RECT_HEIGHT_MAX;
+  static const uint32_t CDMPDVCmdListIPUHelper::TEX_WIDTH_MAX;
+  static const uint32_t CDMPDVCmdListIPUHelper::TEX_HEIGHT_MAX;
+
   /// @brief Constructor.
   CDMPDVCmdListIPUHelper(CDMPDVContext *ctx) : CDMPDVCmdListKHelper(ctx) {
     fnme_acc_ = "/dev/dv_ipu";
@@ -90,12 +98,28 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 		  SET_ERR("Invalid argument: cmd->fmt_wr must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_RGBFP16");
 		  return -1;
 	  }
+	  if (cmd->stride_wr < STRIDE_WR_MIN) {
+		  SET_ERR("Invalid argument: cmd->stride_wr must be higher than %d", STRIDE_WR_MIN + 1);
+		  return -1;
+	  }
+	  if (STRIDE_WR_MAX < cmd->stride_wr) {
+		  SET_ERR("Invalid argument: cmd->stride_wr must be smaller than %d", STRIDE_WR_MIN + 1);
+		  return -1;
+	  }
 	  if (cmd->rect_width == 0) {
 		  SET_ERR("Invalid argument: cmd->rect_width is 0");
 		  return -1;
 	  }
 	  if (cmd->rect_height == 0) {
 		  SET_ERR("Invalid argument: cmd->rect_height is 0");
+		  return -1;
+	  }
+	  if (cmd->rect_width >= RECT_WIDTH_MAX) {
+		  SET_ERR("Invalid argument: cmd->rect_width is higher than %u", RECT_WIDTH_MAX);
+		  return -1;
+	  }
+	  if (cmd->rect_height >= RECT_HEIGHT_MAX) {
+		  SET_ERR("Invalid argument: cmd->rect_height is higher than %u", RECT_HEIGHT_MAX);
 		  return -1;
 	  }
 
@@ -115,6 +139,14 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 		  }
 		  if(cmd->tex_height == 0){
 			  SET_ERR("Invalid argument: cmd->tex_height is 0");
+			  return -1;
+		  }
+		  if(cmd->tex_width > TEX_WIDTH_MAX){
+			  SET_ERR("Invalid argument: cmd->tex_width is higher than %u", TEX_WIDTH_MAX);
+			  return -1;
+		  }
+		  if(cmd->tex_height > TEX_HEIGHT_MAX){
+			  SET_ERR("Invalid argument: cmd->tex_height is higher than %u", TEX_HEIGHT_MAX);
 			  return -1;
 		  }
 
@@ -155,6 +187,18 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 		  if (cmd->fmt_rd != DMP_DV_RGBA8888 &&
 				  cmd->fmt_rd != DMP_DV_RGB888) {
 			  SET_ERR("Invalid argument: cmd->fmt_rd must be DMP_DV_RGBA8888 or DMP_DV_RGB888");
+			  return -1;
+		  }
+		  if (cmd->stride_rd == 0) {
+			  SET_ERR("Invalid argument: cmd->stride_rd must be non-zero");
+			  return -1;
+		  }
+		  if (cmd->stride_rd < STRIDE_RD_MIN) {
+			  SET_ERR("Invalid argument: cmd->stride_rd must be higher than %d", STRIDE_RD_MIN + 1);
+			  return -1;
+		  }
+		  if (STRIDE_RD_MAX < cmd->stride_rd) {
+			  SET_ERR("Invalid argument: cmd->stride_rd must be smaller than %d", STRIDE_RD_MIN + 1);
 			  return -1;
 		  }
 	  }
@@ -269,4 +313,14 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 			  -1;
 	  }
   }
+
 }
+
+const int32_t  CDMPDVCmdListIPUHelper::STRIDE_WR_MIN   = -32768;
+const int32_t  CDMPDVCmdListIPUHelper::STRIDE_WR_MAX   = 32767;
+const int32_t  CDMPDVCmdListIPUHelper::STRIDE_RD_MIN   = -32768;
+const int32_t  CDMPDVCmdListIPUHelper::STRIDE_RD_MAX   = 32767;
+const uint32_t CDMPDVCmdListIPUHelper::RECT_WIDTH_MAX  = 4095;
+const uint32_t CDMPDVCmdListIPUHelper::RECT_HEIGHT_MAX = 4095;
+const uint32_t CDMPDVCmdListIPUHelper::TEX_WIDTH_MAX   = 4095;
+const uint32_t CDMPDVCmdListIPUHelper::TEX_HEIGHT_MAX  = 4095;
