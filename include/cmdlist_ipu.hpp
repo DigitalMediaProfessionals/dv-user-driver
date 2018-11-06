@@ -278,7 +278,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
       kcmd->use_const_alpha = cmd->use_const_alpha;
       kcmd->use_tex         = cmd->use_tex;
       kcmd->use_rd          = cmd->use_rd;
-      kcmd->BLF             = cmd->BLF;
+      kcmd->blf             = cmd->blf;
       kcmd->ridx            = cmd->ridx;
       kcmd->gidx            = cmd->gidx;
       kcmd->aidx            = cmd->aidx;

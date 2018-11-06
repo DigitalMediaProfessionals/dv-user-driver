@@ -123,7 +123,7 @@ struct dmp_dv_cmdraw_ipu_v0 {
 	uint8_t use_const_alpha;	// use alpha in this structure for blending
 	uint8_t use_tex;  		// use texture in this structure
 	uint8_t use_rd;  	      	// use rd in this structure
-	uint8_t BLF;  		      	// apply bilinear filter
+	uint8_t blf;  		      	// apply bilinear filter
 
 	/** swizzle
 	 * Specify an order of RGBA in texture buffer
