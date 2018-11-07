@@ -292,7 +292,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
   }
 
   /// @brief auxiliary function for CheckRaw_v0
-  static int _SwizzleCheck (int max_idx, const struct dmp_dv_cmdraw_ipu_v0 const * cmd) {
+  static int _SwizzleCheck (int max_idx, const struct dmp_dv_cmdraw_ipu_v0 * cmd) {
 	  int8_t indices [] = [cmd->ridx, cmd->gidx, cmd->bidx, cmd->aidx];
 	  char* index_names[] = ["cmd->ridx", "cmd->gidx", "cmd->bidx", "cmd->aidx"];
 	  int _range[4] = {};  // store which cmd->*idx has the index
