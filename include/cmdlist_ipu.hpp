@@ -18,33 +18,35 @@
  */
 #pragma once
 
+#include <assert.h>
 #include "cmdlist.hpp"
 
 /// @brief Helper object work working with command list for IPU
 class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
-  static const int32_t  STRIDE_WR_MIN;
-  static const int32_t  STRIDE_WR_MAX;
-  static const int32_t  STRIDE_RD_MIN;
-  static const int32_t  STRIDE_RD_MAX;
-  static const uint32_t RECT_WIDTH_MAX;
-  static const uint32_t RECT_HEIGHT_MAX;
-  static const uint32_t TEX_WIDTH_MAX;
-  static const uint32_t TEX_HEIGHT_MAX;
+  public:
+    static const int32_t  STRIDE_WR_MIN;
+    static const int32_t  STRIDE_WR_MAX;
+    static const int32_t  STRIDE_RD_MIN;
+    static const int32_t  STRIDE_RD_MAX;
+    static const uint32_t RECT_WIDTH_MAX;
+    static const uint32_t RECT_HEIGHT_MAX;
+    static const uint32_t TEX_WIDTH_MAX;
+    static const uint32_t TEX_HEIGHT_MAX;
 
-  /// @brief Constructor.
-  CDMPDVCmdListIPUHelper(CDMPDVContext *ctx) : CDMPDVCmdListKHelper(ctx) {
-    fnme_acc_ = "/dev/dv_ipu";
-  }
-  
-  /// @brief Destructor.
-  virtual ~CDMPDVCmdListIPUHelper() {
-    // Empty by design
-  }
+    /// @brief Constructor.
+    CDMPDVCmdListIPUHelper(CDMPDVContext *ctx) : CDMPDVCmdListKHelper(ctx) {
+      fnme_acc_ = "/dev/dv_ipu";
+    }
+    
+    /// @brief Destructor.
+    virtual ~CDMPDVCmdListIPUHelper() {
+      // Empty by design
+    }
 
-  /// @brief Creates object of this type.
-  static CDMPDVCmdListDeviceHelper* Create(CDMPDVContext *ctx) {
-    return new CDMPDVCmdListIPUHelper(ctx);
-  }
+    /// @brief Creates object of this type.
+    static CDMPDVCmdListDeviceHelper* Create(CDMPDVContext *ctx) {
+      return new CDMPDVCmdListIPUHelper(ctx);
+    }
 
  private:
   /// @brief Checks provided command for validness.
@@ -228,7 +230,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 	  }
 	  if (cmd->use_tex) {
 		  size = cmd->tex_width * cmd->tex_width * _GetPixelSize(cmd->fmt_tex);
-		  input_bufs.push_back(std::make_pair(cmd->tex, size);
+		  input_bufs.push_back(std::make_pair(cmd->tex, size));
 	  }
 
 	  return 0;
@@ -269,7 +271,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
       kcmd->scale_height = cmd->scale_height;
       kcmd->stride_rd    = cmd->stride_rd;
       kcmd->stride_wr    = cmd->stride_wr;
-	  for(int i = 0; i < sizeof(cmd->lut)/(sizeof(cmd->lut[0]); i++){
+	  for(unsigned i = 0; i < sizeof(cmd->lut)/sizeof(cmd->lut[0]); i++){
 		  kcmd->lut[i] = cmd->lut[i];
 	  }
       kcmd->ncolor_lut      = cmd->ncolor_lut;
@@ -292,12 +294,12 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
   }
 
   /// @brief auxiliary function for CheckRaw_v0
-  static int _SwizzleCheck (int max_idx, const struct dmp_dv_cmdraw_ipu_v0 * cmd) {
-	  int8_t indices [] = [cmd->ridx, cmd->gidx, cmd->bidx, cmd->aidx];
-	  char* index_names[] = ["cmd->ridx", "cmd->gidx", "cmd->bidx", "cmd->aidx"];
+  static int _SwizzleCheck (uint8_t max_idx, const struct dmp_dv_cmdraw_ipu_v0 * cmd) {
+	  int8_t indices [] = {cmd->ridx, cmd->gidx, cmd->bidx, cmd->aidx};
+	  char index_names[][16] = {"cmd->ridx", "cmd->gidx", "cmd->bidx", "cmd->aidx"};
 	  int _range[4] = {};  // store which cmd->*idx has the index
 	  assert(max_idx <= sizeof(_range)/sizeof(_range[0]));
-	  for(int i = 0; i <= max_idx; i++) {
+	  for(uint8_t i = 0; i <= max_idx; i++) {
 		  if(indices[i] < 0 || max_idx < indices[i]) { 
 			  SET_ERR("Invalid argument: %s is %d", index_names[i], indices[i]);
 			  return -1;
@@ -319,16 +321,15 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 			  return 3;
 		  case DMP_DV_RGBA8888:
 			  return 4;
-		  case DMP_DV_RGBFP16;
+		  case DMP_DV_RGBFP16:
 			  return 6;
-		  case DMP_DV_RGBLUT:
+		  case DMP_DV_LUT:
 			  return 1;
 		  default:
-			  -1;
+			  return -1;
 	  }
   }
-
-}
+};
 
 const int32_t  CDMPDVCmdListIPUHelper::STRIDE_WR_MIN   = -32768;
 const int32_t  CDMPDVCmdListIPUHelper::STRIDE_WR_MAX   = 32767;
