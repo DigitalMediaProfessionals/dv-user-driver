@@ -22,14 +22,14 @@
 
 /// @brief Helper object work working with command list for IPU
 class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
-  static const int32_t  CDMPDVCmdListIPUHelper::STRIDE_WR_MIN;
-  static const int32_t  CDMPDVCmdListIPUHelper::STRIDE_WR_MAX;
-  static const int32_t  CDMPDVCmdListIPUHelper::STRIDE_RD_MIN;
-  static const int32_t  CDMPDVCmdListIPUHelper::STRIDE_RD_MAX;
-  static const uint32_t CDMPDVCmdListIPUHelper::RECT_WIDTH_MAX;
-  static const uint32_t CDMPDVCmdListIPUHelper::RECT_HEIGHT_MAX;
-  static const uint32_t CDMPDVCmdListIPUHelper::TEX_WIDTH_MAX;
-  static const uint32_t CDMPDVCmdListIPUHelper::TEX_HEIGHT_MAX;
+  static const int32_t  STRIDE_WR_MIN;
+  static const int32_t  STRIDE_WR_MAX;
+  static const int32_t  STRIDE_RD_MIN;
+  static const int32_t  STRIDE_RD_MAX;
+  static const uint32_t RECT_WIDTH_MAX;
+  static const uint32_t RECT_HEIGHT_MAX;
+  static const uint32_t TEX_WIDTH_MAX;
+  static const uint32_t TEX_HEIGHT_MAX;
 
   /// @brief Constructor.
   CDMPDVCmdListIPUHelper(CDMPDVContext *ctx) : CDMPDVCmdListKHelper(ctx) {
