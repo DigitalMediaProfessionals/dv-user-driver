@@ -222,14 +222,14 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 	  }
 
 	  // register buffers
-	  uint64_t size = cmd->rect_width * cmd->rect_width * _GetPixelSize(cmd->fmt_wr);
+	  uint64_t size = cmd->rect_width * cmd->rect_height * _GetPixelSize(cmd->fmt_wr);
 	  output_bufs.push_back(std::make_pair(cmd->wr, size));
 	  if (cmd->use_rd) {
-		  size = cmd->rect_width * cmd->rect_width * _GetPixelSize(cmd->fmt_rd);
+		  size = cmd->rect_width * cmd->rect_height * _GetPixelSize(cmd->fmt_rd);
 		  input_bufs.push_back(std::make_pair(cmd->rd, size));
 	  }
 	  if (cmd->use_tex) {
-		  size = cmd->tex_width * cmd->tex_width * _GetPixelSize(cmd->fmt_tex);
+		  size = cmd->tex_width * cmd->tex_height * _GetPixelSize(cmd->fmt_tex);
 		  input_bufs.push_back(std::make_pair(cmd->tex, size));
 	  }
 
@@ -283,6 +283,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
       kcmd->blf             = cmd->blf;
       kcmd->ridx            = cmd->ridx;
       kcmd->gidx            = cmd->gidx;
+      kcmd->bidx            = cmd->bidx;
       kcmd->aidx            = cmd->aidx;
       kcmd->cnv_type        = cmd->cnv_type;
       kcmd->cnv_param[0]    = cmd->cnv_param[0];
