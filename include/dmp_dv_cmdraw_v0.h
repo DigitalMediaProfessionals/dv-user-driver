@@ -99,7 +99,7 @@ struct dmp_dv_cmdraw_ipu_v0 {
   uint8_t fmt_tex;  	    // format of texture buffer. This must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_LUT.
   uint8_t fmt_rd;   	    // format of read buffer. This must be DMP_DV_RGBA8888 or DMP_DV_RGB888.
   uint8_t fmt_wr;   	    // format of write buffer. This must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_RGBFP16.
-  uint8_t rsvd[1];			  // padding to 16-bit size
+  uint8_t rsvd1[1];			  // padding to 16-bit size
 
   /* dimension */
   uint16_t tex_width;	    // width of texture
@@ -145,6 +145,6 @@ struct dmp_dv_cmdraw_ipu_v0 {
    */
   uint8_t cnv_type;       // conversion type
   uint8_t cnv_param[3];   // conversion parameter
-  uint8_t rsvd[5];		    // padding to 64-bit size
+  uint8_t rsvd2[5];		    // padding to 64-bit size
 };
 
