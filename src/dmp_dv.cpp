@@ -253,32 +253,32 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
 
 uint32_t dmp_dv_f2fp24(float g)
 {
-	static uint32_t expW=7;
-	static uint32_t manW=16;
-	union { unsigned int uu; float ff; } jj;
-	jj.ff=g;
-	uint32_t uf = jj.uu;
-	uint32_t u = 0;
-	int neg = (uf & 0x80000000);
-	uint32_t expf = (uf >> 23) & 0xff;
-	int32_t exp = expf - 127 + (1<<(expW-1)) - 1;
+  static uint32_t expW=7;
+  static uint32_t manW=16;
+  union { unsigned int uu; float ff; } jj;
+  jj.ff=g;
+  uint32_t uf = jj.uu;
+  uint32_t u = 0;
+  int neg = (uf & 0x80000000);
+  uint32_t expf = (uf >> 23) & 0xff;
+  int32_t exp = expf - 127 + (1<<(expW-1)) - 1;
 
-	if (!expf || (exp <= 0)){
-		u=0;
-	} else if ((expf==255) || (exp >= (1<<expW)-1)) {
-		exp = (1<<expW)-1;
-		u = (exp<<manW) | (neg ? (1<<(expW+manW)) : 0);
-	} else {
-		u = (exp<<manW) | (neg ? (1<<(expW+manW)) : 0);
-		u |= (uf & ((1<<23)-1)) >> (23-manW);
-		if (manW<22) {
-			int half = (uf & (1<<(22-manW)));
-			if (half) {
-				u+=1;
-			}
-		}
-	}
-	return u;
+  if (!expf || (exp <= 0)){
+    u=0;
+  } else if ((expf==255) || (exp >= (1<<expW)-1)) {
+    exp = (1<<expW)-1;
+    u = (exp<<manW) | (neg ? (1<<(expW+manW)) : 0);
+  } else {
+    u = (exp<<manW) | (neg ? (1<<(expW+manW)) : 0);
+    u |= (uf & ((1<<23)-1)) >> (23-manW);
+    if (manW<22) {
+      int half = (uf & (1<<(22-manW)));
+      if (half) {
+        u+=1;
+      }
+    }
+  }
+  return u;
 } 
 
 }  // extern "C"
