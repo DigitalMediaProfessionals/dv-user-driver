@@ -237,8 +237,11 @@ struct dmp_dv_buf {
 /// @brief Fully connected device type id.
 #define DMP_DV_DEV_FC 2
 
+/// @brief Image processing unit device type id.
+#define DMP_DV_DEV_IPU 3
+
 /// @brief Upper bound of different device type ids.
-#define DMP_DV_DEV_COUNT 3
+#define DMP_DV_DEV_COUNT 4
 
 /// @brief Raw command for execution.
 struct dmp_dv_cmdraw {
@@ -322,6 +325,19 @@ int dmp_dv_pack_fc_weights(
     const void *weights, const uint16_t *bias,
     uint8_t *packed_weights, size_t *packed_weights_size);
 
+//! image format
+//! DMP_DV_RGBA8888 RGBA8888 image format
+//! DMP_DV_RGB888   RGB888 image format
+//! DMP_DV_RGBFP16  RGBFP16 image format
+//! DMP_DV_LUT      palette texture image format
+#define DMP_DV_RGBA8888   0 
+#define DMP_DV_RGB888     1 
+#define DMP_DV_RGBFP16    2 
+#define DMP_DV_LUT        7 
+
+// uint8_t to fp16 conversion rule for IPU
+#define DMP_DV_CNV_FP16_SUB       0
+#define DMP_DV_CNV_FP16_DIV_255   1
 
 #ifdef __GNUC__
 #pragma GCC visibility pop

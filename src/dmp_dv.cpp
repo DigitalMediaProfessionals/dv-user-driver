@@ -23,13 +23,15 @@
 #include "cmdlist.hpp"
 #include "cmdlist_conv.hpp"
 #include "cmdlist_fc.hpp"
+#include "cmdlist_ipu.hpp"
 
 
 /// @brief Creators for the specific device types.
 CDMPDVCmdListDeviceHelper* (*CDMPDVCmdListDeviceHelper::creators_[DMP_DV_DEV_COUNT])(CDMPDVContext *ctx) = {
     NULL,
     CDMPDVCmdListConvHelper::Create,
-    CDMPDVCmdListFCHelper::Create
+    CDMPDVCmdListFCHelper::Create,
+    CDMPDVCmdListIPUHelper::Create
 };
 
 
@@ -247,6 +249,5 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
   }
   return ((CDMPDVCmdList*)cmdlist)->AddRaw(cmd);
 }
-
 
 }  // extern "C"
