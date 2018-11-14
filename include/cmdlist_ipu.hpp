@@ -100,11 +100,13 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
         return -1;
       }
       if (cmd->stride_wr < STRIDE_WR_MIN) {
-        SET_ERR("Invalid argument: cmd->stride_wr must be higher than %d", STRIDE_WR_MIN - 1);
+        SET_ERR("Invalid argument: cmd->stride_wr is %d but must be higher than %d", 
+                                                 cmd->stride_wr, STRIDE_WR_MIN - 1);
         return -1;
       }
       if (cmd->stride_wr > STRIDE_WR_MAX) {
-        SET_ERR("Invalid argument: cmd->stride_wr must be smaller than %d", STRIDE_WR_MAX + 1);
+        SET_ERR("Invalid argument: cmd->stride_wr is %d but must be smaller than %d",
+                                                  cmd->stride_wr, STRIDE_WR_MAX + 1);
         return -1;
       }
       if (cmd->rect_width == 0) {
@@ -116,16 +118,18 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
         return -1;
       }
       if (cmd->rect_width >= RECT_WIDTH_MAX) {
-        SET_ERR("Invalid argument: cmd->rect_width is higher than %u", RECT_WIDTH_MAX);
+        SET_ERR("Invalid argument: cmd->rect_width is %u but must be smaller than %u",
+                                                cmd->rect_width, RECT_WIDTH_MAX + 1);
         return -1;
       }
       if (cmd->rect_height >= RECT_HEIGHT_MAX) {
-        SET_ERR("Invalid argument: cmd->rect_height is higher than %u", RECT_HEIGHT_MAX);
+        SET_ERR("Invalid argument: cmd->rect_height is %u but must be smaller than %u",
+                                               cmd->rect_height, RECT_HEIGHT_MAX + 1);
         return -1;
       }
 
       if (!cmd->use_tex && !cmd->use_rd) {
-        SET_ERR("Invalid argument: at least one of cmd->use_tex and cmd->use_rd must be non-zero");
+        SET_ERR("Invalid argument: one of cmd->use_tex and cmd->use_rd must be non-zero");
         return -1;
       }
       // check tex
@@ -143,11 +147,13 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
           return -1;
         }
         if (cmd->tex_width > TEX_WIDTH_MAX) {
-          SET_ERR("Invalid argument: cmd->tex_width is higher than %u", TEX_WIDTH_MAX);
+          SET_ERR("Invalid argument: cmd->tex_width is %u but must be smaller than %u",
+                                                    cmd->tex_width, TEX_WIDTH_MAX + 1);
           return -1;
         }
         if (cmd->tex_height > TEX_HEIGHT_MAX) {
-          SET_ERR("Invalid argument: cmd->tex_height is higher than %u", TEX_HEIGHT_MAX);
+          SET_ERR("Invalid argument: cmd->tex_height is %u but must be smaller than %u",
+                                                   cmd->tex_height, TEX_HEIGHT_MAX + 1);
           return -1;
         }
 
@@ -195,11 +201,13 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
           return -1;
         }
         if (cmd->stride_rd < STRIDE_RD_MIN) {
-          SET_ERR("Invalid argument: cmd->stride_rd must be higher than %d", STRIDE_RD_MIN - 1);
+          SET_ERR("Invalid argument: cmd->stride_rd is %d but must be higher than %d",
+                                                   cmd->stride_rd, STRIDE_RD_MIN - 1);
           return -1;
         }
         if (cmd->stride_rd > STRIDE_RD_MAX) {
-          SET_ERR("Invalid argument: cmd->stride_rd must be smaller than %d", STRIDE_RD_MAX + 1);
+          SET_ERR("Invalid argument: cmd->stride_rd is %d but must be smaller than %d",
+                                                    cmd->stride_rd, STRIDE_RD_MAX + 1);
           return -1;
         }
       }
