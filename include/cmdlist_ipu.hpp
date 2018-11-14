@@ -321,11 +321,11 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
     {
       static const uint32_t expW = 7;
       static const uint32_t manW = 16;
-      union { unsigned int uu; float ff; } jj;
+      union { uint32_t uu; float ff; } jj;
       jj.ff = g;
       uint32_t uf = jj.uu;
       uint32_t u = 0;
-      int neg = uf & 0x80000000;
+      int32_t neg = uf & 0x80000000;
       uint32_t expf = (uf >> 23) & 0xff;
       int32_t exp = expf - 127 + (1 << (expW - 1)) - 1;
 
@@ -338,7 +338,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
         u = (exp<<manW) | (neg ? (1 << (expW + manW)) : 0);
         u |= (uf & ((1 << 23) - 1)) >> (23 - manW);
         if (manW < 22) {
-          int half = uf & (1 << (22 - manW));
+          int32_t half = uf & (1 << (22 - manW));
           if (half) {
             u += 1;
           }
