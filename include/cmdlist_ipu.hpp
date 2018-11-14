@@ -18,7 +18,6 @@
  */
 #pragma once
 
-#include <assert.h>
 #include "cmdlist.hpp"
 
 /// @brief Helper object work working with command list for IPU
@@ -279,11 +278,14 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
     }
 
     /// @brief auxiliary function for CheckRaw_v0
+    /// @return -2 if max_idx is too big, must be less than 5;
     static int _SwizzleCheck (uint8_t max_idx, const struct dmp_dv_cmdraw_ipu_v0 * cmd) {
       int8_t indices [] = {cmd->ridx, cmd->gidx, cmd->bidx, cmd->aidx};
       char index_names[][16] = {"cmd->ridx", "cmd->gidx", "cmd->bidx", "cmd->aidx"};
       int _range[4] = {};  // store which cmd->*idx has the index
-      assert(max_idx <= sizeof(_range)/sizeof(_range[0]));
+      if (max_idx > sizeof(_range)/sizeof(_range[0])) {
+        return -2;
+      }
       for(uint8_t i = 0; i <= max_idx; i++) {
         if (indices[i] < 0 || max_idx < indices[i]) { 
           SET_ERR("Invalid argument: %s is %d", index_names[i], indices[i]);
