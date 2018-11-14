@@ -342,9 +342,9 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
         u=0;
       } else if (expf == 255 || exp >= ((1 << expW) - 1)) {
         exp = (1 << expW) - 1;
-        u = (exp<<manW) | (neg ? (1 << (expW + manW)) : 0);
+        u = (exp << manW) | (neg ? (1 << (expW + manW)) : 0);
       } else {
-        u = (exp<<manW) | (neg ? (1 << (expW + manW)) : 0);
+        u = (exp << manW) | (neg ? (1 << (expW + manW)) : 0);
         u |= (uf & ((1 << 23) - 1)) >> (23 - manW);
         if (manW < 22) {
           uint32_t half = uf & (1 << (22 - manW));
