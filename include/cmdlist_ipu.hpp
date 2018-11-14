@@ -151,22 +151,6 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
           SET_ERR("Invalid argument: cmd->tex_height is higher than %u", TEX_HEIGHT_MAX);
           return -1;
         }
-        if(cmd->scale_width == 0){
-          SET_ERR("Invalid argument: cmd->scale_width is 0");
-          return -1;
-        }
-        if(cmd->scale_height == 0){
-          SET_ERR("Invalid argument: cmd->scale_height is 0");
-          return -1;
-        }
-        if(cmd->scale_width & (0xff << 24)){
-          SET_ERR("Invalid argument: cmd->scale_width is not in FP24 format");
-          return -1;
-        }
-        if(cmd->scale_height & (0xff << 24)){
-          SET_ERR("Invalid argument: cmd->scale_height is not in FP24 format");
-          return -1;
-        }
 
         // format related check
         if (cmd->fmt_tex == DMP_DV_RGBA8888) {
@@ -267,8 +251,8 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
         kcmd->tex_height   = cmd->tex_height;
         kcmd->rect_width   = cmd->rect_width;
         kcmd->rect_height  = cmd->rect_height;
-        kcmd->scale_width  = cmd->scale_width;
-        kcmd->scale_height = cmd->scale_height;
+        kcmd->scale_width  = _f2fp24(1.0f/static_cast<float>(cmd->tex_width));
+        kcmd->scale_height = _f2fp24(1.0f/static_cast<float>(cmd->tex_height));
         kcmd->stride_rd    = cmd->stride_rd;
         kcmd->stride_wr    = cmd->stride_wr;
         for(unsigned i = 0; i < sizeof(cmd->lut)/sizeof(cmd->lut[0]); i++){
@@ -329,6 +313,36 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
         default:
           return -1;
       }
+    }
+
+    static uint32_t _f2fp24(float g)
+    {
+      static const uint32_t expW = 7;
+      static const uint32_t manW = 16;
+      union { unsigned int uu; float ff; } jj;
+      jj.ff = g;
+      uint32_t uf = jj.uu;
+      uint32_t u = 0;
+      int neg = uf & 0x80000000;
+      uint32_t expf = (uf >> 23) & 0xff;
+      int32_t exp = expf - 127 + (1 << (expW - 1)) - 1;
+
+      if (!expf || (exp <= 0)) {
+        u=0;
+      } else if (expf == 255 || exp >= ((1 << expW) - 1)) {
+        exp = (1 << expW) - 1;
+        u = (exp<<manW) | (neg ? (1 << (expW + manW)) : 0);
+      } else {
+        u = (exp<<manW) | (neg ? (1 << (expW + manW)) : 0);
+        u |= (uf & ((1 << 23) - 1)) >> (23 - manW);
+        if (manW < 22) {
+          int half = uf & (1 << (22 - manW));
+          if (half) {
+            u += 1;
+          }
+        }
+      }
+      return u;
     }
 };
 

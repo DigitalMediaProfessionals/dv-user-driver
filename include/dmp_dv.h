@@ -56,10 +56,6 @@ const char *dmp_dv_get_version_string();
 const char *dmp_dv_get_last_error_message();
 
 
-/// @brief Helper to calculate fp24 format by float.
-uint32_t dmp_dv_f2fp24(float g);
-
-
 /// @brief Creates context for working with DV accelerator.
 /// @return Non-NULL on success, NULL on error.
 /// @details It is thread-safe.

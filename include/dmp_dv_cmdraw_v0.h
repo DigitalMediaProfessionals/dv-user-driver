@@ -107,9 +107,6 @@ struct dmp_dv_cmdraw_ipu_v0 {
   uint16_t rect_width;		// width of rendering rectangle
   uint16_t rect_height;		// height of rendering rectangle
 
-  uint32_t scale_width;		// must be (1/(tex_height)) in FP24 format
-  uint32_t scale_height;  // must be (1/(tex_height)) in FP24 format
-
   /* stride */
   int32_t stride_rd;  	 	// stride for read buffer
   int32_t stride_wr;  	 	// stride for write buffer
