@@ -289,7 +289,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
     /// @return -2 if max_idx is invalid
     static int _SwizzleCheck (uint8_t max_idx, const struct dmp_dv_cmdraw_ipu_v0 *cmd) {
       const int8_t indices [] = {cmd->ridx, cmd->gidx, cmd->bidx, cmd->aidx};
-      static const char index_names[][16] = {"cmd->ridx", "cmd->gidx", "cmd->bidx", "cmd->aidx"};
+      static const char *index_names[] = {"cmd->ridx", "cmd->gidx", "cmd->bidx", "cmd->aidx"};
       int _range[4] = {};  // store which cmd->*idx has the index
       if (max_idx != 3 && max_idx != 2) {
         SET_ERR("Invalid argument: max_idx is %u but must be 2 or 3", max_idx);
