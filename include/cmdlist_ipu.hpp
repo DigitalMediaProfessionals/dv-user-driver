@@ -100,11 +100,11 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
         return -1;
       }
       if (cmd->stride_wr < STRIDE_WR_MIN) {
-        SET_ERR("Invalid argument: cmd->stride_wr must be higher than %d", STRIDE_WR_MIN + 1);
+        SET_ERR("Invalid argument: cmd->stride_wr must be higher than %d", STRIDE_WR_MIN - 1);
         return -1;
       }
-      if (STRIDE_WR_MAX < cmd->stride_wr) {
-        SET_ERR("Invalid argument: cmd->stride_wr must be smaller than %d", STRIDE_WR_MIN + 1);
+      if (cmd->stride_wr > STRIDE_WR_MAX) {
+        SET_ERR("Invalid argument: cmd->stride_wr must be smaller than %d", STRIDE_WR_MAX + 1);
         return -1;
       }
       if (cmd->rect_width == 0) {
@@ -195,11 +195,11 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
           return -1;
         }
         if (cmd->stride_rd < STRIDE_RD_MIN) {
-          SET_ERR("Invalid argument: cmd->stride_rd must be higher than %d", STRIDE_RD_MIN + 1);
+          SET_ERR("Invalid argument: cmd->stride_rd must be higher than %d", STRIDE_RD_MIN - 1);
           return -1;
         }
-        if (STRIDE_RD_MAX < cmd->stride_rd) {
-          SET_ERR("Invalid argument: cmd->stride_rd must be smaller than %d", STRIDE_RD_MIN + 1);
+        if (cmd->stride_rd > STRIDE_RD_MAX) {
+          SET_ERR("Invalid argument: cmd->stride_rd must be smaller than %d", STRIDE_RD_MAX + 1);
           return -1;
         }
       }
