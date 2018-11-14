@@ -221,7 +221,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 
     /// @brief Fills command of version 0 in the format suitable for later execution on the device.
     int FillKCommand_v0(struct dmp_dv_kcmdraw_ipu_v0 *kcmd, struct dmp_dv_cmdraw_ipu_v0 *cmd, uint32_t& size) {
-      if (cmd->header.size != sizeof(*kcmd)) {
+      if (cmd->header.size != sizeof(*cmd)) {
         SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
             (int)cmd->header.size, (int)cmd->header.version);
         return -1;
