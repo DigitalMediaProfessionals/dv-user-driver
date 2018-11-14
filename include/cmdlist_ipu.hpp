@@ -131,23 +131,23 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
       }
       // check tex
       if (cmd->use_tex) {
-        if(!cmd->tex.mem){
+        if (!cmd->tex.mem) {
           SET_ERR("Invalid argument: cmd->tex.mem is NULL");
           return -1;
         }
-        if(cmd->tex_width == 0){
+        if (cmd->tex_width == 0) {
           SET_ERR("Invalid argument: cmd->tex_width is 0");
           return -1;
         }
-        if(cmd->tex_height == 0){
+        if (cmd->tex_height == 0) {
           SET_ERR("Invalid argument: cmd->tex_height is 0");
           return -1;
         }
-        if(cmd->tex_width > TEX_WIDTH_MAX){
+        if (cmd->tex_width > TEX_WIDTH_MAX) {
           SET_ERR("Invalid argument: cmd->tex_width is higher than %u", TEX_WIDTH_MAX);
           return -1;
         }
-        if(cmd->tex_height > TEX_HEIGHT_MAX){
+        if (cmd->tex_height > TEX_HEIGHT_MAX) {
           SET_ERR("Invalid argument: cmd->tex_height is higher than %u", TEX_HEIGHT_MAX);
           return -1;
         }
@@ -155,17 +155,17 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
         // format related check
         if (cmd->fmt_tex == DMP_DV_RGBA8888) {
           int ret = _SwizzleCheck(3, cmd);
-          if(ret != 0) {
+          if (ret != 0) {
             return ret;
           }
         } else if (cmd->fmt_tex == DMP_DV_RGB888) {
           int ret = _SwizzleCheck(2, cmd);
-          if(ret != 0) {
+          if (ret != 0) {
             return ret;
           }
         } else if (cmd->fmt_tex == DMP_DV_LUT) {
           int ret = _SwizzleCheck(3, cmd);
-          if(ret != 0) {
+          if (ret != 0) {
             return ret;
           }
         } else {
@@ -174,8 +174,8 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
         }
 
         // conversion check
-        if(cmd->cnv_type != DMP_DV_CNV_FP16_SUB &&
-            cmd->cnv_type != DMP_DV_CNV_FP16_DIV_255){
+        if (cmd->cnv_type != DMP_DV_CNV_FP16_SUB &&
+            cmd->cnv_type != DMP_DV_CNV_FP16_DIV_255) {
           SET_ERR("Invalid argument: cmd->cnv_type must be DMP_DV_CNV_FP16_DIV_255 or DMP_DV_CNV_FP16_SUB");
           return -1;
         }
@@ -255,7 +255,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
         kcmd->scale_height = _f2fp24(1.0f/static_cast<float>(cmd->tex_height));
         kcmd->stride_rd    = cmd->stride_rd;
         kcmd->stride_wr    = cmd->stride_wr;
-        for(unsigned i = 0; i < sizeof(cmd->lut)/sizeof(cmd->lut[0]); i++){
+        for(unsigned i = 0; i < sizeof(cmd->lut)/sizeof(cmd->lut[0]); i++) {
           kcmd->lut[i] = cmd->lut[i];
         }
         kcmd->ncolor_lut      = cmd->ncolor_lut;
@@ -285,11 +285,11 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
       int _range[4] = {};  // store which cmd->*idx has the index
       assert(max_idx <= sizeof(_range)/sizeof(_range[0]));
       for(uint8_t i = 0; i <= max_idx; i++) {
-        if(indices[i] < 0 || max_idx < indices[i]) { 
+        if (indices[i] < 0 || max_idx < indices[i]) { 
           SET_ERR("Invalid argument: %s is %d", index_names[i], indices[i]);
           return -1;
         }
-        if(_range[indices[i]]){
+        if (_range[indices[i]]) {
           SET_ERR("Invalid argument: %s and %s has the same value '%d'", index_names[_range[indices[i]] - 1], index_names[i], indices[i]);
           return -1;
         } else {
@@ -300,8 +300,8 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
     };
 
     /// @brief auxiliary function for CheckRaw_v0
-    static int _GetPixelSize(int img_fmt){
-      switch(img_fmt) {
+    static int _GetPixelSize(int img_fmt) {
+      switch (img_fmt) {
         case DMP_DV_RGB888:
           return 3;
         case DMP_DV_RGBA8888:
