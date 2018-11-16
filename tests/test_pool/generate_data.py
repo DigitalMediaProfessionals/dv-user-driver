@@ -37,6 +37,7 @@ class Main(object):
         parser.add_argument("-f", "--float", action="store_true",
                             help="Generate float random weights")
         args = parser.parse_args()
+
         self.generate(7, 7, 1024,
                       2, (7, 7), (1, 1), (0, 0, 0, 0), args)
         self.generate(960 // 4, 384 // 4, 16,
@@ -45,6 +46,13 @@ class Main(object):
                       1, (2, 2), (2, 2), (0, 0, 0, 0), args)
         self.generate(960, 384, 16,
                       1, (2, 2), (2, 2), (0, 0, 0, 0), args)
+
+        for i in (2, 3):
+            for j in range(1, i + 1):
+                self.generate(i, j, 16, 1, (i, j), (1, 1), (0, 0, 0, 0), args)
+        for i in (2, 3, 4, 5):
+            for j in range(1, i + 1):
+                self.generate(i, j, 16, 2, (i, j), (1, 1), (0, 0, 0, 0), args)
 
     def generate(self, width, height, n_channels,
                  pool_type, pool_size, pool_stride, pool_pad, args):
