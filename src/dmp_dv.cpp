@@ -16,6 +16,11 @@
 /*
  * @brief Shared library exported functions implementation.
  */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <string.h>
+
 #include "dmp_dv.h"
 #include "common.h"
 #include "context.hpp"
@@ -248,6 +253,30 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
     return EINVAL;
   }
   return ((CDMPDVCmdList*)cmdlist)->AddRaw(cmd);
+}
+
+int dmp_dv_fpga_device_exists(int dev_type_id) {
+  const char *dev_path = NULL;
+  struct stat s;
+  switch (dev_type_id) {
+    case DMP_DV_DEV_CONV:
+      dev_path = DMP_DV_DEV_PATH_CONV;
+      break;
+    case DMP_DV_DEV_FC:
+      dev_path = DMP_DV_DEV_PATH_FC;
+      break;
+    case DMP_DV_DEV_IPU:
+      dev_path = DMP_DV_DEV_PATH_IPU;
+      break;
+    default:
+      return 0;
+  }
+
+  memset(&s, 0, sizeof(s));
+  if (stat(dev_path, &s) != 0) {
+    return 0;
+  }
+  return S_ISCHR(s.st_mode) ? 1 : 0;
 }
 
 }  // extern "C"

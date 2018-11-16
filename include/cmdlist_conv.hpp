@@ -26,7 +26,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
  public:
   /// @brief Constructor.
   CDMPDVCmdListConvHelper(CDMPDVContext *ctx) : CDMPDVCmdListKHelper(ctx) {
-    fnme_acc_ = "/dev/dv_conv";
+    fnme_acc_ = DMP_DV_DEV_PATH_CONV;
   }
 
   /// @brief Destructor.

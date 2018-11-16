@@ -243,6 +243,15 @@ struct dmp_dv_buf {
 /// @brief Upper bound of different device type ids.
 #define DMP_DV_DEV_COUNT 4
 
+/// @brief path to convolutional character device file
+#define DMP_DV_DEV_PATH_CONV  "/dev/dv_conv"
+
+/// @brief path to fully connected character device file
+#define DMP_DV_DEV_PATH_FC  "/dev/dv_fc"
+
+/// @brief path to IPU character device file
+#define DMP_DV_DEV_PATH_IPU  "/dev/dv_ipu"
+
 /// @brief Raw command for execution.
 struct dmp_dv_cmdraw {
   uint32_t size;        // size of this structure
@@ -324,6 +333,15 @@ int dmp_dv_pack_fc_weights(
     const uint16_t quant_map[256],
     const void *weights, const uint16_t *bias,
     uint8_t *packed_weights, size_t *packed_weights_size);
+
+
+/// @brief check if the specified device exists
+/// @param dev_type_id device type id. This must be one of the followings.
+///           - DMP_DV_DEV_CONV
+///           - DMP_DV_DEV_FC
+///           - DMP_DV_DEV_IPU
+/// @return 1 if exist, 0 otherwise
+int dmp_dv_fpga_device_exists(int dev_type_id);
 
 //! image format
 //! DMP_DV_RGBA8888 RGBA8888 image format

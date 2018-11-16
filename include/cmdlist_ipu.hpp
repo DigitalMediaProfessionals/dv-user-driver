@@ -34,7 +34,7 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
 
     /// @brief Constructor.
     CDMPDVCmdListIPUHelper(CDMPDVContext *ctx) : CDMPDVCmdListKHelper(ctx) {
-      fnme_acc_ = "/dev/dv_ipu";
+      fnme_acc_ = DMP_DV_DEV_PATH_IPU;
     }
 
     /// @brief Destructor.
