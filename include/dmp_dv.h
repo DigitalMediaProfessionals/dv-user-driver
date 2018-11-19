@@ -240,8 +240,11 @@ struct dmp_dv_buf {
 /// @brief Image processing unit device type id.
 #define DMP_DV_DEV_IPU 3
 
+/// @brief Maximizer device type id.
+#define DMP_DV_DEV_MAXIMIZER 4
+
 /// @brief Upper bound of different device type ids.
-#define DMP_DV_DEV_COUNT 4
+#define DMP_DV_DEV_COUNT 5
 
 /// @brief Raw command for execution.
 struct dmp_dv_cmdraw {
