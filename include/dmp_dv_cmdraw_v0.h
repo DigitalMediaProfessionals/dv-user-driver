@@ -88,7 +88,7 @@ struct dmp_dv_cmdraw_fc_v0 {
 
 /// @brief Raw command for image processing unit version 0.
 struct dmp_dv_cmdraw_ipu_v0 {
-  struct dmp_dv_cmdraw header; 	// general structure information
+  struct dmp_dv_cmdraw header;  // general structure information
 
   /* image buffer */
   struct dmp_dv_buf tex;  // texture buffer
@@ -96,32 +96,32 @@ struct dmp_dv_cmdraw_ipu_v0 {
   struct dmp_dv_buf wr;   // write buffer
 
   /* image format */
-  uint8_t fmt_tex;  	    // format of texture buffer. This must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_LUT.
-  uint8_t fmt_rd;   	    // format of read buffer. This must be DMP_DV_RGBA8888 or DMP_DV_RGB888.
-  uint8_t fmt_wr;   	    // format of write buffer. This must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_RGBFP16.
-  uint8_t rsvd1[1];			  // padding to 16-bit size
+  uint8_t fmt_tex;        // format of texture buffer. This must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_LUT.
+  uint8_t fmt_rd;         // format of read buffer. This must be DMP_DV_RGBA8888 or DMP_DV_RGB888.
+  uint8_t fmt_wr;         // format of write buffer. This must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_RGBFP16.
+  uint8_t rsvd1[1];       // padding to 16-bit size
 
   /* dimension */
-  uint16_t tex_width;	    // width of texture
-  uint16_t tex_height;		// height of texture
-  uint16_t rect_width;		// width of rendering rectangle
-  uint16_t rect_height;		// height of rendering rectangle
+  uint16_t tex_width;     // width of texture
+  uint16_t tex_height;    // height of texture
+  uint16_t rect_width;    // width of rendering rectangle
+  uint16_t rect_height;   // height of rendering rectangle
 
   /* stride */
-  int32_t stride_rd;  	 	// stride for read buffer
-  int32_t stride_wr;  	 	// stride for write buffer
+  int32_t stride_rd;      // stride for read buffer
+  int32_t stride_wr;      // stride for write buffer
 
-  uint32_t lut[32];		  	// look up table for texture of DMP_DV_LUT.
-  uint8_t ncolor_lut;	  	// number of color in lut.  If 0, the look up table used at the last time is used.
+  uint32_t lut[32];       // look up table for texture of DMP_DV_LUT.
+  uint8_t ncolor_lut;     // number of color in lut.  If 0, the look up table used at the last time is used.
 
-  uint8_t alpha;  	      // alpha value for blending
+  uint8_t alpha;          // alpha value for blending
 
   /* operation flags */
-  uint8_t transpose;  	  	// exchange x-y axis of texture
-  uint8_t use_const_alpha;	// use alpha in this structure for blending
-  uint8_t use_tex;  		    // use texture in this structure
-  uint8_t use_rd;  	      	// use rd in this structure
-  uint8_t blf;  		        // apply bilinear filter
+  uint8_t transpose;        // exchange x-y axis of texture
+  uint8_t use_const_alpha;  // use alpha in this structure for blending
+  uint8_t use_tex;          // use texture in this structure
+  uint8_t use_rd;           // use rd in this structure
+  uint8_t blf;              // apply bilinear filter
 
   /** swizzle
    * Specify an order of RGBA in texture buffer
@@ -142,18 +142,18 @@ struct dmp_dv_cmdraw_ipu_v0 {
    */
   uint8_t cnv_type;       // conversion type
   uint8_t cnv_param[3];   // conversion parameter
-  uint8_t rsvd2[5];		    // padding to 64-bit size
+  uint8_t rsvd2[5];       // padding to 64-bit size
 };
 
 /// @brief Raw command for maximizer version 0.
 struct dmp_dv_cmdraw_maximizer_v0 {
-	struct dmp_dv_cmdraw header;	// general structure information
-	struct dmp_dv_buf input_buf;	// input buffer
-	struct dmp_dv_buf output_buf;	// output buffer
+  struct dmp_dv_cmdraw header;  // general structure information
+  struct dmp_dv_buf input_buf;  // input buffer
+  struct dmp_dv_buf output_buf; // output buffer
 
-	uint16_t width;		// width of input
-	uint16_t height;	// height of input
-	uint16_t nclass;	// # of classes
+  uint16_t width;   // width of input
+  uint16_t height;  // height of input
+  uint16_t nclass;  // # of classes
 
-	uint16_t rsvd[1];	// padding to 64-bit size
+  uint16_t rsvd[1]; // padding to 64-bit size
 }
