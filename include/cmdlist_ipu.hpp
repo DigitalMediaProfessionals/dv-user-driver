@@ -213,14 +213,14 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
       }
 
       // register buffers
-      uint64_t size = cmd->rect_width * cmd->rect_height * _GetPixelSize(cmd->fmt_wr);
+      uint64_t size = cmd->rect_width * cmd->rect_height * dmp_dv_get_pixel_size_byte(cmd->fmt_wr);
       output_bufs.push_back(std::make_pair(cmd->wr, size));
       if (cmd->use_rd) {
-        size = cmd->rect_width * cmd->rect_height * _GetPixelSize(cmd->fmt_rd);
+        size = cmd->rect_width * cmd->rect_height * dmp_dv_get_pixel_size_byte(cmd->fmt_rd);
         input_bufs.push_back(std::make_pair(cmd->rd, size));
       }
       if (cmd->use_tex) {
-        size = cmd->tex_width * cmd->tex_height * _GetPixelSize(cmd->fmt_tex);
+        size = cmd->tex_width * cmd->tex_height * dmp_dv_get_pixel_size_byte(cmd->fmt_tex);
         input_bufs.push_back(std::make_pair(cmd->tex, size));
       }
 
@@ -309,22 +309,6 @@ class CDMPDVCmdListIPUHelper : public CDMPDVCmdListKHelper {
       }
       return 0;
     };
-
-    /// @brief auxiliary function for CheckRaw_v0
-    static int _GetPixelSize(int img_fmt) {
-      switch (img_fmt) {
-        case DMP_DV_RGB888:
-          return 3;
-        case DMP_DV_RGBA8888:
-          return 4;
-        case DMP_DV_RGBFP16:
-          return 6;
-        case DMP_DV_LUT:
-          return 1;
-        default:
-          return -1;
-      }
-    }
 
     static uint32_t _f2fp24(float g)
     {

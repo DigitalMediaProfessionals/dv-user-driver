@@ -335,6 +335,15 @@ int dmp_dv_pack_fc_weights(
 #define DMP_DV_RGBFP16    2 
 #define DMP_DV_LUT        7 
 
+/// @brief get pixel size in byte
+/// @param image_format must be one of the following
+///         - DMP_DV_RGBA8888 
+///         - DMP_DV_RGB888   
+///         - DMP_DV_RGBFP16  
+///         - DMP_DV_LUT      
+/// @return the size of pixel in byte if an appropriate parameter is given, -1 otherwise
+int dmp_dv_get_pixel_size_byte(int image_format);
+
 // uint8_t to fp16 conversion rule for IPU
 #define DMP_DV_CNV_FP16_SUB       0
 #define DMP_DV_CNV_FP16_DIV_255   1

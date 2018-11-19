@@ -250,4 +250,19 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
   return ((CDMPDVCmdList*)cmdlist)->AddRaw(cmd);
 }
 
+int dmp_dv_get_pixel_size_byte(int image_format) {
+  switch (image_format) {
+    case DMP_DV_RGB888:
+      return 3;
+    case DMP_DV_RGBA8888:
+      return 4;
+    case DMP_DV_RGBFP16:
+      return 6;
+    case DMP_DV_LUT:
+      return 1;
+    default:
+      return -1;
+  }
+}
+
 }  // extern "C"
