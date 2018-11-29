@@ -80,8 +80,9 @@ class CDMPDVCmdListMaximizerHelper : public CDMPDVCmdListKHelper {
       }
 
       // register buffers
-      // TODO: implement
-      
+      input_bufs.push_back(std::make_pair(cmd->input_buf, cmd->width * cmd->height * cmd->nclass * sizeof(__fp16)));
+      output_bufs.push_back(std::make_pair(cmd->output_buf, cmd->width * cmd->height));
+
       return 0;
     }
 
