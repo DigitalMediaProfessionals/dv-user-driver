@@ -255,28 +255,22 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
   return ((CDMPDVCmdList*)cmdlist)->AddRaw(cmd);
 }
 
-int dmp_dv_fpga_device_exists(int dev_type_id) {
-  const char *dev_path = NULL;
+int dmp_dv_fpga_device_exists(dmp_dv_context ctx, int dev_type_id) {
   struct stat s;
   switch (dev_type_id) {
     case DMP_DV_DEV_CONV:
-      dev_path = DMP_DV_DEV_PATH_CONV;
-      break;
+      return (CDMPDVContext*)ctx->conv_freq_ ? 1 : 0;
     case DMP_DV_DEV_FC:
-      dev_path = DMP_DV_DEV_PATH_FC;
-      break;
+      return (CDMPDVContext*)ctx->fc_freq_ ? 1 : 0;
     case DMP_DV_DEV_IPU:
-      dev_path = DMP_DV_DEV_PATH_IPU;
-      break;
+      memset(&s, 0, sizeof(s));
+      if (stat(DMP_DV_DEV_PATH_IPU, &s) != 0) {
+        return 0;
+      }
+      return S_ISCHR(s.st_mode) ? 1 : 0;
     default:
       return 0;
   }
-
-  memset(&s, 0, sizeof(s));
-  if (stat(dev_path, &s) != 0) {
-    return 0;
-  }
-  return S_ISCHR(s.st_mode) ? 1 : 0;
 }
 
 }  // extern "C"
