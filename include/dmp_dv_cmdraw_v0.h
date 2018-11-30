@@ -153,7 +153,7 @@ struct dmp_dv_cmdraw_maximizer_v0 {
 
   uint16_t width;   // width of input
   uint16_t height;  // height of input
-  uint16_t nclass;  // # of classes
+  uint8_t  nclass;  // # of classes
 
-  uint16_t rsvd[1]; // padding to 64-bit size
+  uint8_t  rsvd[3]; // padding to 64-bit size
 }
