@@ -24,6 +24,7 @@
 #include "cmdlist_conv.hpp"
 #include "cmdlist_fc.hpp"
 #include "cmdlist_ipu.hpp"
+#include "cmdlist_maximizer.hpp"
 
 
 /// @brief Creators for the specific device types.
