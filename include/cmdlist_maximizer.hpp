@@ -131,4 +131,4 @@ class CDMPDVCmdListMaximizerHelper : public CDMPDVCmdListKHelper {
       size = req_size;
       return 0;
     }
-}
+};
