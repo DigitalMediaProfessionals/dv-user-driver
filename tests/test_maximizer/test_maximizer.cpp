@@ -265,16 +265,28 @@ error:
     }
   }
 
+  const char COLOR_WHITE[]  = "\x1b[37m";
+  const char COLOR_GREEN[]  = "\x1b[32m";
+  const char COLOR_YELLOW[] = "\x1b[33m";
+  const char COLOR_RED[]    = "\x1b[31m";
   void log_success(Test &test) {
-    // TODO: impl
+    cout << COLOR_GREEN << "[TEST SUCCESSED]" << COLOR_WHITE << test << endl;
   }
 
   void log_fail(Test &test, RESULT result) {
-    // TODO: impl
+    cout << COLOR_RED << "[TEST FAILED]" << COLOR_WHITE << test << endl;
   }
 
   void log_overall_result(unsigned success, unsigned failed, unsigned not_tested) {
-    // TODO: impl
+    cout << COLOR_YELLOW << "Overall Result\n"
+      << COLOR_GREEN << "\tSuccessed Test : " << COLOR_WHITE << success << "\n"
+      << COLOR_RED << "\tFailed Test : " << COLOR_WHITE << failed << "\n"
+      << "\tNot Executed Test : " << not_tested << "\n";
+
+    cout << "\n"
+      << "NOTE some tests are not executed due to memory limitation\n";
+
+    cout << endl;
   }
 }
 
