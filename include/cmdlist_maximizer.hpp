@@ -74,7 +74,7 @@ class CDMPDVCmdListMaximizerHelper : public CDMPDVCmdListKHelper {
         SET_ERR("Invalid argument: cmd->height is 0");
         return -1;
       }
-      uint32_t npixel = static_cast<uint32_t>(cmd->width) * cmd->height
+      uint32_t npixel = static_cast<uint32_t>(cmd->width) * cmd->height;
       if(npixel & 0xff000000) {
         SET_ERR("Invalid argument: the number of pixel is %u but must be smaller than %u", npixel, 1 << 24);
         return -1;
