@@ -37,7 +37,7 @@ namespace {
     public:
       uint16_t width;   // 0, 1, 128, 491(prime value), 65534, 65535
       uint16_t height;  // 0, 1, 128, 491(prime value), 65534, 65535
-      uint16_t nclass;  // 0, 1, 8, 128, 149(prime value), 254, 255
+      uint8_t nclass;  // 0, 1, 8, 128, 149(prime value), 254, 255
       string valgen;  // rand, 0, -1, 1
       RESULT expected;  // 1(success), 2(ERROR_ON_ADDRAW)
 
