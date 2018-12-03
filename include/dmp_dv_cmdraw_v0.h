@@ -156,4 +156,4 @@ struct dmp_dv_cmdraw_maximizer_v0 {
   uint8_t  nclass;  // # of classes
 
   uint8_t  rsvd[3]; // padding to 64-bit size
-}
+};
