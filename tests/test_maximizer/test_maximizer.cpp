@@ -189,18 +189,15 @@ error:
   }
 
   bool read_test_config(istream &is, Test &c) {
-    char del = ',';
     int result;
-    is >> c.width;
-    is.ignore(numeric_limits<streamsize>::max(), del);
-    is >> c.height;
-    is.ignore(numeric_limits<streamsize>::max(), del);
-    is >> c.nclass;
-    is.ignore(numeric_limits<streamsize>::max(), del);
-    is >> c.valgen;
-    is.ignore(numeric_limits<streamsize>::max(), del);
-    is >> result;
+    char line[1024];
+    char valgen[10];
+
+    is.getline(line, sizeof(line));
+    sscanf(line, "%hu,%hu,%c,%[^,],%d",
+        &c.width, &c.height, &c.nclass, valgen, &result);
     c.expected = static_cast<RESULT>(result);
+    c.valgen = string(valgen);
 
     return !is.fail();
   }
