@@ -21,6 +21,11 @@ using namespace std;
     __FILE__, __LINE__, strerror(errno), ##__VA_ARGS__)
 
 namespace {
+  const char COLOR_WHITE[]  = "\x1b[37m";
+  const char COLOR_GREEN[]  = "\x1b[32m";
+  const char COLOR_YELLOW[] = "\x1b[33m";
+  const char COLOR_RED[]    = "\x1b[31m";
+
   dmp_dv_context context    = nullptr;
   dmp_dv_mem     phys_mem   = nullptr;
   uint8_t        *phys_map  = nullptr;
@@ -40,6 +45,9 @@ namespace {
       uint8_t nclass;  // 0, 1, 8, 128, 149(prime value), 254, 255
       string valgen;  // rand, 0, -1, 1
       RESULT expected;  // 1(success), 2(ERROR_ON_ADDRAW)
+      bool show_log;
+
+      Test() : show_log(true){};
 
       friend ostream& operator<<(ostream &os, const Test &c);
 
@@ -49,6 +57,10 @@ namespace {
         uint8_t *sw_output = new uint8_t[width * height];
         RESULT ret = RESULT::FAIL;
         int64_t exec_id;
+
+        if(show_log) {
+          cout << COLOR_YELLOW << "[TEST START]" << COLOR_WHITE << "\n" << *this << endl;
+        }
 
         if(!sw_output) {
           goto error;
@@ -101,6 +113,16 @@ error:
         }
         if(!sw_output) {
           delete[] sw_output;
+        }
+
+        if(show_log) {
+          cout << "\n\tRESULT : ";
+          if(ret == expected) {
+            cout << COLOR_GREEN << "SUCCESSED" << "\n";
+          } else {
+            cout << COLOR_RED << "FAILED" << "\n";
+          }
+          cout << COLOR_WHITE << endl;
         }
         return ret;
       }
@@ -182,7 +204,7 @@ error:
     os << "Test\n" <<
       "\t- width : " << c.width << "\n" << 
       "\t- height : " << c.height << "\n" << 
-      "\t- nclass : " << c.nclass << "\n" << 
+      "\t- nclass : " << static_cast<uint16_t>(c.nclass) << "\n" <<
       "\t- valgen : " << c.valgen << "\n" << 
       "\t- expected : " << static_cast<int>(c.expected) << "\n";
     return os;
@@ -192,10 +214,15 @@ error:
     int result;
     char line[1024];
     char valgen[10];
+    uint16_t nclass;
 
     is.getline(line, sizeof(line));
-    sscanf(line, "%hu,%hu,%c,%[^,],%d",
-        &c.width, &c.height, &c.nclass, valgen, &result);
+    sscanf(line, "%hu,%hu,%hu,%[^,],%d",
+        &c.width, &c.height, &nclass, valgen, &result);
+    if(nclass > 255) {
+      return -1;
+    }
+    c.nclass = static_cast<uint8_t>(nclass);
     c.expected = static_cast<RESULT>(result);
     c.valgen = string(valgen);
 
@@ -236,7 +263,12 @@ error:
       return -1;
     }
     cma_size = get_free_cma_size();
-    phys_mem = dmp_dv_mem_alloc(context, cma_size);
+    while(phys_mem == nullptr && cma_size >= 0x1000) {
+      phys_mem = dmp_dv_mem_alloc(context, cma_size);
+      if(!phys_mem) {
+        cma_size >>= 1;
+      }
+    }
     if(!phys_mem) {
       PERR("Fail to allocate dmp_dv_mem of %lu B", cma_size);
       return -1;
@@ -260,18 +292,6 @@ error:
     if(context) {
       dmp_dv_context_release(context);
     }
-  }
-
-  const char COLOR_WHITE[]  = "\x1b[37m";
-  const char COLOR_GREEN[]  = "\x1b[32m";
-  const char COLOR_YELLOW[] = "\x1b[33m";
-  const char COLOR_RED[]    = "\x1b[31m";
-  void log_success(Test &test) {
-    cout << COLOR_GREEN << "[TEST SUCCESSED]" << COLOR_WHITE << test << endl;
-  }
-
-  void log_fail(Test &test, RESULT result) {
-    cout << COLOR_RED << "[TEST FAILED]" << COLOR_WHITE << test << endl;
   }
 
   void log_overall_result(unsigned success, unsigned failed, unsigned not_tested) {
@@ -321,11 +341,9 @@ int main(int argc, char const **argv) {
     result = test.run_test(context, phys_mem, phys_map);
     if(test.expected == result) {
       n_succ++;
-      log_success(test);
     } else {
       n_fail++;
       ret = -1;
-      log_fail(test, result);
     }
   }
 
