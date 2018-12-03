@@ -46,7 +46,7 @@ namespace {
       RESULT run_test(dmp_dv_context ctx, dmp_dv_mem mem, uint8_t *map) {
         dmp_dv_cmdlist cmdlist = nullptr;
         struct dmp_dv_cmdraw_maximizer_v0 cmd;
-        unique_ptr<uint8_t[]> sw_output = make_unique<uint8_t[]>(width * height);
+        uint8_t *sw_output = new uint8_t[width * height];
         RESULT ret = RESULT::FAIL;
         int64_t exec_id;
 
@@ -82,7 +82,7 @@ namespace {
         if(exec_id < 0) {
           goto error;
         }
-        run_sw_maximizer(reinterpret_cast<__fp16>(map), sw_output.get());
+        run_sw_maximizer(reinterpret_cast<__fp16>(map), sw_output);
 
         if(dmp_dv_cmdlist_wait(cmdlist, exec_id)) {
           goto error;
@@ -92,12 +92,15 @@ namespace {
         }
 
         // compare result
-        ret = (memcmp(static_cast<void*>(sw_output.get()), static_cast<void*>(map), height * width) == 0) ?
+        ret = (memcmp(static_cast<void*>(sw_output), static_cast<void*>(map), height * width) == 0) ?
               RESULT::SUCCESS : RESULT::FAIL;
 
 error:
         if(!cmdlist) {
           dmp_dv_cmdlist_release(cmdlist);
+        }
+        if(!sw_output) {
+          delete[] sw_output;
         }
         return ret;
       }
