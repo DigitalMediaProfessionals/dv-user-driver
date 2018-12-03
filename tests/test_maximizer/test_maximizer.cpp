@@ -82,7 +82,7 @@ namespace {
         if(exec_id < 0) {
           goto error;
         }
-        run_sw_maximizer(reinterpret_cast<__fp16>(map), sw_output);
+        run_sw_maximizer(reinterpret_cast<__fp16*>(map), sw_output);
 
         if(dmp_dv_cmdlist_wait(cmdlist, exec_id)) {
           goto error;
@@ -117,7 +117,7 @@ error:
             int blockS = 0;
             __fp16 max = 0;
             __fp16 comp = 0;
-            for(int cls = 0; cls < nclass; cls) {
+            for(int cls = 0; cls < nclass; cls++) {
               if(cls % sub == 0) {
                 blk_i++;
                 blockS = nclass - blk_i * sub;
@@ -144,10 +144,9 @@ error:
 
       void initialize_input_buf(uint8_t *map) {
         size_t buf_len = width * height * nclass;
-        __fp16 *buf = reinterpret_cast<__fp16>(map);
+        __fp16 *buf = reinterpret_cast<__fp16*>(map);
         size_t i;
-        int val;
-        int ret = 0;
+        int val = 0;
 
         if(valgen == "0") {
           memset(buf, 0, buf_len * 2);
@@ -160,7 +159,7 @@ error:
             val = 1;
           } 
           for(i = 0; i < buf_len; i++) {
-            buf[i] = static_cast<__fp16>(val ? val : rand());
+            buf[i] = static_cast<__fp16>(val != 0 ? val : rand());
           }
         }
       }
@@ -191,6 +190,7 @@ error:
 
   bool read_test_config(istream &is, Test &c) {
     char del = ',';
+    int result;
     is >> c.width;
     is.ignore(numeric_limits<streamsize>::max(), del);
     is >> c.height;
@@ -199,7 +199,8 @@ error:
     is.ignore(numeric_limits<streamsize>::max(), del);
     is >> c.valgen;
     is.ignore(numeric_limits<streamsize>::max(), del);
-    is >> reinterpret_cast<int&>(c.expected);
+    is >> result;
+    c.expected = static_cast<RESULT>(result);
 
     return !is.fail();
   }
