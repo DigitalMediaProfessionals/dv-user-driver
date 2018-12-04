@@ -26,7 +26,7 @@ class CDMPDVCmdListMaximizerHelper : public CDMPDVCmdListKHelper {
   public:
     /// @brief Constructor.
     CDMPDVCmdListMaximizerHelper(CDMPDVContext *ctx) : CDMPDVCmdListKHelper(ctx) {
-      fnme_acc_ = "/dev/dv_mx";
+      fnme_acc_ = "/dev/dv_maximizer";
     }
 
     /// @brief Destructor.
@@ -117,6 +117,8 @@ class CDMPDVCmdListMaximizerHelper : public CDMPDVCmdListKHelper {
 
       size_t req_size = sizeof(*kcmd);
       if (size >= req_size) {
+        kcmd->header.version  = 0;
+        kcmd->header.size     = sizeof(*kcmd);
         kcmd->input_buf.fd    = CDMPDVMem::get_fd(cmd->input_buf.mem);
         kcmd->input_buf.rsvd  = 0;
         kcmd->input_buf.offs  = cmd->input_buf.offs;
