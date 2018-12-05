@@ -59,13 +59,13 @@ extern char s_last_error_message[256];
 #define SET_LOGIC_ERR() SET_ERR("Control should not reach line %d of file %s", __LINE__, __FILE__)
 
 
-/// @brief path to convolutional character device file
+/// @brief Path to convolutional character device file.
 #define DMP_DV_DEV_PATH_CONV  "/dev/dv_conv"
 
-/// @brief path to fully connected character device file
+/// @brief Path to fully connected character device file.
 #define DMP_DV_DEV_PATH_FC  "/dev/dv_fc"
 
-/// @brief path to IPU character device file
+/// @brief Path to IPU character device file.
 #define DMP_DV_DEV_PATH_IPU  "/dev/dv_ipu"
 
 #ifdef __cplusplus
