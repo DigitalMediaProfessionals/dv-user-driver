@@ -261,9 +261,9 @@ int dmp_dv_fpga_device_exists(dmp_dv_context ctx, int dev_type_id) {
   }
   switch (dev_type_id) {
     case DMP_DV_DEV_CONV:
-      return (CDMPDVContext*)ctx->conv_freq_ ? 1 : 0;
+      return ((CDMPDVContext*)ctx)->get_conv_freq() ? 1 : 0;
     case DMP_DV_DEV_FC:
-      return (CDMPDVContext*)ctx->fc_freq_ ? 1 : 0;
+      return ((CDMPDVContext*)ctx)->get_fc_freq() ? 1 : 0;
     case DMP_DV_DEV_IPU:
       {
         struct stat s;
