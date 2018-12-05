@@ -257,7 +257,7 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
 
 int dmp_dv_fpga_device_exists(dmp_dv_context ctx, int dev_type_id) {
   if(!ctx) {
-    return 0;
+    return -1;
   }
   switch (dev_type_id) {
     case DMP_DV_DEV_CONV:
@@ -274,7 +274,7 @@ int dmp_dv_fpga_device_exists(dmp_dv_context ctx, int dev_type_id) {
         return S_ISCHR(s.st_mode) ? 1 : 0;
       }
     default:
-      return 0;
+      return -1;
   }
 }
 
