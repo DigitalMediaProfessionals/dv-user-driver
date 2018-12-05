@@ -20,7 +20,10 @@ using namespace std;
 #define PERRNO(fmt, ...) fprintf(stderr, "%s:%u # errno(%s) : " fmt " \n", \
     __FILE__, __LINE__, strerror(errno), ##__VA_ARGS__)
 
+#define ALIGN_UP(val, align_bit) (((val) + ((1 << (align_bit)) - 1)) & ~((1 << (align_bit)) - 1))
+
 namespace {
+
   const char COLOR_WHITE[]  = "\x1b[37m";
   const char COLOR_GREEN[]  = "\x1b[32m";
   const char COLOR_YELLOW[] = "\x1b[33m";
@@ -54,16 +57,13 @@ namespace {
       RESULT run_test(dmp_dv_context ctx, dmp_dv_mem mem, uint8_t *map) {
         dmp_dv_cmdlist cmdlist = nullptr;
         struct dmp_dv_cmdraw_maximizer_v0 cmd;
-        uint8_t *sw_output = new uint8_t[width * height];
+        uint8_t *sw_output = nullptr;
         RESULT ret = RESULT::FAIL;
         int64_t exec_id;
+        int i;
 
         if(show_log) {
           cout << COLOR_YELLOW << "[TEST START]" << COLOR_WHITE << "\n" << *this << endl;
-        }
-
-        if(!sw_output) {
-          goto error;
         }
 
         // setup IPU
@@ -90,12 +90,18 @@ namespace {
         }
 
         // run HW/SW IPU
+        if(valgen == "rand") {
+          sw_output = new uint8_t[width * height];
+          if(!sw_output) {
+            goto error;
+          }
+          run_sw_maximizer(reinterpret_cast<__fp16*>(map), sw_output);
+        }
+
         exec_id = dmp_dv_cmdlist_exec(cmdlist);
         if(exec_id < 0) {
           goto error;
         }
-        run_sw_maximizer(reinterpret_cast<__fp16*>(map), sw_output);
-
         if(dmp_dv_cmdlist_wait(cmdlist, exec_id)) {
           goto error;
         }
@@ -104,8 +110,18 @@ namespace {
         }
 
         // compare result
-        ret = (memcmp(static_cast<void*>(sw_output), static_cast<void*>(map), height * width) == 0) ?
-              RESULT::SUCCESS : RESULT::FAIL;
+        if(valgen == "rand") {
+          ret = (memcmp(static_cast<void*>(sw_output), static_cast<void*>(map + cmd.output_buf.offs), height * width) == 0) ?
+            RESULT::SUCCESS : RESULT::FAIL;
+        } else {
+          ret = RESULT::SUCCESS;
+          for(i = 0;i < width * height; i++) {
+            if((map + width * height * nclass * 2)[i] != 0) {
+              ret = RESULT::FAIL;
+              break;
+            }
+          }
+        }
 
 error:
         if(!cmdlist) {
@@ -121,6 +137,8 @@ error:
             cout << COLOR_GREEN << "SUCCESSED" << "\n";
           } else {
             cout << COLOR_RED << "FAILED" << "\n";
+            cout << "\t\tThe result is " << static_cast<int>(ret) << "..\n";
+            cout << "\t\tdmp_dv_get_last_error_message() gives `" << dmp_dv_get_last_error_message() << "`\n";
           }
           cout << COLOR_WHITE << endl;
         }
@@ -193,7 +211,7 @@ error:
         cmd.input_buf.mem = mem;
         cmd.input_buf.offs = 0;
         cmd.output_buf.mem = mem;
-        cmd.output_buf.offs = 2 * width * height * nclass;
+        cmd.output_buf.offs = ALIGN_UP(2 * width * height * nclass, 16);
         cmd.width = width;
         cmd.height = height;
         cmd.nclass = nclass;
@@ -217,16 +235,20 @@ error:
     uint16_t nclass;
 
     is.getline(line, sizeof(line));
+    if(is.fail()) {
+      return false;
+    }
+
     sscanf(line, "%hu,%hu,%hu,%[^,],%d",
         &c.width, &c.height, &nclass, valgen, &result);
     if(nclass > 255) {
-      return -1;
+      return false;
     }
     c.nclass = static_cast<uint8_t>(nclass);
     c.expected = static_cast<RESULT>(result);
     c.valgen = string(valgen);
 
-    return !is.fail();
+    return true;
   }
 
   size_t get_free_cma_size(void) {
@@ -332,7 +354,8 @@ int main(int argc, char const **argv) {
 
   // main loop
   while(read_test_config(f, test)) {
-    buf_sz = test.width * test.height * (test.nclass * 2 + 1);
+    buf_sz = ALIGN_UP(test.width * test.height * (test.nclass * 2), 16)
+      + test.width * test.height;
     if(buf_sz > cma_size) {
       n_not_tested++;
       continue;
