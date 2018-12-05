@@ -197,8 +197,8 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
       if (!res) {
         break;
       }
-      switch (res) {
-        case -EBUSY:       // timeout of 2 seconds reached
+      switch (errno) {
+        case EBUSY:        // timeout of 2 seconds reached
         case ERESTARTSYS:  // signal has interrupted the wait
           continue;  // repeat ioctl
 
