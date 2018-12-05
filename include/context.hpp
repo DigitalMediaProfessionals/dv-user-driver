@@ -169,6 +169,16 @@ class CDMPDVContext : public CDMPDVBase {
     return ub_size_;
   }
 
+  /// @brief Returns frequency of CONV
+  inline int get_conv_freq() const {
+    return conv_freq_;
+  }
+
+  /// @brief Returns frequency of FC
+  inline int get_fc_freq() const {
+    return fc_freq_;
+  }
+
   int GetInfo(struct dmp_dv_info *p_info) {
     if (p_info->size < 8) {
       SET_ERR("Invalid argument: info->size is too small: %u", p_info->size);

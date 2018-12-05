@@ -325,6 +325,15 @@ int dmp_dv_pack_fc_weights(
     const void *weights, const uint16_t *bias,
     uint8_t *packed_weights, size_t *packed_weights_size);
 
+
+/// @brief Check if the specified device exists.
+/// @param dev_type_id Device type id. This must be one of the followings:
+///           - DMP_DV_DEV_CONV
+///           - DMP_DV_DEV_FC
+///           - DMP_DV_DEV_IPU
+/// @return 1 if exist, -1 if invalid arguments are passed, 0 otherwise.
+int dmp_dv_fpga_device_exists(dmp_dv_context ctx, int dev_type_id);
+
 //! image format
 //! DMP_DV_RGBA8888 RGBA8888 image format
 //! DMP_DV_RGB888   RGB888 image format
