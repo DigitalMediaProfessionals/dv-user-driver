@@ -60,6 +60,7 @@ namespace {
         uint8_t *sw_output = nullptr;
         RESULT ret = RESULT::FAIL;
         int64_t exec_id;
+        uint8_t *output_map = map + ALIGN_UP(width * height * 2 * nclass, 16);
         int i;
 
         if(show_log) {
@@ -111,12 +112,12 @@ namespace {
 
         // compare result
         if(valgen == "rand") {
-          ret = (memcmp(static_cast<void*>(sw_output), static_cast<void*>(map + cmd.output_buf.offs), height * width) == 0) ?
+          ret = (memcmp(static_cast<void*>(sw_output), static_cast<void*>(output_map), height * width) == 0) ?
             RESULT::SUCCESS : RESULT::FAIL;
         } else {
           ret = RESULT::SUCCESS;
           for(i = 0;i < width * height; i++) {
-            if((map + width * height * nclass * 2)[i] != 0) {
+            if(output_map[i] != 0) {
               ret = RESULT::FAIL;
               break;
             }
@@ -234,10 +235,12 @@ error:
     char valgen[10];
     uint16_t nclass;
 
-    is.getline(line, sizeof(line));
-    if(is.fail()) {
-      return false;
-    }
+    do {
+      is.getline(line, sizeof(line));
+      if(is.fail()) {
+        return false;
+      }
+    } while(line[0] == '#');
 
     sscanf(line, "%hu,%hu,%hu,%[^,],%d",
         &c.width, &c.height, &nclass, valgen, &result);
@@ -295,6 +298,7 @@ error:
       PERR("Fail to allocate dmp_dv_mem of %lu B", cma_size);
       return -1;
     }
+    cout << "Allocated dmp_dv_mem for " << hex << cma_size << " bytes" << dec << endl;
     phys_map = dmp_dv_mem_map(phys_mem);
     if(!phys_map) {
       PERR("Fail to map dmp_dv_mem");
@@ -344,8 +348,6 @@ int main(int argc, char const **argv) {
     PERRNO("Failed to open %s", test_config_file);
     return -1;
   }
-  // discard header
-  f.ignore(numeric_limits<streamsize>::max(), '\n');
 
   ret = _init();
   if(ret) {
@@ -354,6 +356,11 @@ int main(int argc, char const **argv) {
 
   // main loop
   while(read_test_config(f, test)) {
+    if(test.valgen != "rand") {
+      // Do not test for constant value
+      // TODO: remove valgen field from test configuration
+      continue;
+    }
     buf_sz = ALIGN_UP(test.width * test.height * (test.nclass * 2), 16)
       + test.width * test.height;
     if(buf_sz > cma_size) {
