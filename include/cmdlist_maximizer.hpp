@@ -42,8 +42,8 @@ class CDMPDVCmdListMaximizerHelper : public CDMPDVCmdListKHelper {
   private:
     /// @brief Checks provided command for validness.
     virtual int CheckRaw(dmp_dv_cmdraw *cmd,
-        std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& input_bufs,
-        std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& output_bufs) {
+                         std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& input_bufs,
+                         std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& output_bufs) {
       switch (cmd->version) {
         case 0:
           return CheckRaw_v0((dmp_dv_cmdraw_maximizer_v0*)cmd, input_bufs, output_bufs);
@@ -108,7 +108,7 @@ class CDMPDVCmdListMaximizerHelper : public CDMPDVCmdListKHelper {
 
     /// @brief Fills command of version 0 in the format suitable for later execution on the device.
     int FillKCommand_v0(struct dmp_dv_kcmdraw_maximizer_v0 *kcmd,
-        struct dmp_dv_cmdraw_maximizer_v0 *cmd, uint32_t& size) {
+                        struct dmp_dv_cmdraw_maximizer_v0 *cmd, uint32_t& size) {
       if (cmd->header.size != sizeof(*cmd)) {
         SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
             (int)cmd->header.size, (int)cmd->header.version);
