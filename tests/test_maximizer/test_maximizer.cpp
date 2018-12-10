@@ -63,61 +63,61 @@ namespace {
         uint8_t *output_map = map + ALIGN_UP(width * height * 2 * nclass, 16);
         int i;
 
-        if(show_log) {
+        if (show_log) {
           cout << COLOR_YELLOW << "[TEST START]" << COLOR_WHITE << "\n" << *this << endl;
         }
 
         // setup IPU
         cmdlist = dmp_dv_cmdlist_create(ctx);
-        if(!cmdlist) {
+        if (!cmdlist) {
           goto error;
         }
         fill_cmdraw_v0(cmd, mem);
-        if(dmp_dv_cmdlist_add_raw(cmdlist, reinterpret_cast<struct dmp_dv_cmdraw*>(&cmd))) {
+        if (dmp_dv_cmdlist_add_raw(cmdlist, reinterpret_cast<struct dmp_dv_cmdraw*>(&cmd))) {
           ret = RESULT::ERROR_ON_ADDRAW;
           goto error;
         }
-        if(dmp_dv_cmdlist_commit(cmdlist)) {
+        if (dmp_dv_cmdlist_commit(cmdlist)) {
           goto error;
         }
 
         // initialize input
         initialize_input_buf(map);
-        if(dmp_dv_mem_sync_start(mem, 0, 1)) {
+        if (dmp_dv_mem_sync_start(mem, 0, 1)) {
           goto error;
         }
-        if(dmp_dv_mem_sync_end(mem)) {
+        if (dmp_dv_mem_sync_end(mem)) {
           goto error;
         }
 
         // run HW/SW IPU
-        if(valgen == "rand") {
+        if (valgen == "rand") {
           sw_output = new uint8_t[width * height];
-          if(!sw_output) {
+          if (!sw_output) {
             goto error;
           }
           run_sw_maximizer(reinterpret_cast<__fp16*>(map), sw_output);
         }
 
         exec_id = dmp_dv_cmdlist_exec(cmdlist);
-        if(exec_id < 0) {
+        if (exec_id < 0) {
           goto error;
         }
-        if(dmp_dv_cmdlist_wait(cmdlist, exec_id)) {
+        if (dmp_dv_cmdlist_wait(cmdlist, exec_id)) {
           goto error;
         }
-        if(dmp_dv_mem_sync_start(mem, 1, 0)) {
+        if (dmp_dv_mem_sync_start(mem, 1, 0)) {
           goto error;
         }
 
         // compare result
-        if(valgen == "rand") {
+        if (valgen == "rand") {
           ret = (memcmp(static_cast<void*>(sw_output), static_cast<void*>(output_map), height * width) == 0) ?
             RESULT::SUCCESS : RESULT::FAIL;
         } else {
           ret = RESULT::SUCCESS;
           for(i = 0;i < width * height; i++) {
-            if(output_map[i] != 0) {
+            if (output_map[i] != 0) {
               ret = RESULT::FAIL;
               break;
             }
@@ -125,16 +125,16 @@ namespace {
         }
 
 error:
-        if(!cmdlist) {
+        if (!cmdlist) {
           dmp_dv_cmdlist_release(cmdlist);
         }
-        if(!sw_output) {
+        if (!sw_output) {
           delete[] sw_output;
         }
 
-        if(show_log) {
+        if (show_log) {
           cout << "\n\tRESULT : ";
-          if(ret == expected) {
+          if (ret == expected) {
             cout << COLOR_GREEN << "SUCCESSED" << "\n";
           } else {
             cout << COLOR_RED << "FAILED" << "\n";
@@ -159,20 +159,20 @@ error:
             __fp16 max = 0;
             __fp16 comp = 0;
             for(int cls = 0; cls < nclass; cls++) {
-              if(cls % sub == 0) {
+              if (cls % sub == 0) {
                 blk_i++;
                 blockS = nclass - blk_i * sub;
-                if(blockS > sub) {
+                if (blockS > sub) {
                   blockS = sub;
                 }
               }
 
               comp = input[(block_size_128 << 3) * blk_i + x * height * blockS + y * blockS + (cls % sub)];
-              if(cls == 0) {
+              if (cls == 0) {
                 max_cls = 0;
                 max = comp;
               } else {
-                if(comp > max) {
+                if (comp > max) {
                   max = comp;
                   max_cls = cls;
                 }
@@ -189,14 +189,14 @@ error:
         size_t i;
         int val = 0;
 
-        if(valgen == "0") {
+        if (valgen == "0") {
           memset(buf, 0, buf_len * 2);
         } else {
-          if(valgen == "rand") {
+          if (valgen == "rand") {
             val = 0;
-          }  else if(valgen == "-1") {
+          }  else if (valgen == "-1") {
             val = -1;
-          } else if(valgen == "1") {
+          } else if (valgen == "1") {
             val = 1;
           } 
           for(i = 0; i < buf_len; i++) {
@@ -237,14 +237,14 @@ error:
 
     do {
       is.getline(line, sizeof(line));
-      if(is.fail()) {
+      if (is.fail()) {
         return false;
       }
-    } while(line[0] == '#');
+    } while (line[0] == '#');
 
     sscanf(line, "%hu,%hu,%hu,%[^,],%d",
         &c.width, &c.height, &nclass, valgen, &result);
-    if(nclass > 255) {
+    if (nclass > 255) {
       return false;
     }
     c.nclass = static_cast<uint8_t>(nclass);
@@ -256,18 +256,18 @@ error:
 
   size_t get_free_cma_size(void) {
     FILE *file = fopen("/proc/meminfo", "r");
-    if(!file) {
+    if (!file) {
       return 0;
     }
 
     char buf[1024];
     size_t cma = 0;
-    while(fgets(buf, sizeof(buf), file)) {
-      if(strstr(buf, "CmaFree:")) {
+    while (fgets(buf, sizeof(buf), file)) {
+      if (strstr(buf, "CmaFree:")) {
         // extract size in kB
         char *p = strchr(buf, ':');
         p++;
-        while(isblank(*p)) {
+        while (isblank(*p)) {
           p++;
         }
         char *end = strchr(p, ' ');
@@ -283,24 +283,24 @@ error:
 
   int _init() {
     context = dmp_dv_context_create();
-    if(!context) {
+    if (!context) {
       PERR("Fail to create dmp_dv_context");
       return -1;
     }
     cma_size = get_free_cma_size();
-    while(phys_mem == nullptr && cma_size >= 0x1000) {
+    while (phys_mem == nullptr && cma_size >= 0x1000) {
       phys_mem = dmp_dv_mem_alloc(context, cma_size);
-      if(!phys_mem) {
+      if (!phys_mem) {
         cma_size >>= 1;
       }
     }
-    if(!phys_mem) {
+    if (!phys_mem) {
       PERR("Fail to allocate dmp_dv_mem of %lu B", cma_size);
       return -1;
     }
     cout << "Allocated dmp_dv_mem for " << hex << cma_size << " bytes" << dec << endl;
     phys_map = dmp_dv_mem_map(phys_mem);
-    if(!phys_map) {
+    if (!phys_map) {
       PERR("Fail to map dmp_dv_mem");
       return -1;
     }
@@ -309,13 +309,13 @@ error:
   }
 
   void _fin() {
-    if(phys_mem) {
-      if(phys_map) {
+    if (phys_mem) {
+      if (phys_map) {
         dmp_dv_mem_unmap(phys_mem);
       }
       dmp_dv_mem_release(phys_mem);
     }
-    if(context) {
+    if (context) {
       dmp_dv_context_release(context);
     }
   }
@@ -344,32 +344,32 @@ int main(int argc, char const **argv) {
   int ret = 0;
   RESULT result;
 
-  if(f.fail()) {
+  if (f.fail()) {
     PERRNO("Failed to open %s", test_config_file);
     return -1;
   }
 
   ret = _init();
-  if(ret) {
+  if (ret) {
     goto error;
   }
 
   // main loop
-  while(read_test_config(f, test)) {
-    if(test.valgen != "rand") {
+  while (read_test_config(f, test)) {
+    if (test.valgen != "rand") {
       // Do not test for constant value
       // TODO: remove valgen field from test configuration
       continue;
     }
     buf_sz = ALIGN_UP(test.width * test.height * (test.nclass * 2), 16)
       + test.width * test.height;
-    if(buf_sz > cma_size) {
+    if (buf_sz > cma_size) {
       n_not_tested++;
       continue;
     }
 
     result = test.run_test(context, phys_mem, phys_map);
-    if(test.expected == result) {
+    if (test.expected == result) {
       n_succ++;
     } else {
       n_fail++;

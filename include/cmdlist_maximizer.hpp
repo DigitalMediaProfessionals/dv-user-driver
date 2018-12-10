@@ -66,20 +66,20 @@ class CDMPDVCmdListMaximizerHelper : public CDMPDVCmdListKHelper {
         return -1;
       }
 
-      if(cmd->width == 0) {
+      if (cmd->width == 0) {
         SET_ERR("Invalid argument: cmd->width is 0");
         return -1;
       }
-      if(cmd->height == 0) {
+      if (cmd->height == 0) {
         SET_ERR("Invalid argument: cmd->height is 0");
         return -1;
       }
       uint32_t npixel = static_cast<uint32_t>(cmd->width) * cmd->height;
-      if(npixel & 0xff000000) {
+      if (npixel & 0xff000000) {
         SET_ERR("Invalid argument: the number of pixel is %u but must be smaller than %u", npixel, 1 << 24);
         return -1;
       }
-      if(cmd->nclass < 2) {
+      if (cmd->nclass < 2) {
         SET_ERR("Invalid argument: cmd->nclass is %d but must be larger than 1", cmd->nclass);
         return -1;
       }
