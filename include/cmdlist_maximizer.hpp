@@ -62,7 +62,7 @@ class CDMPDVCmdListMaximizerHelper : public CDMPDVCmdListKHelper {
         std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& output_bufs) {
       if (cmd->header.size != sizeof(*cmd)) {
         SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
-            (int)cmd->header.size, (int)cmd->header.version);
+                (int)cmd->header.size, (int)cmd->header.version);
         return -1;
       }
 
@@ -111,7 +111,7 @@ class CDMPDVCmdListMaximizerHelper : public CDMPDVCmdListKHelper {
                         struct dmp_dv_cmdraw_maximizer_v0 *cmd, uint32_t& size) {
       if (cmd->header.size != sizeof(*cmd)) {
         SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
-            (int)cmd->header.size, (int)cmd->header.version);
+                (int)cmd->header.size, (int)cmd->header.version);
         return -1;
       }
 
