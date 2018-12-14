@@ -45,7 +45,10 @@ typedef struct dmp_dv_cmdlist_impl *dmp_dv_cmdlist;
 
 
 /// @brief Returns version string of the driver interface.
-/// @details Starts with MAJOR.MINOR.SUB YYYYMMDD for example "0.3.0 20181029"
+/// @details Starts with HW_MAJOR.HW_MINOR.YYYYMMDD for example "7.0.20181214".
+///          HW_MAJOR - supported hardware revision major,
+///          HW_MINOR - supported hardware revision minor,
+///          YYYYMMDD - release date.
 ///          It is thread-safe.
 const char *dmp_dv_get_version_string();
 
@@ -339,10 +342,10 @@ int dmp_dv_fpga_device_exists(dmp_dv_context ctx, int dev_type_id);
 //! DMP_DV_RGB888   RGB888 image format
 //! DMP_DV_RGBFP16  RGBFP16 image format
 //! DMP_DV_LUT      palette texture image format
-#define DMP_DV_RGBA8888   0 
-#define DMP_DV_RGB888     1 
-#define DMP_DV_RGBFP16    2 
-#define DMP_DV_LUT        7 
+#define DMP_DV_RGBA8888   0
+#define DMP_DV_RGB888     1
+#define DMP_DV_RGBFP16    2
+#define DMP_DV_LUT        7
 
 // uint8_t to fp16 conversion rule for IPU
 #define DMP_DV_CNV_FP16_SUB       0
