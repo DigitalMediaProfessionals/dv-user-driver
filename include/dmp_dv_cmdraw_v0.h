@@ -88,60 +88,72 @@ struct dmp_dv_cmdraw_fc_v0 {
 
 /// @brief Raw command for image processing unit version 0.
 struct dmp_dv_cmdraw_ipu_v0 {
-  struct dmp_dv_cmdraw header; 	// general structure information
+  struct dmp_dv_cmdraw header;  // General structure information
 
-  /* image buffer */
-  struct dmp_dv_buf tex;  // texture buffer
-  struct dmp_dv_buf rd;   // read buffer
-  struct dmp_dv_buf wr;   // write buffer
+  /* Image buffer */
+  struct dmp_dv_buf tex;  // Texture buffer
+  struct dmp_dv_buf rd;   // Read buffer
+  struct dmp_dv_buf wr;   // Write buffer
 
-  /* image format */
-  uint8_t fmt_tex;  	    // format of texture buffer. This must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_LUT.
-  uint8_t fmt_rd;   	    // format of read buffer. This must be DMP_DV_RGBA8888 or DMP_DV_RGB888.
-  uint8_t fmt_wr;   	    // format of write buffer. This must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_RGBFP16.
-  uint8_t rsvd1[1];			  // padding to 16-bit size
+  /* Image format */
+  uint8_t fmt_tex;        // Format of texture buffer. This must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_LUT.
+  uint8_t fmt_rd;         // Format of read buffer. This must be DMP_DV_RGBA8888 or DMP_DV_RGB888.
+  uint8_t fmt_wr;         // Format of write buffer. This must be DMP_DV_RGBA8888, DMP_DV_RGB888 or DMP_DV_RGBFP16.
+  uint8_t rsvd1[1];       // Padding to 16-bit size
 
-  /* dimension */
-  uint16_t tex_width;	    // width of texture
-  uint16_t tex_height;		// height of texture
-  uint16_t rect_width;		// width of rendering rectangle
-  uint16_t rect_height;		// height of rendering rectangle
+  /* Dimension */
+  uint16_t tex_width;     // Width of texture
+  uint16_t tex_height;    // Height of texture
+  uint16_t rect_width;    // Width of rendering rectangle
+  uint16_t rect_height;   // Height of rendering rectangle
 
-  /* stride */
-  int32_t stride_rd;  	 	// stride for read buffer
-  int32_t stride_wr;  	 	// stride for write buffer
+  /* Stride */
+  int32_t stride_rd;      // Stride for read buffer
+  int32_t stride_wr;      // Stride for write buffer
 
-  uint32_t lut[32];		  	// look up table for texture of DMP_DV_LUT.
-  uint8_t ncolor_lut;	  	// number of color in lut.  If 0, the look up table used at the last time is used.
+  uint32_t lut[32];       // Look up table for texture of DMP_DV_LUT.
+  uint8_t ncolor_lut;     // Number of color in lut.  If 0, the look up table used at the last time is used.
 
-  uint8_t alpha;  	      // alpha value for blending
+  uint8_t alpha;          // Alpha value for blending
 
-  /* operation flags */
-  uint8_t transpose;  	  	// exchange x-y axis of texture
-  uint8_t use_const_alpha;	// use alpha in this structure for blending
-  uint8_t use_tex;  		    // use texture in this structure
-  uint8_t use_rd;  	      	// use rd in this structure
-  uint8_t blf;  		        // apply bilinear filter
+  /* Operation flags */
+  uint8_t transpose;        // Exchange x-y axis of texture
+  uint8_t use_const_alpha;  // Use alpha in this structure for blending
+  uint8_t use_tex;          // Use texture in this structure
+  uint8_t use_rd;           // Use rd in this structure
+  uint8_t blf;              // Apply bilinear filter
 
-  /** swizzle
+  /** Swizzle
    * Specify an order of RGBA in texture buffer
    * aidx can be -1 if the texture not contain alpha channel.
    *   - If aidx is -1 ridx, gidx and bidx must be in {0, 1, 2} without overlap.
    *   - Otherwize, ridx, gidx, bidx and aidx must be in {0, 1, 2, 3} without overlap.
    */
-  int8_t ridx;  // index of red channel
-  int8_t gidx;  // index of green channel
-  int8_t bidx;  // index of blue channel
-  int8_t aidx;  // index of alpha channel
+  int8_t ridx;  // Index of red channel
+  int8_t gidx;  // Index of green channel
+  int8_t bidx;  // Index of blue channel
+  int8_t aidx;  // Index of alpha channel
 
-  /*! cnversion to fp16
+  /*! Conversion to fp16
    * Each pixels in type of uint8_t is converted to a fp16 value as below. 
    *   - For DMP_DV_CNV_FP16_SUB, R_F16 = F16(R_8 - param[0]), G_F16 = F16(G_8 - param[1]), B_F16 = F16(B_8 - param[2])
    *   - For DMP_DV_CNV_FP16_DIV_255, R_F16 = F16(R_8/255.0), G_F16 = F16(G_8/255.0), B_F16 = F16(B_8/255.0). cnv_param can be NULL.
    * (*_8 means uint8_t values of the channel, *_F16 means fp16 values of the channel, F16() represents cast function to fp16)
    */
-  uint8_t cnv_type;       // conversion type
-  uint8_t cnv_param[3];   // conversion parameter
-  uint8_t rsvd2[5];		    // padding to 64-bit size
+  uint8_t cnv_type;       // Conversion type
+  uint8_t cnv_param[3];   // Conversion parameter
+  uint8_t rsvd2[5];       // Padding to 64-bit size
 };
 
+/// @brief Raw command for maximizer version 0.
+struct dmp_dv_cmdraw_maximizer_v0 {
+  struct dmp_dv_cmdraw header;  // general structure information
+  struct dmp_dv_buf input_buf;  // Input buffer
+  struct dmp_dv_buf output_buf; // Output buffer
+
+  uint16_t width;   // Width of input
+  uint16_t height;  // Height of input
+  uint8_t  nclass;  // # of classes
+
+  uint8_t  rsvd[3]; // Padding to 64-bit size
+};

@@ -29,6 +29,7 @@
 #include "cmdlist_conv.hpp"
 #include "cmdlist_fc.hpp"
 #include "cmdlist_ipu.hpp"
+#include "cmdlist_maximizer.hpp"
 
 
 /// @brief Creators for the specific device types.
@@ -36,7 +37,8 @@ CDMPDVCmdListDeviceHelper* (*CDMPDVCmdListDeviceHelper::creators_[DMP_DV_DEV_COU
     NULL,
     CDMPDVCmdListConvHelper::Create,
     CDMPDVCmdListFCHelper::Create,
-    CDMPDVCmdListIPUHelper::Create
+    CDMPDVCmdListIPUHelper::Create,
+    CDMPDVCmdListMaximizerHelper::Create
 };
 
 
