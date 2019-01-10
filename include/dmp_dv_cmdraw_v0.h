@@ -18,6 +18,9 @@
  */
 #pragma once
 
+#ifndef _DMP_DV_CMDRAW_V0_H_
+#define _DMP_DV_CMDRAW_V0_H_
+
 #include "dmp_dv.h"
 
 
@@ -135,7 +138,7 @@ struct dmp_dv_cmdraw_ipu_v0 {
   int8_t aidx;  // Index of alpha channel
 
   /*! Conversion to fp16
-   * Each pixels in type of uint8_t is converted to a fp16 value as below. 
+   * Each pixels in type of uint8_t is converted to a fp16 value as below.
    *   - For DMP_DV_CNV_FP16_SUB, R_F16 = F16(R_8 - param[0]), G_F16 = F16(G_8 - param[1]), B_F16 = F16(B_8 - param[2])
    *   - For DMP_DV_CNV_FP16_DIV_255, R_F16 = F16(R_8/255.0), G_F16 = F16(G_8/255.0), B_F16 = F16(B_8/255.0). cnv_param can be NULL.
    * (*_8 means uint8_t values of the channel, *_F16 means fp16 values of the channel, F16() represents cast function to fp16)
@@ -157,3 +160,5 @@ struct dmp_dv_cmdraw_maximizer_v0 {
 
   uint8_t  rsvd[3]; // Padding to 64-bit size
 };
+
+#endif  // _DMP_DV_CMDRAW_V0_H_

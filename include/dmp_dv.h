@@ -18,6 +18,9 @@
  */
 #pragma once
 
+#ifndef _DMP_DV_H_
+#define _DMP_DV_H_
+
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -57,6 +60,11 @@ const char *dmp_dv_get_version_string();
 /// @details It might return garbage if several functions will fail from multiple threads
 ///          simultaneously during this function call.
 const char *dmp_dv_get_last_error_message();
+
+
+/// @brief Sets last error message.
+/// @details It might set garbage when calling simultaneously from multiple threads.
+void dmp_dv_set_last_error_message(const char *format, ...);
 
 
 /// @brief Creates context for working with DV accelerator.
@@ -101,15 +109,17 @@ int dmp_dv_context_get_info(dmp_dv_context ctx, struct dmp_dv_info *info);
 
 /// @brief Releases context for working with DV accelerator (decreases reference counter).
 /// @param ctx Context for working with DV accelerator, when NULL it is ignored.
+/// @return Reference counter value after the function call, 0 if graph is NULL.
 /// @details Call this when "ctx" is no longer needed.
 ///          It is thread-safe.
-void dmp_dv_context_release(dmp_dv_context ctx);
+int dmp_dv_context_release(dmp_dv_context ctx);
 
 
 /// @brief Retains context for working with DV accelerator (increases reference counter).
 /// @param ctx Context for working with DV accelerator, when NULL it is ignored.
+/// @return Reference counter value after the function call, 0 if graph is NULL.
 /// @details It is thread-safe.
-void dmp_dv_context_retain(dmp_dv_context ctx);
+int dmp_dv_context_retain(dmp_dv_context ctx);
 
 
 /// @brief Allocates physically continuous chunk of memory.
@@ -123,16 +133,18 @@ dmp_dv_mem dmp_dv_mem_alloc(dmp_dv_context ctx, size_t size);
 
 /// @brief Releases allocated memory (decreses reference counter).
 /// @param mem Handle for the allocated memory, when NULL it is ignored.
+/// @return Reference counter value after the function call, 0 if graph is NULL.
 /// @details Call this when "mem" is no longer needed.
 ///          dmp_dv_mem_unmap() will be called automatically before the memory is returned to the system.
 ///          It is thread-safe.
-void dmp_dv_mem_release(dmp_dv_mem mem);
+int dmp_dv_mem_release(dmp_dv_mem mem);
 
 
 /// @brief Retains allocated memory (increases reference counter).
 /// @param mem Handle for the allocated memory, when NULL it is ignored.
+/// @return Reference counter value after the function call, 0 if graph is NULL.
 /// @details It is thread-safe.
-void dmp_dv_mem_retain(dmp_dv_mem mem);
+int dmp_dv_mem_retain(dmp_dv_mem mem);
 
 
 /// @brief Maps previously allocated memory to the user address space.
@@ -191,15 +203,17 @@ dmp_dv_cmdlist dmp_dv_cmdlist_create(dmp_dv_context ctx);
 
 /// @brief Releases the command list (decreases reference counter).
 /// @param cmdlist Handle to command list, when NULL it is ignored.
+/// @return Reference counter value after the function call, 0 if graph is NULL.
 /// @details Call this when "cmdlist" is no longer needed.
 ///          It is thread-safe.
-void dmp_dv_cmdlist_release(dmp_dv_cmdlist cmdlist);
+int dmp_dv_cmdlist_release(dmp_dv_cmdlist cmdlist);
 
 
 /// @brief Retains the command list (increases reference counter).
 /// @param cmdlist Handle to command list, when NULL it is ignored.
+/// @return Reference counter value after the function call, 0 if graph is NULL.
 /// @details It is thread-safe.
-void dmp_dv_cmdlist_retain(dmp_dv_cmdlist cmdlist);
+int dmp_dv_cmdlist_retain(dmp_dv_cmdlist cmdlist);
 
 
 /// @brief Commits the command list, preparing device-specific structures for further execution.
@@ -362,3 +376,5 @@ int dmp_dv_fpga_device_exists(dmp_dv_context ctx, int dev_type_id);
 #ifdef __cplusplus
 }  // extern "C"
 #endif
+
+#endif  // _DMP_DV_H_

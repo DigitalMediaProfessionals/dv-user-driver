@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "dmp_dv.h"
 #include "common.h"
@@ -58,8 +59,15 @@ const char *dmp_dv_get_last_error_message() {
 }
 
 
+void dmp_dv_set_last_error_message(const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+  vsnprintf(s_last_error_message, sizeof(s_last_error_message), format, args);
+}
+
+
 const char *dmp_dv_get_version_string() {
-  return "7.0.20181214";
+  return "7.0.20190110";
 }
 
 
@@ -95,19 +103,19 @@ int dmp_dv_context_get_info(dmp_dv_context ctx, struct dmp_dv_info *info) {
 }
 
 
-void dmp_dv_context_release(dmp_dv_context ctx) {
+int dmp_dv_context_release(dmp_dv_context ctx) {
   if (!ctx) {
-    return;
+    return 0;
   }
-  ((CDMPDVContext*)ctx)->Release();
+  return ((CDMPDVContext*)ctx)->Release();
 }
 
 
-void dmp_dv_context_retain(dmp_dv_context ctx) {
+int dmp_dv_context_retain(dmp_dv_context ctx) {
   if (!ctx) {
-    return;
+    return 0;
   }
-  ((CDMPDVContext*)ctx)->Retain();
+  return ((CDMPDVContext*)ctx)->Retain();
 }
 
 
@@ -126,19 +134,19 @@ dmp_dv_mem dmp_dv_mem_alloc(dmp_dv_context ctx, size_t size) {
 }
 
 
-void dmp_dv_mem_release(dmp_dv_mem mem) {
+int dmp_dv_mem_release(dmp_dv_mem mem) {
   if (!mem) {
-    return;
+    return 0;
   }
-  ((CDMPDVMem*)mem)->Release();
+  return ((CDMPDVMem*)mem)->Release();
 }
 
 
-void dmp_dv_mem_retain(dmp_dv_mem mem) {
+int dmp_dv_mem_retain(dmp_dv_mem mem) {
   if (!mem) {
-    return;
+    return 0;
   }
-  ((CDMPDVMem*)mem)->Retain();
+  return ((CDMPDVMem*)mem)->Retain();
 }
 
 
@@ -206,19 +214,19 @@ dmp_dv_cmdlist dmp_dv_cmdlist_create(dmp_dv_context ctx) {
 }
 
 
-void dmp_dv_cmdlist_release(dmp_dv_cmdlist cmdlist) {
+int dmp_dv_cmdlist_release(dmp_dv_cmdlist cmdlist) {
   if (!cmdlist) {
-    return;
+    return 0;
   }
-  ((CDMPDVCmdList*)cmdlist)->Release();
+  return ((CDMPDVCmdList*)cmdlist)->Release();
 }
 
 
-void dmp_dv_cmdlist_retain(dmp_dv_cmdlist cmdlist) {
+int dmp_dv_cmdlist_retain(dmp_dv_cmdlist cmdlist) {
   if (!cmdlist) {
-    return;
+    return 0;
   }
-  ((CDMPDVCmdList*)cmdlist)->Retain();
+  return ((CDMPDVCmdList*)cmdlist)->Retain();
 }
 
 
