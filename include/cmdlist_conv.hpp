@@ -118,6 +118,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
     bool valid_multi_run = true;
 
     for (uint32_t topo = cmd->topo, i_run = 0; topo; topo >>= 1, ++i_run) {
+      const int is_deconv = (cmd->run[i_run].conv_enable & 4) ? 1 : 0;
       const int kx = cmd->run[i_run].p & 0xFF;
       const int ky = (cmd->run[i_run].p & 0xFF00) ? (cmd->run[i_run].p & 0xFF00) >> 8 : kx;
       const int pad[4] = {(int)(cmd->run[i_run].conv_pad & 0x7F), (int)((cmd->run[i_run].conv_pad >> 8) & 0xFF),
@@ -224,8 +225,12 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
                   w, h, kx, ky, dil_x, dil_y);
           return -1;
         }
-        const int ox = get_conv_out_width(w, kxfull, pad[0], pad[1], 1),
-                  oy = get_conv_out_width(h, kyfull, pad[2], pad[3], 1);
+        if ((is_deconv) && ((stride[0] != 1) || (stride[1] != 1))) {
+          SET_ERR("Deconvolution with dilation only supports stride 1");
+          return -1;
+        }
+        const int ox = get_conv_out_width(w, kxfull, pad[0], pad[1], 1, is_deconv),
+                  oy = get_conv_out_width(h, kyfull, pad[2], pad[3], 1, is_deconv);
         if ((ox != w) || (oy != h)) {
           SET_ERR("Dilated convolution only supports \"same\" padding");
           return -1;
@@ -277,7 +282,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         tiles = calc_num_tiles_conv(
             w, h, c, m, (kx > ky ? kx : ky) | 1,
             pad[0], pad[1], pad[2], pad[3],
-            stride[0], stride[1], ctx_->get_ub_size() >> 10);
+            stride[0], stride[1], ctx_->get_ub_size() >> 10, is_deconv);
       }
       if (tiles < 1) {
         SET_ERR("Could not calculate number of tiles for cmd->run[%d]", i_run);
@@ -302,7 +307,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       }
       else {  // output goes to unified buffer
         if (tiles != 1) {
-          SET_ERR("cmd->run[%d] wants tiles to be %d while only %d is supported",
+          SET_ERR("cmd->run[%d] wants tiles to be %d while only %d is supported for output in the Unified Buffer",
                   i_run, tiles, 1);
           return -1;
         }

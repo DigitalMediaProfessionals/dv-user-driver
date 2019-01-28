@@ -67,7 +67,7 @@ void dmp_dv_set_last_error_message(const char *format, ...) {
 
 
 const char *dmp_dv_get_version_string() {
-  return "7.0.20190110";
+  return "7.0.20190111";
 }
 
 

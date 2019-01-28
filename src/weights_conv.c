@@ -51,18 +51,19 @@ static inline void write_bias(int m_start, int m_stop, size_t *out_offs, size_t 
 
 
 /// @brief Packs convolution layer weights and biases into output array.
-/// @param n_channels Number of input channels.
+/// @param n_channels Number of input channels, for depthwise convolution this must be set to 1.
 /// @param kx Kernel width.
 /// @param ky Kernel height.
 /// @param n_kernels Number of output channels.
-/// @param quant_map Quantization table for weights (but not bias), can be NULL.
+/// @param quant_map Quantization table for weights (but not bias), 256 elements, can be NULL.
 /// @param weights If quant_map is NULL, array of half precision floating point weights in NCHW format, else array of 1-byte indices.
 /// @param bias Array of half precision floating point biases of size n_kernels.
 /// @param prelu Array of half precision floating point values for PReLU activation of size n_kernels, can be NULL.
 /// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
 /// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
 /// @return 0 on success, non-zero otherwise.
-/// @details It is thread-safe.
+/// @details When packing weights for deconvolution, HW plane must be rotated by 180 degrees.
+///          It is thread-safe.
 int dmp_dv_pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],

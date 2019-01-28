@@ -70,6 +70,7 @@ typedef struct conv_config_impl {
   int width, height, n_channels, kx, ky, n_kernels,
       pad_left, pad_top, pad_right, pad_bottom, stride_x, stride_y, activation;
   int tpe;  // 0 - 2D, 1 - depthwise, >1 - dilation
+  int deconv;  // 0 - convolution, 1 - deconvolution
   bool quantized;
   bool hash_set;
   bool failed;
@@ -81,10 +82,10 @@ typedef struct conv_config_impl {
   bool pure_ints;  // only integers were used - error check should be exact
 
   bool operator <(const struct conv_config_impl& pt) const {
-    return std::make_tuple(width, height, n_channels, tpe, kx, ky, n_kernels,
+    return std::make_tuple(width, height, n_channels, tpe, deconv, kx, ky, n_kernels,
                            pad_left, pad_top, pad_right, pad_bottom,
                            stride_x, stride_y, activation, quantized) <
-        std::make_tuple(pt.width, pt.height, pt.n_channels, pt.tpe, pt.kx, pt.ky, pt.n_kernels,
+        std::make_tuple(pt.width, pt.height, pt.n_channels, pt.tpe, pt.deconv, pt.kx, pt.ky, pt.n_kernels,
                         pt.pad_left, pt.pad_top, pt.pad_right, pt.pad_bottom,
                         pt.stride_x, pt.stride_y, pt.activation, pt.quantized);
   }
@@ -92,14 +93,14 @@ typedef struct conv_config_impl {
 
 
 /// @brief Returns width of the output based on kernel size, padding and stride.
-int get_conv_out_width(int width, int kx, int pad_left, int pad_right, int stride) {
-  return (pad_left + width + pad_right - kx) / stride + 1;
+int get_conv_out_width(int width, int kx, int pad_left, int pad_right, int stride, int is_deconv) {
+  return (pad_left + (is_deconv ? (width - 1) * stride + 1 : width) + pad_right - kx) / (is_deconv ? 1 : stride) + 1;
 }
 
 
 /// @brief Prints command content for debugging.
 void print_cmd(dmp_dv_cmdraw_conv_v0& cmd) {
-  LOG("topo = %u\nw = %u\nh = %u\nz = %u\nc = %u\ninput_circular_offset = %u\noutput_mode = %u\n",
+  /*LOG("topo = %u\nw = %u\nh = %u\nz = %u\nc = %u\ninput_circular_offset = %u\noutput_mode = %u\n",
       (uint32_t)cmd.topo, (uint32_t)cmd.w, (uint32_t)cmd.h, (uint32_t)cmd.z, (uint32_t)cmd.c,
       (uint32_t)cmd.input_circular_offset, (uint32_t)cmd.output_mode);
   LOG("conv_pad = 0x%08x\npool_pad = 0x%08x\nm = %u\nconv_enable = %u\np = 0x%04x\n"
@@ -112,7 +113,7 @@ void print_cmd(dmp_dv_cmdraw_conv_v0& cmd) {
       (uint32_t)cmd.run[0].weight_fmt, (uint32_t)cmd.run[0].pool_enable, (uint32_t)cmd.run[0].pool_avg_param,
       (uint32_t)cmd.run[0].pool_size, (uint32_t)cmd.run[0].pool_stride,
       (uint32_t)cmd.run[0].actfunc, (uint32_t)cmd.run[0].actfunc_param, (uint32_t)cmd.run[0].rectifi_en,
-      (uint32_t)cmd.run[0].lrn);
+      (uint32_t)cmd.run[0].lrn);*/
 }
 
 
@@ -166,8 +167,8 @@ int test_conv(const std::vector<conv_config*>& confs) {
   LOG("ENTER: test_conv: %d commands:", (int)confs.size());
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     conv_config *conf = *it;
-    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_t%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
-             conf->width, conf->height, conf->n_channels, conf->tpe, conf->kx, conf->ky, conf->n_kernels,
+    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_t%dd%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
+             conf->width, conf->height, conf->n_channels, conf->tpe, conf->deconv, conf->kx, conf->ky, conf->n_kernels,
              conf->pad_left, conf->pad_top, conf->pad_right, conf->pad_bottom,
              conf->stride_x, conf->stride_y, conf->activation);
     LOG(" %s %s", prefix, conf->quantized ? "Q8" : "FP16");
@@ -214,8 +215,8 @@ int test_conv(const std::vector<conv_config*>& confs) {
   // Outer loop by configurations to be packed in the single command list
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     conv_config *conf = *it;
-    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_t%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
-             conf->width, conf->height, conf->n_channels, conf->tpe, conf->kx, conf->ky, conf->n_kernels,
+    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_t%dd%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
+             conf->width, conf->height, conf->n_channels, conf->tpe, conf->deconv, conf->kx, conf->ky, conf->n_kernels,
              conf->pad_left, conf->pad_top, conf->pad_right, conf->pad_bottom,
              conf->stride_x, conf->stride_y, conf->activation);
 
@@ -344,8 +345,8 @@ int test_conv(const std::vector<conv_config*>& confs) {
     }
 
     // Load output
-    out_width = get_conv_out_width(conf->width, kxfull, conf->pad_left, conf->pad_right, conf->stride_x);
-    out_height = get_conv_out_width(conf->height, kyfull, conf->pad_top, conf->pad_bottom, conf->stride_y);
+    out_width = get_conv_out_width(conf->width, kxfull, conf->pad_left, conf->pad_right, conf->stride_x, conf->deconv);
+    out_height = get_conv_out_width(conf->height, kyfull, conf->pad_top, conf->pad_bottom, conf->stride_y, conf->deconv);
     if (!conf->hash_set) {
       snprintf(fnme, sizeof(fnme), "%s.o.bin", prefix);
       fin = fopen(fnme, "rb");
@@ -380,15 +381,20 @@ int test_conv(const std::vector<conv_config*>& confs) {
     cmd.z = 1;
     cmd.topo = 1;
     cmd.run[0].m = conf->n_kernels;
-    cmd.run[0].conv_enable = (conf->tpe == 1 ? 3 : 1);
+    cmd.run[0].conv_enable = (conf->deconv ? (conf->tpe == 1 ? 7 : 5) : (conf->tpe == 1 ? 3 : 1));
     cmd.run[0].conv_dilation = (conf->tpe <= 1 ? 0 : ((conf->tpe & 0xFF) | ((conf->tpe << 8) & 0xFF00)));
     cmd.run[0].p = (uint16_t)conf->kx | (((uint16_t)conf->ky) << 8);
     if ((conf->kx == conf->ky) && (conf->io_offs & 16)) {  // some randomization over valid square kernel size representation
       cmd.run[0].p = (uint16_t)conf->kx;
     }
     cmd.run[0].pz = 1;
-    cmd.run[0].conv_pad = (uint32_t)conf->pad_left | ((uint32_t)conf->pad_right << 8) |
-                          ((uint32_t)conf->pad_top << 16) | ((uint32_t)conf->pad_bottom << 24);
+    {
+      uint32_t pad_left = conf->pad_left,
+               pad_right = conf->pad_right,
+               pad_top = conf->pad_top,
+               pad_bottom = conf->pad_bottom;
+      cmd.run[0].conv_pad = pad_left | (pad_right << 8) | (pad_top << 16) | (pad_bottom << 24);
+    }
     cmd.run[0].conv_stride = (uint16_t)conf->stride_x | ((uint16_t)conf->stride_y << 8);
     cmd.run[0].actfunc = conf->activation;
 
@@ -470,6 +476,15 @@ int test_conv(const std::vector<conv_config*>& confs) {
             conf->quantized ? quant_map : NULL, caffe_weights.data(), (const uint16_t*)caffe_bias.data(),
             conf->activation == 4 ? (uint16_t*)caffe_prelu.data() : NULL, weights, &weights_size);
     }
+    /*{
+      LOG("packed weights size: %d\n", (int)weights_size);
+      LOG("packed weights:");
+      __fp16 *w16 = (__fp16*)weights;
+      for (int i = 0; i < ((int)weights_size >> 1); ++i) {
+        LOG(" %g,", (float)w16[i]);
+      }
+      LOG("\n");
+    }*/
     if (n) {
       ERR("Weights packing failed: %s\n", dmp_dv_get_last_error_message());
       conf->failed = true;
@@ -516,7 +531,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
       goto L_EXIT;
     }
 
-    //print_cmd(cmd);
+    print_cmd(cmd);
 
     if (dmp_dv_cmdlist_add_raw(cmdlist, (dmp_dv_cmdraw*)&cmd)) {
       ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
@@ -575,9 +590,16 @@ int test_conv(const std::vector<conv_config*>& confs) {
     }
 
     // Compare output with the gold one
-    out_width = get_conv_out_width(conf->width, kxfull, conf->pad_left, conf->pad_right, conf->stride_x);
-    out_height = get_conv_out_width(conf->height, kyfull, conf->pad_top, conf->pad_bottom, conf->stride_y);
+    out_width = get_conv_out_width(conf->width, kxfull, conf->pad_left, conf->pad_right, conf->stride_x, conf->deconv);
+    out_height = get_conv_out_width(conf->height, kyfull, conf->pad_top, conf->pad_bottom, conf->stride_y, conf->deconv);
     const int o_offs = roundup(conf->width * conf->height * conf->n_channels);
+    /*FILE *fy = fopen("y.fp16", "wb");
+    if (fy) {
+      if ((int)fwrite(conf->io_ptr + o_offs, sizeof(__fp16), out_height * out_width * conf->n_kernels, fy) != out_height * out_width * conf->n_kernels) {
+        ERR("fwrite() failed for y.fp16\n");
+      }
+      fclose(fy);
+    }*/
     if (conf->hash_set) {  // check hash
       uint8_t hash[32];
       SHA256_CTX sha256;
@@ -751,8 +773,8 @@ int test_conv(const std::vector<conv_config*>& confs) {
   LOG("EXIT%s: test_conv: %d commands, %d FDs:", result ? "(FAILED)" : "", (int)confs.size(), n_fd);
   for (auto it = confs.begin(); it != confs.end(); ++it) {
     conv_config *conf = *it;
-    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_t%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
-             conf->width, conf->height, conf->n_channels, conf->tpe, conf->kx, conf->ky, conf->n_kernels,
+    snprintf(prefix, sizeof(prefix), "data/%dx%dx%d_t%dd%d/%dx%dx%d_pad%dx%dx%dx%d_stride%dx%d_act%d",
+             conf->width, conf->height, conf->n_channels, conf->tpe, conf->deconv, conf->kx, conf->ky, conf->n_kernels,
              conf->pad_left, conf->pad_top, conf->pad_right, conf->pad_bottom,
              conf->stride_x, conf->stride_y, conf->activation);
     LOG(" %s %s", prefix, conf->quantized ? "Q8" : "FP16");
@@ -800,7 +822,8 @@ int main(int argc, char **argv) {
         break;
       }
     }
-    if (sscanf(fnme, "%d%d%d%d", &config.width, &config.height, &config.n_channels, &config.tpe) != 4) {
+    if (sscanf(fnme, "%d%d%d%d%d", &config.width, &config.height, &config.n_channels,
+               &config.tpe, &config.deconv) != 5) {
       continue;
     }
     snprintf(fnme, sizeof(fnme), "data/%s", dir->d_name);

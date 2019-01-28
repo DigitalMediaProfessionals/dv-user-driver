@@ -294,7 +294,8 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd);
 /// @param packed_weights Output buffer for packed weights information (can be NULL if packed_weights_size is 0).
 /// @param packed_weights_size On input, contains the size of the packed_weights buffer in bytes (can be 0, in such case it will be filled with the required buffer size), on output will contain the required buffer size.
 /// @return 0 on success, non-zero otherwise.
-/// @details It is thread-safe.
+/// @details When packing weights for deconvolution, HW plane must be rotated by 180 degrees.
+///          It is thread-safe.
 int dmp_dv_pack_conv_weights(
     int n_channels, int kx, int ky, int n_kernels,
     const uint16_t quant_map[256],

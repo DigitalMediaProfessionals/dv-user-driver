@@ -34,25 +34,33 @@ def roundup(a, b):
 class Main(object):
     def __init__(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument("-b", "--big", action="store_true",
-                            help="Generate big configuration")
-        parser.add_argument("-f", "--float", action="store_true",
+        parser.add_argument("--float", action="store_true",
                             help="Generate float random weights")
-        parser.add_argument("-s", "--square", action="store_true",
+        parser.add_argument("--square", action="store_true",
                             help="Generate only square sizes")
-        parser.add_argument("-o", "--odd", action="store_true",
+        parser.add_argument("--odd", action="store_true",
                             help="Generate only odd sizes")
-        parser.add_argument("-m", "--multiple", type=int, default=1,
+        parser.add_argument("--multiple", type=int, default=1,
                             help="Force generated channels to be multiple "
                                  "of this value (default: 1)")
-        parser.add_argument("-d", "--dilated", action="store_true",
+        parser.add_argument("--dilated", action="store_true",
                             help="Generate only tests for dilated "
                             "convolutions")
+        parser.add_argument("--deconv", action="store_true",
+                            help="Generate only tests for deconvolutions")
+        parser.add_argument("--seed", type=int, default=1234,
+                            help="Random seed")
+        parser.add_argument("--bz", action="store_true",
+                            help="Set bias to zero")
         args = parser.parse_args()
 
         self.generate_tests(args)
 
     def generate_tests(self, args):
+        for deconv in (False, True):
+            self.generate_deconv(deconv, args)
+
+    def generate_deconv(self, deconv, args):
         if args.odd:
             kxx = (1, 3, 5, 7)
         else:
@@ -79,7 +87,7 @@ class Main(object):
                         self.generate(
                             x, y, roundup(c, args.multiple),
                             kx, ky, roundup(m, args.multiple),
-                            pad, stride, act, dw, dil, args)
+                            pad, stride, act, dw, dil, deconv, args)
 
         # Test activations
         for kx in (1, 3, 5, 7):
@@ -101,13 +109,30 @@ class Main(object):
                         self.generate(
                             x, y, roundup(c, args.multiple),
                             kx, ky, roundup(m, args.multiple),
-                            pad, stride, act, dw, dil, args)
+                            pad, stride, act, dw, dil, deconv, args)
 
-    def get_ox(self, width, kx, pad_left, pad_right, stride):
-        return (pad_left + width + pad_right - kx) // stride + 1
+        # Generate big input
+        kx = 3
+        ky = 3
+        width = 128
+        height = 64
+        n_channels = 64
+        n_kernels = 32
+        pad_ltrb = (1, 1, 1, 1)
+        stride_xy = (2, 2)
+        activation = 0
+        dw = False
+        dil = 1
+        self.generate(
+            width, height, n_channels, kx, ky, n_kernels,
+            pad_ltrb, stride_xy, activation, dw, dil, deconv, args)
+
+    def get_ox(self, width, kx, pad_left, pad_right, stride, deconv):
+        return (pad_left + ((width - 1) * stride + 1 if deconv else width) +
+                pad_right - kx) / (1 if deconv else stride) + 1
 
     def generate(self, width, height, n_channels, kx, ky, n_kernels,
-                 pad_ltrb, stride_xy, activation, dw, dil, args):
+                 pad_ltrb, stride_xy, activation, dw, dil, deconv, args):
         """Generates test data for convolutional layer and invokes caffe
         to generate gold output.
 
@@ -127,6 +152,12 @@ class Main(object):
         """
         dil = max(1, dil)
 
+        if not deconv and args.deconv:
+            return
+
+        if deconv and dil > 1 and max(stride_xy) > 1:
+            return
+
         if dw and n_kernels != n_channels:  # check if dw is applicable
             return
 
@@ -145,12 +176,28 @@ class Main(object):
                 (pad_ltrb[1] + height + pad_ltrb[3] < ky)):
             return
 
+        ox = self.get_ox(width, (kx - 1) * dil + 1,
+                         pad_ltrb[0], pad_ltrb[2], stride_xy[0], deconv)
+        oy = self.get_ox(height, (ky - 1) * dil + 1,
+                         pad_ltrb[1], pad_ltrb[3], stride_xy[1], deconv)
+        if ox < 1 or oy < 1:
+            return
+        if deconv:
+            ox2 = self.get_ox(ox, (kx - 1) * dil + 1,
+                              pad_ltrb[0], pad_ltrb[2], stride_xy[0], 0)
+            oy2 = self.get_ox(oy, (ky - 1) * dil + 1,
+                              pad_ltrb[1], pad_ltrb[3], stride_xy[1], 0)
+            if ox2 != width or oy2 != height:
+                return  # deconvolution configuration is invalid
+
         try:
             os.mkdir("data")
         except OSError:
             pass
-        s_dir = "data/%dx%dx%d_t%d" % (width, height, n_channels,
-                                       1 if dw else (0 if dil < 2 else dil))
+        s_dir = ("data/%dx%dx%d_t%dd%d" %
+                 (width, height, n_channels,
+                  1 if dw else (0 if dil < 2 else dil),
+                  int(deconv)))
         try:
             os.mkdir(s_dir)
         except OSError:
@@ -162,16 +209,18 @@ class Main(object):
         prefix = ("%s/%dx%dx%d_pad%s_stride%s_act%d" %
                   (s_dir, kx, ky, n_kernels, s_pad, s_stride, activation))
 
-        numpy.random.seed(1234)
+        numpy.random.seed(args.seed)
 
         if args.float:
             values = numpy.random.uniform(
                 -1.0, 1.0, 1001).astype(numpy.float32)
         else:
-            values = numpy.array([-2.0, -1.0, 0.0, 1.0, 2.0],
+            values = numpy.array([-2.0, -1.0, 1.0, 2.0],
                                  dtype=numpy.float32)
 
         bias = numpy.random.choice(values, n_kernels).astype(numpy.float16)
+        if args.bz:
+            bias[:] = 0
         bias.tofile("%s.b.bin" % prefix)
 
         prelu = numpy.random.choice(values, n_kernels).astype(numpy.float16)
@@ -189,16 +238,33 @@ class Main(object):
         assert len(quant) == 256
         assert numpy.count_nonzero(numpy.isnan(quant)) == 0
         i_weights = numpy.random.randint(
-            0, 256, kx * ky * weights_dim_1 * n_kernels).astype(
+            1, 256, kx * ky * weights_dim_1 * n_kernels).astype(
                 numpy.uint8)
-        i_weights.tofile("%s.w.bin" % prefix)
-        weights = quant[i_weights].copy().reshape(
-            n_kernels, weights_dim_1, ky, kx)
+        if deconv:
+            iw = numpy.rot90(
+                i_weights.reshape(
+                    (weights_dim_1, n_kernels, ky, kx) if not dw else
+                    (n_kernels, weights_dim_1, ky, kx)),
+                2, (2, 3))
+            iw = numpy.moveaxis(iw, [0, 1, 2, 3], [1, 0, 2, 3])
+            iw = iw.ravel()
+            print("ROTATED")
+        else:
+            iw = i_weights
+        iw.tofile("%s.w.bin" % prefix)
+        del iw
+        weights = quant[i_weights].copy()
+        if deconv and not dw:
+            weights.shape = weights_dim_1, n_kernels, ky, kx
+        else:
+            weights.shape = n_kernels, weights_dim_1, ky, kx
         assert numpy.count_nonzero(numpy.isnan(weights)) == 0
         del i_weights
         del quant
 
         caffe.set_mode_cpu()
+
+        s_type = "Deconvolution" if deconv else "Convolution"
 
         s_kern = ("kernel_size: %d" % kx if kx == ky
                   else "kernel_w: %d\n    kernel_h: %d" % (kx, ky))
@@ -234,7 +300,7 @@ layer {
 }
 layer {
   name: "conv1"
-  type: "Convolution"
+  type: "%s"
   bottom: "data"
   top: "conv1"
   convolution_param {
@@ -245,7 +311,7 @@ layer {
   }
 }
 """
-            fout.write(s % (n_channels, height, width, n_kernels,
+            fout.write(s % (n_channels, height, width, s_type, n_kernels,
                             s_pad, s_kern, s_stride, s_dw, s_dil))
 
             if activation == 5:
@@ -286,8 +352,7 @@ layer {
 """)
 
         net = caffe.Net("data/test.prototxt", caffe.TEST)
-        net.params["conv1"][0].data[:] = weights.astype(
-            numpy.float32).reshape(n_kernels, weights_dim_1, ky, kx)
+        net.params["conv1"][0].data[:] = weights.astype(numpy.float32)
         del weights
         net.params["conv1"][1].data[:] = bias.astype(numpy.float32)
         del bias
@@ -302,11 +367,8 @@ layer {
         results = net.forward()
         output = results["conv1"].copy()
 
-        ox = self.get_ox(width, (kx - 1) * dil + 1,
-                         pad_ltrb[0], pad_ltrb[2], stride_xy[0])
-        oy = self.get_ox(height, (ky - 1) * dil + 1,
-                         pad_ltrb[1], pad_ltrb[3], stride_xy[1])
         assert output.shape == (1, n_kernels, oy, ox)
+
         output.astype(numpy.float16).tofile("%s.o.bin" % prefix)
 
         print("Successfully generated test input/weights/output for %s" %
