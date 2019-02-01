@@ -285,8 +285,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       }
 
       if ((kcmd.z > 1) || (kcmd.run[i_run].pz > 1) ||
-          (kcmd.run[i_run].conv_dilation & 0xfe) ||
-          ((kcmd.run[i_run].conv_dilation >> 8) & 0xfe)) {
+          (kcmd.run[i_run].conv_dilation & 0xfefe)) {
         // TODO: add more checks: no maxpool_with_argmax, no unpool_with_argmax.
         valid_multi_run = false;
       }
