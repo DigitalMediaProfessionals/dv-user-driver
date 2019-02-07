@@ -219,7 +219,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         }
         const int kxfull = (kx - 1) * dil_x + 1,
                   kyfull = (ky - 1) * dil_y + 1;
-        if ((w + pad[0] + pad[1] < kxfull) || (h + pad[2] + pad[3] < kyfull)) {
+        if ((w + pad[0] + pad[1] < kxfull) || (h + pad[2] + pad[3] < kyfull) ||
+            (w < pad[0]) || (w < pad[1]) || (h < pad[2]) || (h < pad[3])){
           SET_ERR("Input size %dx%d is too small for convolution of size %dx%d dilated by %dx%d",
                   w, h, kx, ky, dil_x, dil_y);
           return -1;
