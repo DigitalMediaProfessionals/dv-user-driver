@@ -220,7 +220,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         }
         const int kxfull = (kx - 1) * dil_x + 1,
                   kyfull = (ky - 1) * dil_y + 1;
-        if ((w < kxfull) || (h < kyfull)) {
+        if ((w + pad[0] + pad[1] < kxfull) || (h + pad[2] + pad[3] < kyfull) ||
+            (w < pad[0]) || (w < pad[1]) || (h < pad[2]) || (h < pad[3])) {
           SET_ERR("Input size %dx%d is too small for convolution of size %dx%d dilated by %dx%d",
                   w, h, kx, ky, dil_x, dil_y);
           return -1;
@@ -247,7 +248,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
 
       kcmd.run[i_run].actfunc = cmd->run[i_run].actfunc;
       kcmd.run[i_run].actfunc_param = cmd->run[i_run].actfunc_param;
-      kcmd.run[i_run].conv_dilation = cmd->run[i_run].conv_dilation;
+      kcmd.run[i_run].conv_dilation = (cmd->run[i_run].conv_dilation & 0xfefe) ? cmd->run[i_run].conv_dilation : 0;
       kcmd.run[i_run].conv_enable = cmd->run[i_run].conv_enable;
       kcmd.run[i_run].conv_pad = cmd->run[i_run].conv_pad;
       kcmd.run[i_run].conv_stride = cmd->run[i_run].conv_stride;
@@ -402,7 +403,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         kcmd->run[i_run].p = cmd->run[i_run].p;
         kcmd->run[i_run].pz = cmd->run[i_run].pz;
         kcmd->run[i_run].conv_stride = cmd->run[i_run].conv_stride;
-        kcmd->run[i_run].conv_dilation = cmd->run[i_run].conv_dilation;
+        kcmd->run[i_run].conv_dilation = (cmd->run[i_run].conv_dilation & 0xfefe) ? cmd->run[i_run].conv_dilation : 0;
         kcmd->run[i_run].weight_fmt = cmd->run[i_run].weight_fmt;
         kcmd->run[i_run].pool_enable = cmd->run[i_run].pool_enable;
         kcmd->run[i_run].pool_avg_param = cmd->run[i_run].pool_avg_param;
