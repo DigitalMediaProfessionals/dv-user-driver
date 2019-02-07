@@ -243,7 +243,11 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
 
       kcmd.run[i_run].actfunc = cmd->run[i_run].actfunc;
       kcmd.run[i_run].actfunc_param = cmd->run[i_run].actfunc_param;
-      kcmd.run[i_run].conv_dilation = cmd->run[i_run].conv_dilation;
+      if (cmd->run[i_run].conv_dilation & 0xfefe) {
+        kcmd->run[i_run].conv_dilation = cmd->run[i_run].conv_dilation;
+      } else {
+        kcmd->run[i_run].conv_dilation = 0;
+      }
       kcmd.run[i_run].conv_enable = cmd->run[i_run].conv_enable;
       kcmd.run[i_run].conv_pad = cmd->run[i_run].conv_pad;
       kcmd.run[i_run].conv_stride = cmd->run[i_run].conv_stride;
@@ -286,7 +290,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       }
 
       if ((kcmd.z > 1) || (kcmd.run[i_run].pz > 1) ||
-          (kcmd.run[i_run].conv_dilation & 0xfefe)) {
+          (kcmd.run[i_run].conv_dilation)) {
         // TODO: add more checks: no maxpool_with_argmax, no unpool_with_argmax.
         valid_multi_run = false;
       }
@@ -398,7 +402,11 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         kcmd->run[i_run].p = cmd->run[i_run].p;
         kcmd->run[i_run].pz = cmd->run[i_run].pz;
         kcmd->run[i_run].conv_stride = cmd->run[i_run].conv_stride;
-        kcmd->run[i_run].conv_dilation = cmd->run[i_run].conv_dilation;
+        if (cmd->run[i_run].conv_dilation & 0xfefe) {
+          kcmd->run[i_run].conv_dilation = cmd->run[i_run].conv_dilation;
+        } else {
+          kcmd->run[i_run].conv_dilation = 0;
+        }
         kcmd->run[i_run].weight_fmt = cmd->run[i_run].weight_fmt;
         kcmd->run[i_run].pool_enable = cmd->run[i_run].pool_enable;
         kcmd->run[i_run].pool_avg_param = cmd->run[i_run].pool_avg_param;
