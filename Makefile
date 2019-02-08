@@ -2,7 +2,7 @@ include ../env.mk
 
 .PHONY:	all clean tests
 
-all:	libdmpdv.so tests
+all:	libdmpdv.so
 
 weights_conv.o:	src/weights_conv.c include/dmp_dv.h
 	$(GCC) -fPIC -c src/weights_conv.c -o weights_conv.o -std=c99 -Wall -Werror -Wno-unused-function -I./include $(OPT) -fvisibility=hidden
