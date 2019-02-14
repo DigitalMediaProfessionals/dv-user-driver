@@ -54,6 +54,20 @@ class Main(object):
                             help="Set bias to zero")
         args = parser.parse_args()
 
+        if args.dilated:
+            for w in range(1, 80, 1):
+                for kx in (3, 5, 7):
+                    for dil in (2, 3, 6, 12, 18, 24):
+                        kxfull = (kx - 1) * dil + 1
+                        pad = kxfull >> 1
+                        self.generate(
+                            width=w, height=w, n_channels=256,
+                            kx=kx, ky=kx, n_kernels=16,
+                            pad_ltrb=(pad, pad, pad, pad),
+                            stride_xy=(1, 1), activation=0,
+                            dw=False, dil=dil, deconv=False, args=args)
+            return
+
         self.generate_tests(args)
 
     def generate_tests(self, args):
@@ -61,6 +75,8 @@ class Main(object):
             self.generate_deconv(deconv, args)
 
     def generate_deconv(self, deconv, args):
+        sizes = [1, 9, 15]
+        dilations = [1, 2]
         if args.odd:
             kxx = (1, 3, 5, 7)
         else:
@@ -73,9 +89,9 @@ class Main(object):
             for ky in kyy:
                 for stride, act, x, y, c, m, dw, dil in product(
                         [(1, 1), (2, 2)], [0],
-                        [1, 9, 15], [1, 9, 15],
+                        sizes, sizes,
                         [1, 3, 9, 64, 65], [1, 3, 9, 64, 65],
-                        [False, True], [1, 2]):
+                        [False, True], dilations):
                     dil = max(dil, 1)
                     kxfull = (kx - 1) * dil + 1
                     kyfull = (ky - 1) * dil + 1
@@ -93,11 +109,13 @@ class Main(object):
         for kx in (1, 3, 5, 7):
             kyy = (kx,)
             for ky in kyy:
+                acts = [1, 2, 3, 4, 5]
+                dils = [1, 2]
                 for stride, act, x, y, c, m, dw, dil in product(
-                        [(1, 1), (2, 2)], [1, 3, 4, 5],
+                        [(1, 1), (2, 2)], acts,
                         [1, 9, 15], [1, 9, 15],
                         [1, 65], [1, 65],
-                        [False, True], [1, 2]):
+                        [False, True], dils):
                     dil = max(dil, 1)
                     kxfull = (kx - 1) * dil + 1
                     kyfull = (ky - 1) * dil + 1
@@ -126,6 +144,35 @@ class Main(object):
         self.generate(
             width, height, n_channels, kx, ky, n_kernels,
             pad_ltrb, stride_xy, activation, dw, dil, deconv, args)
+
+        # Dense-ASPP layer with big dilation
+        self.generate(width=60, height=40, n_channels=128,
+                      kx=3, ky=3, n_kernels=64,
+                      pad_ltrb=(24, 24, 24, 24),
+                      stride_xy=(1, 1), activation=0,
+                      dw=False, dil=24, deconv=False, args=args)
+
+        # Generate tests with big dilation
+        for w in range(1, 80, 1):
+            for kx in (3, 5, 7):
+                for dil in (24,):
+                    kxfull = (kx - 1) * dil + 1
+                    pad = kxfull >> 1
+                    self.generate(
+                        width=w, height=w, n_channels=8, kx=kx, ky=kx, n_kernels=8,
+                        pad_ltrb=(pad, pad, pad, pad), stride_xy=(1, 1), activation=0,
+                        dw=False, dil=dil, deconv=False, args=args)
+
+        # With big dialtion and big input
+        for w in (80,):
+            for kx in (3, 5, 7):
+                for dil in (24,):
+                    kxfull = (kx - 1) * dil + 1
+                    pad = kxfull >> 1
+                    self.generate(
+                        width=w, height=w, n_channels=256, kx=kx, ky=kx, n_kernels=16,
+                        pad_ltrb=(pad, pad, pad, pad), stride_xy=(1, 1), activation=0,
+                        dw=False, dil=dil, deconv=False, args=args)
 
     def get_ox(self, width, kx, pad_left, pad_right, stride, deconv):
         return (pad_left + ((width - 1) * stride + 1 if deconv else width) +
@@ -164,8 +211,8 @@ class Main(object):
         if dil > 1 and (dw or activation == 4):  # check dilated limitations
             return
 
-        if (dil > 1 and (width < (dil * (kx - 1) + 1) or
-                         height < (dil * (ky - 1) + 1) or
+        if (dil > 1 and (pad_ltrb[0] + width + pad_ltrb[2] < (dil * (kx - 1) + 1) or
+                         pad_ltrb[1] + height + pad_ltrb[3] < (dil * (ky - 1) + 1) or
                          kx % 2 == 0 or ky % 2 == 0)):
             return
 
@@ -337,6 +384,15 @@ layer {
 layer {
   name: "conv1/Sigmoid"
   type: "Sigmoid"
+  bottom: "conv1"
+  top: "conv1"
+}
+""")
+            elif activation == 2:
+                fout.write("""
+layer {
+  name: "conv1/ReLU"
+  type: "ReLU"
   bottom: "conv1"
   top: "conv1"
 }

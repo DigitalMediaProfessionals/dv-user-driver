@@ -40,6 +40,7 @@ class CDMPDVContext : public CDMPDVBase {
     conv_freq_ = 0;
     fc_freq_ = 0;
     max_fc_vector_size_ = 16384;
+    svn_version_ = 0;
   }
 
   /// @brief Called when the object is about to be destroyed.
@@ -114,6 +115,7 @@ class CDMPDVContext : public CDMPDVBase {
     conv_freq_ = sysfs_read_int("conv/conv_freq", 0);
     fc_freq_ = sysfs_read_int("fc/fc_freq", 0);
     max_fc_vector_size_ = sysfs_read_int("fc/max_fc_vector_size", 16384);
+    svn_version_ = sysfs_read_int("conv/svn_version", 0);
 
     char s[256];
     snprintf(s, sizeof(s), "DMP DV: ub_size=%d max_kernel_size=%d conv_freq=%d fc_freq=%d max_fc_vector_size=%d",
@@ -179,6 +181,11 @@ class CDMPDVContext : public CDMPDVBase {
     return fc_freq_;
   }
 
+  /// @brief Returns hardware SVN version of CONV.
+  inline int get_svn_version() const {
+    return svn_version_;
+  }
+
   int GetInfo(struct dmp_dv_info *p_info) {
     if (p_info->size < 8) {
       SET_ERR("Invalid argument: info->size is too small: %u", p_info->size);
@@ -211,6 +218,9 @@ class CDMPDVContext : public CDMPDVBase {
 
   /// @brief Fully Connected block maximum input vector size in elements.
   int max_fc_vector_size_;
+
+  /// @brief Hardware SVN version to limit capabilities.
+  int svn_version_;
 
   /// @brief Device information.
   std::string info_;

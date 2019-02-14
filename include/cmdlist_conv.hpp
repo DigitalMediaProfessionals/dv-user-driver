@@ -131,6 +131,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       const int pool_stride[2] = {(int)(cmd->run[i_run].pool_stride & 0xFF), (int)((cmd->run[i_run].pool_stride >> 8) & 0xFF)};
       const int m = cmd->run[i_run].m;
       const int w = conv_size.w, h = conv_size.h, c = conv_size.c;
+      const int dil[2] = {std::max((int)(cmd->run[i_run].conv_dilation & 0xFF), 1),
+                          std::max((int)((cmd->run[i_run].conv_dilation >> 8) & 0xFF), 1)};
 
       if ((!cmd->run[i_run].conv_enable) && (!cmd->run[i_run].pool_enable) &&
           (!cmd->run[i_run].actfunc) && (!(cmd->run[i_run].lrn & 1))) {
@@ -168,8 +170,15 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         case 1:
         case 2:
         {
-          if ((pool_kx < 1) || (pool_kx > max_kernel_size) || (pool_ky < 1) || (pool_ky > max_kernel_size)) {
-            SET_ERR("Unsupported pooling size %dx%d, only sizes from 1 to %d are supported",
+          if ((cmd->run[i_run].pool_enable == 1) &&
+              ((pool_kx < 2) || (pool_kx > 3) || (pool_ky < 2) || (pool_ky > 3))) {
+            SET_ERR("Unsupported max pooling size %dx%d, only sizes from 2 to 3 are supported",
+                    pool_kx, pool_ky);
+            return -1;
+          }
+          if ((cmd->run[i_run].pool_enable == 2) &&
+              ((pool_kx < 1) || (pool_kx > max_kernel_size) || (pool_ky < 1) || (pool_ky > max_kernel_size))) {
+            SET_ERR("Unsupported average pooling size %dx%d, only sizes from 1 to %d are supported",
                     pool_kx, pool_ky, max_kernel_size);
             return -1;
           }
@@ -180,6 +189,11 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
           if ((pool_kx > pool_pad[0] + w + pool_pad[1]) || (pool_ky > pool_pad[2] + h + pool_pad[3])) {
             SET_ERR("Input (%d, %d) with padding L=%d, R=%d, T=%d, B=%d is too small for pooling of size (%d, %d)",
                     (int)cmd->w, (int)cmd->h, pool_pad[0], pool_pad[1], pool_pad[2], pool_pad[3], pool_kx, pool_ky);
+            return -1;
+          }
+          if ((pool_kx != pool_ky) && (ctx_->get_svn_version() < 93)) {
+            SET_ERR("Non-square pooling support requires /sys/class/dmp_dv/dv_conv/svn_version to be at least 93, got %d",
+                    ctx_->get_svn_version());
             return -1;
           }
           break;
@@ -202,9 +216,13 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         }
       }
 
-      const int dil_x = cmd->run[i_run].conv_dilation & 0xFF,
-                dil_y = (cmd->run[i_run].conv_dilation >> 8) & 0xFF;
-      if ((dil_x > 1) || (dil_y > 1)) {
+      if ((is_deconv) && (ctx_->get_svn_version() < 93)) {
+        SET_ERR("Deconvolution support requires /sys/class/dmp_dv/dv_conv/svn_version to be at least 93, got %d",
+                ctx_->get_svn_version());
+        return -1;
+      }
+
+      if ((dil[0] > 1) || (dil[1] > 1)) {
         if (cmd->topo != 1) {
           SET_ERR("Dilated convolution must be the only run, but topo=%u", cmd->topo);
           return -1;
@@ -218,12 +236,17 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
                   kx, ky);
           return -1;
         }
-        const int kxfull = (kx - 1) * dil_x + 1,
-                  kyfull = (ky - 1) * dil_y + 1;
-        if ((w + pad[0] + pad[1] < kxfull) || (h + pad[2] + pad[3] < kyfull) ||
-            (w < pad[0]) || (w < pad[1]) || (h < pad[2]) || (h < pad[3])) {
-          SET_ERR("Input size %dx%d is too small for convolution of size %dx%d dilated by %dx%d",
-                  w, h, kx, ky, dil_x, dil_y);
+        const int kxfull = (kx - 1) * dil[0] + 1,
+                  kyfull = (ky - 1) * dil[1] + 1;
+        if ((w + pad[0] + pad[1] < kxfull) || (h + pad[2] + pad[3] < kyfull)) {
+          SET_ERR("Input size %dx%d pad_lrtb=%dx%dx%dx%d is too small for convolution of size %dx%d dilated by %dx%d",
+                  w, h, pad[0], pad[1], pad[2], pad[3], kx, ky, dil[0], dil[1]);
+          return -1;
+        }
+        if ((ctx_->get_svn_version() < 95) && ((w < pad[0]) || (w < pad[1]) || (h < pad[2]) || (h < pad[3]))) {
+          SET_ERR("Input size %dx%d pad_lrtb=%dx%dx%dx%d is too small for convolution of size %dx%d dilated by %dx%d "
+                  "for /sys/class/dmp_dv/dv_conv/svn_version less than 95, got %d",
+                  w, h, pad[0], pad[1], pad[2], pad[3], kx, ky, dil[0], dil[1], ctx_->get_svn_version());
           return -1;
         }
         if ((is_deconv) && ((stride[0] != 1) || (stride[1] != 1))) {
@@ -248,7 +271,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
 
       kcmd.run[i_run].actfunc = cmd->run[i_run].actfunc;
       kcmd.run[i_run].actfunc_param = cmd->run[i_run].actfunc_param;
-      kcmd.run[i_run].conv_dilation = (cmd->run[i_run].conv_dilation & 0xfefe) ? cmd->run[i_run].conv_dilation : 0;
+      kcmd.run[i_run].conv_dilation = (uint16_t)dil[0] | ((uint16_t)dil[1] << 8);
       kcmd.run[i_run].conv_enable = cmd->run[i_run].conv_enable;
       kcmd.run[i_run].conv_pad = cmd->run[i_run].conv_pad;
       kcmd.run[i_run].conv_stride = cmd->run[i_run].conv_stride;
@@ -271,27 +294,30 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       }
 
       int tiles = 1;
+      int u_b_in, u_b_out;
       if (kcmd.run[i_run].lrn & 1) {
-        tiles = calc_num_tiles_lrn(w, h, c, ctx_->get_ub_size() >> 10);
+        tiles = calc_num_tiles_lrn(w, h, c, ctx_->get_ub_size() >> 10, &u_b_in, &u_b_out);
       }
       else if (!is_conv_2d_v0(&kcmd.run[i_run])) {
         if (kcmd.run[i_run].pool_enable) {
-          tiles = calc_num_tiles_pool(w, h, c);
+          tiles = calc_num_tiles_pool(w, h, c, &u_b_in, &u_b_out);
         }
       }
       else {
         tiles = calc_num_tiles_conv(
-            w, h, c, m, (kx > ky ? kx : ky) | 1,
+            w, h, c, m, kx, ky,
             pad[0], pad[1], pad[2], pad[3],
-            stride[0], stride[1], ctx_->get_ub_size() >> 10, is_deconv);
+            stride[0], stride[1], dil[0], dil[1],
+            ctx_->get_ub_size() >> 10, is_deconv, &u_b_in, &u_b_out);
       }
       if (tiles < 1) {
-        SET_ERR("Could not calculate number of tiles for cmd->run[%d]", i_run);
+        SET_ERR("cmd->run[%d] requires at least %d bytes of unified buffer: w=%d h=%d c=%d m=%d p=0x%04x dil=0x%04x",
+                i_run, u_b_in + u_b_out, w, h, c, m, kcmd.run[i_run].p, kcmd.run[i_run].conv_dilation);
         return -1;
       }
 
       if ((kcmd.z > 1) || (kcmd.run[i_run].pz > 1) ||
-          (kcmd.run[i_run].conv_dilation)) {
+          (dil[0] > 1) || (dil[1] > 1)) {
         // TODO: add more checks: no maxpool_with_argmax, no unpool_with_argmax.
         valid_multi_run = false;
       }
@@ -325,9 +351,6 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         return -1;
       }
       int ubuf_used = ubuf_get_single_tile_usage(&kcmd, ctx_->get_ub_size());
-      //fprintf(stderr, "UBUF used size for the input W=%d H=%d C=%d is %d\n",
-      //        (int)cmd->w, (int)cmd->h, (int)cmd->c, ubuf_used);
-      //fflush(stderr);
       if (ubuf_used > ctx_->get_ub_size()) {
         SET_ERR("Unified buffer should be at least %d bytes to process the input W=%d H=%d C=%d",
                 ubuf_used, (int)cmd->w, (int)cmd->h, (int)cmd->c);
@@ -403,7 +426,13 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         kcmd->run[i_run].p = cmd->run[i_run].p;
         kcmd->run[i_run].pz = cmd->run[i_run].pz;
         kcmd->run[i_run].conv_stride = cmd->run[i_run].conv_stride;
-        kcmd->run[i_run].conv_dilation = (cmd->run[i_run].conv_dilation & 0xfefe) ? cmd->run[i_run].conv_dilation : 0;
+        {
+          uint16_t dil_x = cmd->run[i_run].conv_dilation & 0xFF,
+                   dil_y = (cmd->run[i_run].conv_dilation >> 8) & 0xFF;
+          dil_x = dil_x < 1 ? 1 : dil_x;
+          dil_y = dil_y < 1 ? 1 : dil_y;
+          kcmd->run[i_run].conv_dilation = dil_x | (dil_y << 8);
+        }
         kcmd->run[i_run].weight_fmt = cmd->run[i_run].weight_fmt;
         kcmd->run[i_run].pool_enable = cmd->run[i_run].pool_enable;
         kcmd->run[i_run].pool_avg_param = cmd->run[i_run].pool_avg_param;
