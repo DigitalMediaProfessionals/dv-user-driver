@@ -295,7 +295,7 @@ error:
       }
     }
     if (!phys_mem) {
-      PERR("Fail to allocate dmp_dv_mem of %lu B", cma_size);
+      PERR("Fail to allocate dmp_dv_mem of %zu B", cma_size);
       return -1;
     }
     cout << "Allocated dmp_dv_mem for " << hex << cma_size << " bytes" << dec << endl;
