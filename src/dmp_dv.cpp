@@ -67,7 +67,7 @@ void dmp_dv_set_last_error_message(const char *format, ...) {
 
 
 const char *dmp_dv_get_version_string() {
-  return "7.0.20190214";
+  return "7.0.20190215";
 }
 
 
@@ -264,6 +264,7 @@ int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
   }
   return ((CDMPDVCmdList*)cmdlist)->AddRaw(cmd);
 }
+
 
 int dmp_dv_fpga_device_exists(dmp_dv_context ctx, int dev_type_id) {
   if(!ctx) {

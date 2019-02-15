@@ -40,7 +40,9 @@ class CDMPDVContext : public CDMPDVBase {
     conv_freq_ = 0;
     fc_freq_ = 0;
     max_fc_vector_size_ = 16384;
+    mac_num_ = 0;
     svn_version_ = 0;
+    zia_c2_ = false;
   }
 
   /// @brief Called when the object is about to be destroyed.
@@ -115,7 +117,10 @@ class CDMPDVContext : public CDMPDVBase {
     conv_freq_ = sysfs_read_int("conv/conv_freq", 0);
     fc_freq_ = sysfs_read_int("fc/fc_freq", 0);
     max_fc_vector_size_ = sysfs_read_int("fc/max_fc_vector_size", 16384);
+    mac_num_ = sysfs_read_int("conv/mac_num", 0);
     svn_version_ = sysfs_read_int("conv/svn_version", 0);
+
+    zia_c2_ = (sizeof(size_t) == 4) && (ub_size_ == 524288) && (mac_num_ == 576);  // TODO: add proper detection.
 
     char s[256];
     snprintf(s, sizeof(s), "DMP DV: ub_size=%d max_kernel_size=%d conv_freq=%d fc_freq=%d max_fc_vector_size=%d",
@@ -186,6 +191,11 @@ class CDMPDVContext : public CDMPDVBase {
     return svn_version_;
   }
 
+  /// @brief Returns true if the hardware is ZIA-C2.
+  inline bool is_zia_c2() const {
+    return zia_c2_;
+  }
+
   int GetInfo(struct dmp_dv_info *p_info) {
     if (p_info->size < 8) {
       SET_ERR("Invalid argument: info->size is too small: %u", p_info->size);
@@ -219,8 +229,14 @@ class CDMPDVContext : public CDMPDVBase {
   /// @brief Fully Connected block maximum input vector size in elements.
   int max_fc_vector_size_;
 
-  /// @brief Hardware SVN version to limit capabilities.
+  /// @brief Number of MACs.
+  int mac_num_;
+
+  /// @brief Hardware SVN version.
   int svn_version_;
+
+  /// @brief If the hardware is ZIA-C2.
+  bool zia_c2_;
 
   /// @brief Device information.
   std::string info_;

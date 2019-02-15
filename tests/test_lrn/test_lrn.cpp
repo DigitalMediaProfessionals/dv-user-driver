@@ -40,6 +40,9 @@
 #include "dmp_dv_cmdraw_v0.h"
 
 
+#define FAILED_ADD_RAW -100
+
+
 /// @brief Rounds up "a" to be the multiple of "n".
 static inline int roundup(int a) {
   const int n = 64;
@@ -292,6 +295,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
 
     if (dmp_dv_cmdlist_add_raw(cmdlist, (dmp_dv_cmdraw*)&cmd)) {
       ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
+      result = FAILED_ADD_RAW;
       goto L_EXIT;
     }
   }
@@ -541,6 +545,7 @@ int main(int argc, char **argv) {
 
   int n_ok = 0;
   int n_err = 0;
+  int n_add_raw = 0;
   int res = 0;
 
   std::shared_ptr<std::set<conv_config> > config_set = std::make_shared<std::set<conv_config> >();
@@ -650,7 +655,12 @@ int main(int argc, char **argv) {
         }
         res = test_cmdlists(confs);
         if (res) {
-          ++n_err;
+          if (res == FAILED_ADD_RAW) {
+            ++n_add_raw;
+          }
+          else {
+            ++n_err;
+          }
         }
         else {
           ++n_ok;
@@ -660,7 +670,12 @@ int main(int argc, char **argv) {
       if (confs.size()) {
         res = test_cmdlists(confs);
         if (res) {
-          ++n_err;
+          if (res == FAILED_ADD_RAW) {
+            ++n_add_raw;
+          }
+          else {
+            ++n_err;
+          }
         }
         else {
           ++n_ok;
@@ -675,7 +690,8 @@ int main(int argc, char **argv) {
   }
 
   LOG("Tests succeeded: %d\n", n_ok);
-  LOG("Tests failed: %d\n", n_err);
+  LOG("Tests failed on dmp_dv_cmdlist_add_raw: %d\n", n_add_raw);
+  LOG("Tests failed to produce correct results: %d\n", n_err);
   LOG("Number of configurations tested: %d\n", (int)configs.size());
 
   fclose(g_flog);

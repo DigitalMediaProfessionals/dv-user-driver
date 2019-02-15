@@ -40,6 +40,9 @@
 #include "dmp_dv_cmdraw_v0.h"
 
 
+#define FAILED_ADD_RAW -100
+
+
 static int g_sleep = 0;
 
 
@@ -324,6 +327,7 @@ int test_cmdlists(const std::vector<conv_config*>& confs) {
 
     if (dmp_dv_cmdlist_add_raw(cmdlist, (dmp_dv_cmdraw*)&cmd)) {
       ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
+      result = FAILED_ADD_RAW;
       goto L_EXIT;
     }
   }
@@ -567,6 +571,7 @@ int main(int argc, char **argv) {
 
   int n_ok = 0;
   int n_err = 0;
+  int n_add_raw = 0;
   int res = 0;
 
   std::shared_ptr<std::set<conv_config> > config_set = std::make_shared<std::set<conv_config> >();
@@ -652,18 +657,18 @@ int main(int argc, char **argv) {
     configs[i] = config_data.data() + i;
   }
 
-  const int seed = 1234;  // time(NULL);
+  const int seed = time(NULL);
   std::mt19937 mt_rand(seed);
   std::uniform_int_distribution<int> rnd_offs(0, 1024);
 
-  const int n_passes = 1;
+  const int n_passes = 2;
   for (int i_pass = 0; i_pass < n_passes; ++i_pass) {
     // Randomize configrations order
     std::shuffle(configs.begin(), configs.end(), mt_rand);
 
     // Execute configurations in different chunk sizes
     const size_t pack_sizes[2] = {1, 50};
-    const int n_packs = 1;
+    const int n_packs = 2;
     for (int i_pack = 0; i_pack < n_packs; ++i_pack) {
       std::vector<conv_config*> confs;
       int i_config = 0;
@@ -680,7 +685,12 @@ int main(int argc, char **argv) {
         }
         res = test_cmdlists(confs);
         if (res) {
-          ++n_err;
+          if (res == FAILED_ADD_RAW) {
+            ++n_add_raw;
+          }
+          else {
+            ++n_err;
+          }
         }
         else {
           ++n_ok;
@@ -690,7 +700,12 @@ int main(int argc, char **argv) {
       if (confs.size()) {
         res = test_cmdlists(confs);
         if (res) {
-          ++n_err;
+          if (res == FAILED_ADD_RAW) {
+            ++n_add_raw;
+          }
+          else {
+            ++n_err;
+          }
         }
         else {
           ++n_ok;
@@ -705,7 +720,8 @@ int main(int argc, char **argv) {
   }
 
   LOG("Tests succeeded: %d\n", n_ok);
-  LOG("Tests failed: %d\n", n_err);
+  LOG("Tests failed on dmp_dv_cmdlist_add_raw: %d\n", n_add_raw);
+  LOG("Tests failed to produce correct results: %d\n", n_err);
   LOG("Number of configurations tested: %d\n", (int)configs.size());
 
   fclose(g_flog);

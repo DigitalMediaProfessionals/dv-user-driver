@@ -171,8 +171,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         case 2:
         {
           if ((cmd->run[i_run].pool_enable == 1) &&
-              ((pool_kx < 2) || (pool_kx > 3) || (pool_ky < 2) || (pool_ky > 3))) {
-            SET_ERR("Unsupported max pooling size %dx%d, only sizes from 2 to 3 are supported",
+              ((pool_kx < 1) || (pool_kx > 3) || (pool_ky < 1) || (pool_ky > 3) || ((pool_kx < 2) && (pool_ky < 2)))) {
+            SET_ERR("Unsupported max pooling size %dx%d, longest pooling window side must be 2 or 3",
                     pool_kx, pool_ky);
             return -1;
           }
@@ -243,10 +243,11 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
                   w, h, pad[0], pad[1], pad[2], pad[3], kx, ky, dil[0], dil[1]);
           return -1;
         }
-        if ((ctx_->get_svn_version() < 95) && ((w < pad[0]) || (w < pad[1]) || (h < pad[2]) || (h < pad[3]))) {
+        const int min_svn_version = ctx_->is_zia_c2() ? 83 : 93;
+        if ((ctx_->get_svn_version() < min_svn_version) && ((w < pad[0]) || (w < pad[1]) || (h < pad[2]) || (h < pad[3]))) {
           SET_ERR("Input size %dx%d pad_lrtb=%dx%dx%dx%d is too small for convolution of size %dx%d dilated by %dx%d "
-                  "for /sys/class/dmp_dv/dv_conv/svn_version less than 95, got %d",
-                  w, h, pad[0], pad[1], pad[2], pad[3], kx, ky, dil[0], dil[1], ctx_->get_svn_version());
+                  "for /sys/class/dmp_dv/dv_conv/svn_version less than %d, got %d",
+                  w, h, pad[0], pad[1], pad[2], pad[3], kx, ky, dil[0], dil[1], min_svn_version, ctx_->get_svn_version());
           return -1;
         }
         if ((is_deconv) && ((stride[0] != 1) || (stride[1] != 1))) {

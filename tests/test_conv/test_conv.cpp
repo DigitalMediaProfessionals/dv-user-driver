@@ -712,8 +712,10 @@ int test_conv(const std::vector<conv_config*>& confs) {
 
   if ((!result) && (confs.size())) {
     const int64_t total_size = dmp_dv_mem_get_total_size();
+    static int64_t max_total_size = 0;
+    max_total_size = std::max(max_total_size, total_size);
     if (total_size) {
-      LOG("Totally allocated: %lld bytes\n", (long long)total_size);
+      LOG("Totally allocated: %lld bytes (%lld bytes max)\n", (long long)total_size, (long long)max_total_size);
     }
     else {
       ERR("dmp_dv_mem_get_total_size() returned zero while it shouldn't\n");
