@@ -511,7 +511,10 @@ int test_conv(const std::vector<conv_config*>& confs) {
       conf->failed = true;
       goto L_EXIT;
     }
-    memset(conf->io_ptr, 0, conf->io_size);
+    for (int i = 0; i < (int)conf->io_size / 2; ++i) {
+      conf->io_ptr[i] = (__fp16)1000.0f;
+    }
+    //memset(conf->io_ptr, 0, conf->io_size);
     conf->io_ptr += conf->io_offs >> 1;
 
     // Caffe's input is stored as channel, height, width
