@@ -47,12 +47,18 @@ class Main(object):
         self.generate(960, 384, 16,
                       1, (2, 2), (2, 2), (0, 0, 0, 0), args)
 
-        for i in (2, 3):
-            for j in range(1, i + 1):
+        for i in (1, 2, 3):
+            for j in (1, 2, 3):
                 self.generate(i, j, 16, 1, (i, j), (1, 1), (0, 0, 0, 0), args)
-        for i in (2, 3, 4, 5):
-            for j in range(1, i + 1):
+                self.generate(i * 2, j, 16, 1, (i, j), (1, 1), (0, 0, 0, 0), args)
+                self.generate(i, j * 2, 16, 1, (i, j), (1, 1), (0, 0, 0, 0), args)
+                self.generate(i * 2, j * 2, 16, 1, (i, j), (1, 1), (0, 0, 0, 0), args)
+        for i in (1, 2, 3, 4, 5, 6, 7):
+            for j in (1, 2, 3, 4, 5, 6, 7):
                 self.generate(i, j, 16, 2, (i, j), (1, 1), (0, 0, 0, 0), args)
+                self.generate(i * 2, j, 16, 2, (i, j), (1, 1), (0, 0, 0, 0), args)
+                self.generate(i, j * 2, 16, 2, (i, j), (1, 1), (0, 0, 0, 0), args)
+                self.generate(i * 2, j * 2, 16, 2, (i, j), (1, 1), (0, 0, 0, 0), args)
 
     def generate(self, width, height, n_channels,
                  pool_type, pool_size, pool_stride, pool_pad, args):

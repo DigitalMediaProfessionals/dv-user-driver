@@ -171,8 +171,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         case 2:
         {
           if ((cmd->run[i_run].pool_enable == 1) &&
-              ((pool_kx < 1) || (pool_kx > 3) || (pool_ky < 1) || (pool_ky > 3) || ((pool_kx < 2) && (pool_ky < 2)))) {
-            SET_ERR("Unsupported max pooling size %dx%d, longest pooling window side must be 2 or 3",
+              ((pool_kx < 2) || (pool_kx > 3) || (pool_ky < 1) || (pool_ky > 3))) {
+            SET_ERR("Unsupported max pooling size %dx%d, only 2x1, 2x2, 2x3, 3x1, 3x2, 3x3 are supported",
                     pool_kx, pool_ky);
             return -1;
           }
