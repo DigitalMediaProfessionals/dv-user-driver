@@ -46,56 +46,61 @@ inline uint32_t xorshift32(uint32_t state[1]) {
 int test_mem(size_t size) {
   LOG("ENTER: test_mem(%zu)\n", size);
 
-  dmp_dv_context ctx = dmp_dv_context_create();
+  dmp_dv_context ctx = NULL;
+  dmp_dv_mem mem = NULL;
+  int result = -1;
+  uint8_t *arr = NULL;
+  void *ptr = NULL;
+  const size_t sz_big = 1 * 1024 * 1024;
+  std::unique_ptr<uint8_t> big_ptr;
+  uint8_t *big = NULL;
+  const int n = size >> 2;
+  volatile uint32_t *buf = NULL;
+  struct timespec ts;
+  uint32_t state[1];
+  uint32_t s0;
+  size_t a_start, a_end, a_map;
+  uint32_t *big32 = NULL;
+
+  ctx = dmp_dv_context_create();
   if (!ctx) {
     ERR("dmp_dv_context_create() failed: %s\n", dmp_dv_get_last_error_message());
-    return -1;
+    goto L_EXIT;
   }
   LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
 
-  dmp_dv_mem mem = dmp_dv_mem_alloc(ctx, size);
+  mem = dmp_dv_mem_alloc(ctx, size);
   if (!mem) {
     ERR("dmp_dv_mem_alloc() failed: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_context_release(ctx);
-    return -1;
+    goto L_EXIT;
   }
   LOG("Successfully allocated %zu bytes of memory (%zu requested)\n", dmp_dv_mem_get_size(mem), size);
 
-  uint8_t *arr = dmp_dv_mem_map(mem);
+  arr = dmp_dv_mem_map(mem);
   if (!arr) {
     ERR("dmp_dv_mem_map() failed: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_mem_release(mem);
-    dmp_dv_context_release(ctx);
-    return -1;
+    goto L_EXIT;
   }
   LOG("Successfully mapped to user space %zu bytes of memory, address is %zu\n", size, (size_t)arr);
   if (dmp_dv_mem_sync_start(mem, 0, 1)) {
     ERR("dmp_dv_mem_sync_start() failed for writing: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_mem_release(mem);
-    dmp_dv_context_release(ctx);
-    return -1;
+    goto L_EXIT;
   }
   memset(arr, 0, size);
   if (dmp_dv_mem_sync_end(mem)) {
     ERR("dmp_dv_mem_sync_end() failed: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_mem_release(mem);
-    dmp_dv_context_release(ctx);
-    return -1;
+    goto L_EXIT;
   }
 
   // Start Read-Write memory transaction
   if (dmp_dv_mem_sync_start(mem, 1, 1)) {
     ERR("dmp_dv_mem_sync_start() failed for writing: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_mem_release(mem);
-    dmp_dv_context_release(ctx);
-    return -1;
+    goto L_EXIT;
   }
-  const int n = size >> 2;
-  volatile uint32_t *buf = (uint32_t*)arr;
-  struct timespec ts;
+
+  buf = (uint32_t*)arr;
   clock_gettime(CLOCK_MONOTONIC, &ts);
-  const uint32_t s0 = (uint32_t)(ts.tv_sec * 1000000 + ts.tv_nsec / 1000);  // in microseconds
-  uint32_t state[1];
+  s0 = (uint32_t)(ts.tv_sec * 1000000 + ts.tv_nsec / 1000);  // in microseconds
   state[0] = {s0};
   for (int i = 0; i < n; ++i) {
     uint32_t gold = xorshift32(state);
@@ -106,16 +111,12 @@ int test_mem(size_t size) {
     uint32_t gold = xorshift32(state);
     if (buf[i] != gold) {
       ERR("Cache incoherence detected at first stage: %u != %u at %d\n", buf[i], gold, i);
-      dmp_dv_mem_release(mem);
-      dmp_dv_context_release(ctx);
-      return -1;
+      goto L_EXIT;
     }
   }
   if (dmp_dv_mem_sync_end(mem)) {
     ERR("dmp_dv_mem_sync_end() failed: %s\n", dmp_dv_get_last_error_message());
-    dmp_dv_mem_release(mem);
-    dmp_dv_context_release(ctx);
-    return -1;
+    goto L_EXIT;
   }
   LOG("Successfully filled the buffer and synced with physical memory\n");
 
@@ -123,51 +124,41 @@ int test_mem(size_t size) {
   LOG("Unmapped the buffer\n");
 
   // Map at the previous address
-  void *ptr = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ptr = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (!ptr) {
     ERR("mmap() failed at the previous address\n");
-    dmp_dv_mem_release(mem);
-    dmp_dv_context_release(ctx);
-    return -1;
+    goto L_EXIT;
   }
   memset(ptr, 0, 4096);
 
-  const size_t sz_big = 1 * 1024 * 1024;
-  std::unique_ptr<uint8_t> big_ptr(new uint8_t[sz_big]);
-  uint8_t *big = big_ptr.get();
+  big_ptr.reset(new uint8_t[sz_big]);
+  big = big_ptr.get();
   if (!big) {
     ERR("malloc() failed for 64Mb\n");
-    dmp_dv_mem_release(mem);
-    dmp_dv_context_release(ctx);
-    return -1;
+    goto L_EXIT;
   }
   memset(big, 0xFF, sz_big);
 
   arr = dmp_dv_mem_map(mem);
   if (!arr) {
     ERR("dmp_dv_mem_map() failed: %s\n", dmp_dv_get_last_error_message());
-    munmap(ptr, 4096);
-    dmp_dv_mem_release(mem);
-    dmp_dv_context_release(ctx);
-    return -1;
+    goto L_EXIT;
   }
   LOG("Successfully mapped to user space %zu bytes of memory, address is %zu\n", size, (size_t)arr);
   munmap(ptr, 4096);
 
-  size_t a_start = (size_t)big;
-  size_t a_end = a_start + sz_big;
-  size_t a_map = (size_t)arr;
+  a_start = (size_t)big;
+  a_end = a_start + sz_big;
+  a_map = (size_t)arr;
   if (!((a_map + size <= a_start) || (a_map >= a_end))) {
     ERR("Memory allocator returned bad address: [%zu, %zu] map=%zu\n", a_start, a_end, a_map);
-    dmp_dv_mem_release(mem);
-    dmp_dv_context_release(ctx);
-    return -1;
+    goto L_EXIT;
   }
-  const uint32_t *big32 = (uint32_t*)big;
+  big32 = (uint32_t*)big;
   for (int i = 0; i < (int)(sz_big >> 2); ++i) {
     if (big32[i] != 0xFFFFFFFF) {
       ERR("Unexpected value encountered\n");
-      return -1;
+      goto L_EXIT;
     }
   }
   big_ptr.reset();
@@ -175,8 +166,7 @@ int test_mem(size_t size) {
   // Start Read-Only memory transaction
   if (dmp_dv_mem_sync_start(mem, 1, 0)) {
     ERR("dmp_dv_mem_sync_start() failed for reading: %s", dmp_dv_get_last_error_message());
-    dmp_dv_mem_release(mem);
-    dmp_dv_context_release(ctx);
+    goto L_EXIT;
   }
 
   buf = (uint32_t*)arr;
@@ -185,19 +175,19 @@ int test_mem(size_t size) {
     uint32_t gold = xorshift32(state);
     if (buf[i] != gold) {
       ERR("%u != %u at %d\n", buf[i], gold, i);
-      dmp_dv_mem_release(mem);
-      dmp_dv_context_release(ctx);
-      return -1;
+      goto L_EXIT;
     }
   }
-
-  int result = 0;
 
   if (dmp_dv_mem_get_total_size() != (int64_t)dmp_dv_mem_get_size(mem)) {
     ERR("dmp_dv_mem_get_total_size() returned different value %lld than expected %lld\n",
         (long long)dmp_dv_mem_get_total_size(), (long long)dmp_dv_mem_get_size(mem));
-    result = -1;
+    goto L_EXIT;
   }
+
+  result = 0;
+
+  L_EXIT:
 
   dmp_dv_mem_release(mem);
   dmp_dv_context_release(ctx);
