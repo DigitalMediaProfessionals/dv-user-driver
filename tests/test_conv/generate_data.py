@@ -31,30 +31,20 @@ def roundup(a, b):
     return a + (b - d) if d else a
 
 
-class Main(object):
-    def __init__(self):
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--float", action="store_true",
-                            help="Generate float random weights")
-        parser.add_argument("--square", action="store_true",
-                            help="Generate only square sizes")
-        parser.add_argument("--odd", action="store_true",
-                            help="Generate only odd sizes")
-        parser.add_argument("--multiple", type=int, default=1,
-                            help="Force generated channels to be multiple "
-                                 "of this value (default: 1)")
-        parser.add_argument("--dilated", action="store_true",
-                            help="Generate only tests for dilated "
-                            "convolutions")
-        parser.add_argument("--deconv", action="store_true",
-                            help="Generate only tests for deconvolutions")
-        parser.add_argument("--seed", type=int, default=1234,
-                            help="Random seed")
-        parser.add_argument("--bz", action="store_true",
-                            help="Set bias to zero")
-        args = parser.parse_args()
+class Generator(object):
+    def __init__(self, *, float=False, square=False, odd=False, multiple=1,
+                 dilated=False, deconv=False, seed=1234, bz=False):
+        self.float = float
+        self.square = square
+        self.odd = odd
+        self.multiple = multiple
+        self.dilated = dilated
+        self.deconv = deconv
+        self.seed = seed
+        self.bz = bz
 
-        if args.dilated:
+    def __call__(self):
+        if self.dilated:
             for w in range(1, 80, 1):
                 for kx in (3, 5, 7):
                     for dil in (2, 3, 6, 12, 18, 24):
@@ -65,24 +55,25 @@ class Main(object):
                             kx=kx, ky=kx, n_kernels=16,
                             pad_ltrb=(pad, pad, pad, pad),
                             stride_xy=(1, 1), activation=0,
-                            dw=False, dil=dil, deconv=False, args=args)
+                            dw=False, dil=dil, deconv=False)
             return
 
-        self.generate_tests(args)
+        self.generate_tests()
 
-    def generate_tests(self, args):
+    def generate_tests(self):
         for deconv in (False, True):
-            self.generate_deconv(deconv, args)
+            if deconv or not self.deconv:
+                self.generate_deconv(deconv)
 
-    def generate_deconv(self, deconv, args):
+    def generate_deconv(self, deconv):
         sizes = [1, 9, 15]
         dilations = [1, 2]
-        if args.odd:
+        if self.odd:
             kxx = (1, 3, 5, 7)
         else:
             kxx = (1, 2, 3, 4, 5, 6, 7)
         for kx in kxx:
-            if args.square:
+            if self.square:
                 kyy = (kx,)
             else:
                 kyy = kxx
@@ -101,9 +92,9 @@ class Main(object):
                         pads.append((0, 0, 0, 0))
                     for pad in pads:
                         self.generate(
-                            x, y, roundup(c, args.multiple),
-                            kx, ky, roundup(m, args.multiple),
-                            pad, stride, act, dw, dil, deconv, args)
+                            x, y, roundup(c, self.multiple),
+                            kx, ky, roundup(m, self.multiple),
+                            pad, stride, act, dw, dil, deconv)
 
         # Test activations
         for kx in (1, 3, 5, 7):
@@ -125,9 +116,9 @@ class Main(object):
                         pads.append((0, 0, 0, 0))
                     for pad in pads:
                         self.generate(
-                            x, y, roundup(c, args.multiple),
-                            kx, ky, roundup(m, args.multiple),
-                            pad, stride, act, dw, dil, deconv, args)
+                            x, y, roundup(c, self.multiple),
+                            kx, ky, roundup(m, self.multiple),
+                            pad, stride, act, dw, dil, deconv)
 
         # Generate big input
         kx = 3
@@ -143,14 +134,14 @@ class Main(object):
         dil = 1
         self.generate(
             width, height, n_channels, kx, ky, n_kernels,
-            pad_ltrb, stride_xy, activation, dw, dil, deconv, args)
+            pad_ltrb, stride_xy, activation, dw, dil, deconv)
 
         # Dense-ASPP layer with big dilation
         self.generate(width=60, height=40, n_channels=128,
                       kx=3, ky=3, n_kernels=64,
                       pad_ltrb=(24, 24, 24, 24),
                       stride_xy=(1, 1), activation=0,
-                      dw=False, dil=24, deconv=False, args=args)
+                      dw=False, dil=24, deconv=False)
 
         # Generate tests with big dilation
         for w in range(1, 80, 1):
@@ -161,7 +152,7 @@ class Main(object):
                     self.generate(
                         width=w, height=w, n_channels=8, kx=kx, ky=kx, n_kernels=8,
                         pad_ltrb=(pad, pad, pad, pad), stride_xy=(1, 1), activation=0,
-                        dw=False, dil=dil, deconv=False, args=args)
+                        dw=False, dil=dil, deconv=False)
 
         # With big dialtion and big input
         for w in (80,):
@@ -172,14 +163,14 @@ class Main(object):
                     self.generate(
                         width=w, height=w, n_channels=256, kx=kx, ky=kx, n_kernels=16,
                         pad_ltrb=(pad, pad, pad, pad), stride_xy=(1, 1), activation=0,
-                        dw=False, dil=dil, deconv=False, args=args)
+                        dw=False, dil=dil, deconv=False)
 
     def get_ox(self, width, kx, pad_left, pad_right, stride, deconv):
         return (pad_left + ((width - 1) * stride + 1 if deconv else width) +
                 pad_right - kx) // (1 if deconv else stride) + 1
 
     def generate(self, width, height, n_channels, kx, ky, n_kernels,
-                 pad_ltrb, stride_xy, activation, dw, dil, deconv, args):
+                 pad_ltrb, stride_xy, activation, dw, dil, deconv):
         """Generates test data for convolutional layer and invokes caffe
         to generate gold output.
 
@@ -199,9 +190,6 @@ class Main(object):
         """
         dil = max(1, dil)
 
-        if not deconv and args.deconv:
-            return
-
         if deconv and dil > 1 and max(stride_xy) > 1:
             return
 
@@ -216,7 +204,7 @@ class Main(object):
                          kx % 2 == 0 or ky % 2 == 0)):
             return
 
-        if dil < 2 and args.dilated:
+        if dil < 2 and self.dilated:
             return
 
         if ((pad_ltrb[0] + width + pad_ltrb[2] < kx) or
@@ -256,9 +244,9 @@ class Main(object):
         prefix = ("%s/%dx%dx%d_pad%s_stride%s_act%d" %
                   (s_dir, kx, ky, n_kernels, s_pad, s_stride, activation))
 
-        numpy.random.seed(args.seed)
+        numpy.random.seed(self.seed)
 
-        if args.float:
+        if self.float:
             values = numpy.random.uniform(
                 -1.0, 1.0, 1001).astype(numpy.float32)
         else:
@@ -266,7 +254,7 @@ class Main(object):
                                  dtype=numpy.float32)
 
         bias = numpy.random.choice(values, n_kernels).astype(numpy.float16)
-        if args.bz:
+        if self.bz:
             bias[:] = 0
         bias.tofile("%s.b.bin" % prefix)
 
@@ -437,4 +425,24 @@ layer {
 
 
 if __name__ == "__main__":
-    Main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--float", action="store_true",
+                        help="Generate float random weights")
+    parser.add_argument("--square", action="store_true",
+                        help="Generate only square sizes")
+    parser.add_argument("--odd", action="store_true",
+                        help="Generate only odd sizes")
+    parser.add_argument("--multiple", type=int, default=1,
+                        help="Force generated channels to be multiple "
+                             "of this value (default: 1)")
+    parser.add_argument("--dilated", action="store_true",
+                        help="Generate only tests for dilated "
+                        "convolutions")
+    parser.add_argument("--deconv", action="store_true",
+                        help="Generate only tests for deconvolutions")
+    parser.add_argument("--seed", type=int, default=1234,
+                        help="Random seed")
+    parser.add_argument("--bz", action="store_true",
+                        help="Set bias to zero")
+    args = parser.parse_args()
+    Generator(**vars(args))()
