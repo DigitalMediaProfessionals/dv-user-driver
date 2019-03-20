@@ -31,7 +31,9 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
 
   /// @brief Destructor.
   virtual ~CDMPDVCmdListConvHelper() {
-    // Empty by design
+    for (auto it = helper_bufs_.rbegin(); it != helper_bufs_.rend(); ++it) {
+      dmp_dv_mem_release(*it);
+    }
   }
 
   /// @brief Creates object of this type.
@@ -44,12 +46,32 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
   virtual int CheckRaw(dmp_dv_cmdraw *cmd,
                        std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& input_bufs,
                        std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& output_bufs) {
-    switch (cmd->version) {
-      case 0:
-        return CheckRaw_v0((dmp_dv_cmdraw_conv_v0*)cmd, input_bufs, output_bufs);
+    switch (cmd->device_type) {
+      case DMP_DV_DEV_CONV:
+        switch (cmd->version) {
+          case 0:
+            return CheckRaw_v0((dmp_dv_cmdraw_conv_v0*)cmd, input_bufs, output_bufs);
 
+          default:
+            SET_ERR("Invalid argument: cmd->version %d is not supported with device_type %d",
+                    (int)cmd->version, cmd->device_type);
+            return ENOTSUP;
+        }
+        break;
+      case DMP_DV_DEV_FC:
+        switch (cmd->version) {
+          case 0:
+            return CheckRawFC_v0((dmp_dv_cmdraw_fc_v0*)cmd, input_bufs, output_bufs);
+
+          default:
+            SET_ERR("Invalid argument: cmd->version %d is not supported with device_type %d on device_type %d",
+                    (int)cmd->version, cmd->device_type, DMP_DV_DEV_CONV);
+            return ENOTSUP;
+        }
+        break;
       default:
-        SET_ERR("Invalid argument: cmd->version %d is not supported", (int)cmd->version);
+        SET_ERR("Invalid argument: handling of cmd->device_type %d is not supported on device_type %d",
+                cmd->device_type, DMP_DV_DEV_CONV);
         return ENOTSUP;
     }
     SET_LOGIC_ERR();
@@ -58,12 +80,31 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
 
   /// @brief Fills command in the format suitable for later execution on the device.
   virtual int FillKCommand(uint8_t *kcmd, dmp_dv_cmdraw *cmd, uint32_t& size) {
-    switch (cmd->version) {
-      case 0:
-        return FillKCommand_v0((dmp_dv_kcmdraw_conv_v0*)kcmd, (dmp_dv_cmdraw_conv_v0*)cmd, size);
+    switch (cmd->device_type) {
+      case DMP_DV_DEV_CONV:
+        switch (cmd->version) {
+          case 0:
+            return FillKCommand_v0((dmp_dv_kcmdraw_conv_v0*)kcmd, (dmp_dv_cmdraw_conv_v0*)cmd, size);
 
+          default:
+            SET_ERR("Invalid argument: cmd->version %d is not supported", (int)cmd->version);
+            return ENOTSUP;
+        }
+        break;
+      case DMP_DV_DEV_FC:
+        switch (cmd->version) {
+          case 0:
+            return FillKCommandFC_v0((dmp_dv_kcmdraw_conv_v0*)kcmd, (dmp_dv_cmdraw_fc_v0*)cmd, size);
+
+          default:
+            SET_ERR("Invalid argument: cmd->version %d is not supported with device_type %d on device_type %d",
+                    (int)cmd->version, cmd->device_type, DMP_DV_DEV_CONV);
+            return ENOTSUP;
+        }
+        break;
       default:
-        SET_ERR("Invalid argument: cmd->version %d is not supported", (int)cmd->version);
+        SET_ERR("Invalid argument: handling of cmd->device_type %d is not supported on device_type %d",
+                cmd->device_type, DMP_DV_DEV_CONV);
         return ENOTSUP;
     }
     SET_LOGIC_ERR();
@@ -450,4 +491,216 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
     size = req_size;
     return 0;
   }
+
+  /// @brief Checks command of version 0 for validness for legacy FC configuration.
+  int CheckRawFC_v0(struct dmp_dv_cmdraw_fc_v0 *cmd,
+                    std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& input_bufs,
+                    std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& output_bufs) {
+    if (cmd->header.size != sizeof(struct dmp_dv_cmdraw_fc_v0)) {
+      SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
+              (int)cmd->header.size, (int)cmd->header.version);
+      return -1;
+    }
+
+    if (!cmd->input_buf.mem) {
+      SET_ERR("Invalid argument: cmd->input_buf.mem is NULL");
+      return -1;
+    }
+
+    if (!cmd->output_buf.mem) {
+      SET_ERR("Invalid argument: cmd->output_buf.mem is NULL");
+      return -1;
+    }
+
+    if (!cmd->weight_buf.mem) {
+      SET_ERR("Invalid argument: cmd->weight_buf.mem is NULL");
+      return -1;
+    }
+
+    if ((!cmd->input_size) || ((int)cmd->input_size > ctx_->get_max_fc_vector_size())) {
+      SET_ERR("Unsupported input vector size %d, only sizes up to %d are supported",
+              (int)cmd->input_size, ctx_->get_max_fc_vector_size());
+      return -1;
+    }
+
+    if ((!cmd->output_size) || ((int)cmd->output_size > ctx_->get_max_fc_vector_size())) {
+      SET_ERR("Unsupported output vector size %d, only sizes from 1 to %d are supported",
+              (int)cmd->input_size, ctx_->get_max_fc_vector_size());
+      return -1;
+    }
+
+    input_bufs.push_back(std::make_pair(cmd->input_buf, cmd->input_size * 2));
+
+    size_t weights_size = 0;
+    uint16_t quant_map[256];
+    int res = dmp_dv_pack_fc_weights(
+        cmd->input_size, 1, 1,
+        cmd->output_size, 1, 1,
+        cmd->weight_fmt == 1 ? quant_map : NULL,
+        NULL, NULL, NULL, &weights_size);
+    if (res) {
+      return res;
+    }
+    input_bufs.push_back(std::make_pair(cmd->weight_buf, weights_size));
+
+    output_bufs.push_back(std::make_pair(cmd->output_buf, cmd->output_size * 2));
+
+    return 0;
+  }
+
+  /// @brief Fills command of version 0 in the format suitable for later execution on the device.
+  int FillKCommandFC_v0(struct dmp_dv_kcmdraw_conv_v0 *kcmd, struct dmp_dv_cmdraw_fc_v0 *cmd, uint32_t& size) {
+    if (cmd->header.size != sizeof(struct dmp_dv_cmdraw_fc_v0)) {
+      SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
+              (int)cmd->header.size, (int)cmd->header.version);
+      return -1;
+    }
+
+    uint32_t req_size = sizeof(*kcmd) - sizeof(kcmd->run) + sizeof(kcmd->run[0]);
+    if (size < req_size) {
+      size = req_size;
+      return 0;
+    }
+
+    // Convert command to convolutional configuration
+    struct dmp_dv_cmdraw_conv_v0 conv;
+    memset(&conv, 0, sizeof(conv));
+    conv.header.size = sizeof(conv);
+    conv.header.device_type = DMP_DV_DEV_CONV;
+    conv.topo = 1;
+    conv.w = 1;
+    conv.h = 1;
+    conv.c = cmd->input_size;
+    conv.z = 1;
+    conv.run[0].m = cmd->output_size;
+    conv.run[0].conv_enable = 1;
+    conv.run[0].p = 0x0101;
+    conv.run[0].pz = 1;
+    conv.run[0].conv_stride = 0x0101;
+    conv.run[0].weight_fmt = cmd->weight_fmt ? 3 : 1;
+    uint16_t actfunc = 0;
+    switch (cmd->actfunc) {
+      case 0:  // None
+        actfunc = 0;
+        break;
+      case 1:  // ReLU
+        actfunc = 2;
+        break;
+      case 2:  // Tanh
+        actfunc = 1;
+        break;
+      case 3:  // Leaky ReLU
+        actfunc = 2;
+        break;
+      case 4:  // Sigmoid
+        actfunc = 3;
+        break;
+      default:
+        SET_ERR("Unsupported actfunc %d for device_type %d on device_type %d",
+                (int)cmd->actfunc, DMP_DV_DEV_FC, DMP_DV_DEV_CONV);
+        return ENOTSUP;
+    }
+    conv.run[0].actfunc = actfunc;
+    conv.run[0].actfunc_param = cmd->actfunc_param;
+
+    conv.input_buf = cmd->input_buf;
+    conv.output_buf = cmd->output_buf;
+
+    // Allocate buffer for weights and repack them
+
+    // Get old weights buffer
+    CDMPDVMem *weights_fc = (CDMPDVMem*)cmd->weight_buf.mem;
+    if (!weights_fc) {
+      SET_LOGIC_ERR();
+      return -1;
+    }
+    bool unmap_after = false;
+    if (!weights_fc->get_ptr()) {
+      if (!weights_fc->Map()) {
+        return -1;
+      }
+      unmap_after = true;
+    }
+    bool sync_end_after = false;
+    if (!weights_fc->get_sync_flags()) {
+      sync_end_after = true;
+      if (weights_fc->SyncStart(1, 0)) {
+        if (unmap_after) {
+          weights_fc->Unmap();
+        }
+        return -1;
+      }
+    }
+
+    uint16_t *quant_map;
+    uint16_t *bias;
+    uint8_t *weights;
+    uint32_t bias_offs = (uint32_t)cmd->input_size * cmd->output_size;
+    if (cmd->weight_fmt) {
+      quant_map = (uint16_t*)(weights_fc->get_ptr() + cmd->weight_buf.offs);
+      weights = ((uint8_t*)quant_map) + 512;
+    }
+    else {
+      quant_map = NULL;
+      weights = weights_fc->get_ptr() + cmd->weight_buf.offs;
+      bias_offs <<= 1;
+    }
+    if (bias_offs & 15) {
+      bias_offs += 16 - (bias_offs & 15);
+    }
+    bias = (uint16_t*)(weights + bias_offs);
+
+    size_t packed_weights_size = 0;
+    int res = dmp_dv_pack_conv_weights(
+                conv.c, 1, 1, conv.run[0].m,
+                quant_map, NULL, NULL, NULL,
+                NULL, &packed_weights_size);
+    if (res) {
+      return res;
+    }
+
+    dmp_dv_mem mem = dmp_dv_mem_alloc((dmp_dv_context)ctx_, packed_weights_size);
+    uint8_t *ptr = NULL;
+    if (!mem) {
+      res = ENOMEM;
+      goto L_EXIT;
+    }
+    ptr = dmp_dv_mem_map(mem);
+    if ((!ptr) || (dmp_dv_mem_sync_start(mem, 0, 1))) {
+      res = -1;
+      goto L_EXIT;
+    }
+
+    res = dmp_dv_pack_conv_weights(
+        conv.c, 1, 1, conv.run[0].m,
+        quant_map, weights, bias, NULL,
+        ptr, &packed_weights_size);
+
+    dmp_dv_mem_unmap(mem);
+
+    conv.run[0].weight_buf.mem = mem;
+
+    L_EXIT:
+
+    if (unmap_after) {
+      weights_fc->Unmap();
+    }
+    else if (sync_end_after) {
+      weights_fc->SyncEnd();
+    }
+
+    if (!res) {
+      res = FillKCommand_v0(kcmd, &conv, size);
+    }
+    if (res) {
+      dmp_dv_mem_release(mem);
+      return res;
+    }
+
+    helper_bufs_.push_back(mem);
+    return 0;
+  }
+
+  /// @brief Helper buffers.
+  std::vector<dmp_dv_mem> helper_bufs_;
 };

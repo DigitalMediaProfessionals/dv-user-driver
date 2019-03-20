@@ -179,6 +179,16 @@ class CDMPDVMem : public CDMPDVBase {
     return __sync_add_and_fetch(&total_size_, 0);
   }
 
+  /// @brief Returns pointer to mapped memory.
+  inline uint8_t *get_ptr() const {
+    return map_ptr_;
+  }
+
+  /// @brief Returns sync flags.
+  inline int get_sync_flags() const {
+    return sync_flags_;
+  }
+
  private:
   /// @brief Pointer to dv context.
   CDMPDVContext *ctx_;

@@ -284,10 +284,14 @@ class CDMPDVCmdList : public CDMPDVBase {
               (int)cmd->device_type, 0, DMP_DV_DEV_COUNT - 1);
       return EINVAL;
     }
+    int device_type = cmd->device_type;
+    if ((device_type == DMP_DV_DEV_FC) && (!ctx_->DeviceExists(DMP_DV_DEV_FC))) {
+      device_type = DMP_DV_DEV_CONV;  // switch to CONV to support legacy FC configuration
+    }
     int res;
-    if (!device_helpers_[cmd->device_type]) {
+    if (!device_helpers_[device_type]) {
       CDMPDVCmdListDeviceHelper *helper = NULL;
-      res = CDMPDVCmdListDeviceHelper::Instantiate(ctx_, cmd->device_type, &helper);
+      res = CDMPDVCmdListDeviceHelper::Instantiate(ctx_, device_type, &helper);
       if (res) {
         return res;
       }
@@ -295,14 +299,14 @@ class CDMPDVCmdList : public CDMPDVBase {
         SET_LOGIC_ERR();
         return -1;
       }
-      device_helpers_[cmd->device_type] = helper;
+      device_helpers_[device_type] = helper;
     }
 
     DMPDVCommand command;
     command.cmd.resize(cmd->size);
     memcpy(command.cmd.data(), cmd, cmd->size);
-    command.device_helper = device_helpers_[cmd->device_type];
-    res = device_helpers_[cmd->device_type]->CheckRaw(cmd, command.input_bufs, command.output_bufs);
+    command.device_helper = device_helpers_[device_type];
+    res = device_helpers_[device_type]->CheckRaw(cmd, command.input_bufs, command.output_bufs);
     if (res) {
       return res;
     }
@@ -452,7 +456,7 @@ class CDMPDVCmdList : public CDMPDVBase {
   }
 
   /// @brief Commits command list in case of single device.
-  int CommitSingleDevice() {  // TODO: when non-raw commands will be implemented, convert all commands to raw format before this function call.
+  int CommitSingleDevice() {
     if (!commands_.size()) {
       SET_ERR("Command list is empty");
       return EINVAL;

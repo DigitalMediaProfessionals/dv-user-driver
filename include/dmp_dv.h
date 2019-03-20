@@ -353,7 +353,12 @@ int dmp_dv_pack_fc_weights(
 ///           - DMP_DV_DEV_FC
 ///           - DMP_DV_DEV_IPU
 /// @return 1 if exist, -1 if invalid arguments are passed, 0 otherwise.
+int dmp_dv_device_exists(dmp_dv_context ctx, int dev_type_id);
+
+
+/// @brief Alias for dmp_dv_device_exists.
 int dmp_dv_fpga_device_exists(dmp_dv_context ctx, int dev_type_id);
+
 
 //! image format
 //! DMP_DV_RGBA8888 RGBA8888 image format

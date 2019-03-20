@@ -213,6 +213,29 @@ class CDMPDVContext : public CDMPDVBase {
     return 0;
   }
 
+  /// @brief If specified device exists.
+  inline int DeviceExists(int dev_type_id) {
+    switch (dev_type_id) {
+      case DMP_DV_DEV_CONV:
+        return get_conv_freq() ? 1 : 0;
+      case DMP_DV_DEV_FC:
+        return get_fc_freq() ? 1 : 0;
+      case DMP_DV_DEV_IPU:
+        {
+          struct stat s;
+          memset(&s, 0, sizeof(s));
+          if (stat(DMP_DV_DEV_PATH_IPU, &s) != 0) {
+            return 0;
+          }
+          return S_ISCHR(s.st_mode) ? 1 : 0;
+        }
+      default:
+        SET_ERR("Invalid argument: unsupported device type %d", dev_type_id);
+        break;
+    }
+    return -1;
+  }
+
  private:
   /// @brief Size of the Unified Buffer.
   int ub_size_;

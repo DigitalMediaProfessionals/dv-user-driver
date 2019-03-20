@@ -56,7 +56,7 @@ extern char s_last_error_message[256];
 
 
 /// @brief Helper to set the last error message on implementation logic error.
-#define SET_LOGIC_ERR() SET_ERR("Control should not reach line %d of file %s", __LINE__, __FILE__)
+#define SET_LOGIC_ERR() SET_ERR("%s(): Control should not reach line %d of file %s", __func__, __LINE__, __FILE__)
 
 
 /// @brief Path to convolutional character device file.

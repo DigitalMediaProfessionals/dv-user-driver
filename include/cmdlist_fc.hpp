@@ -15,6 +15,7 @@
  */
 /*
  * @brief Helper object work working with command list for FC accelerator implementation.
+ * @details FC accelerator is deprecated and this file exists for backward compatibility.
  */
 #pragma once
 
@@ -22,6 +23,7 @@
 
 
 /// @brief Helper object work working with command list for FC accelerator.
+/// @details FC accelerator is deprecated and this class exists for backward compatibility.
 class CDMPDVCmdListFCHelper : public CDMPDVCmdListKHelper {
  public:
   /// @brief Constructor.
@@ -134,7 +136,7 @@ class CDMPDVCmdListFCHelper : public CDMPDVCmdListKHelper {
       return -1;
     }
 
-    size_t req_size = sizeof(*kcmd);
+    uint32_t req_size = sizeof(*kcmd);
 
     if (size >= req_size) {
       kcmd->header.size = sizeof(struct dmp_dv_kcmdraw_fc_v0);
