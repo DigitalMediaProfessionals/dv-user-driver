@@ -53,6 +53,9 @@ extern "C" {
 /// @brief Last error message (instantiation).
 char s_last_error_message[256];
 
+/// @brief Verbosity level for debug messages.
+static int s_verbosity_level = -1;
+
 
 const char *dmp_dv_get_last_error_message() {
   return s_last_error_message;
@@ -63,6 +66,14 @@ void dmp_dv_set_last_error_message(const char *format, ...) {
   va_list args;
   va_start(args, format);
   vsnprintf(s_last_error_message, sizeof(s_last_error_message), format, args);
+  if (s_verbosity_level == -1) {
+    const char *s = getenv("VERBOSITY");
+    s_verbosity_level = s ? atoi(s) : 0;
+  }
+  if (s_verbosity_level >= 1) {
+    fprintf(stderr, "%s\n", s_last_error_message);
+    fflush(stderr);
+  }
 }
 
 
