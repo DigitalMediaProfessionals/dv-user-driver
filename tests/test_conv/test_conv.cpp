@@ -92,12 +92,36 @@ typedef struct conv_config_impl {
                         pt.pad_left, pt.pad_top, pt.pad_right, pt.pad_bottom,
                         pt.stride_x, pt.stride_y, pt.activation, pt.quantized);
   }
+
+  uint32_t pad_fpga() const
+  {
+    uint32_t pad_lrtb[4] = {};
+    if (deconv) {
+      uint32_t kw = (tpe & 0xFF ? tpe & 0xFF : 1) * (kx - 1) + 1;
+      uint32_t kh = (tpe & 0xFF ? tpe & 0xFF : 1) * (ky - 1) + 1;
+
+      pad_lrtb[0] = kw - pad_left - 1;
+      pad_lrtb[1] = kw - pad_right - 1;
+      pad_lrtb[2] = kh - pad_top - 1;
+      pad_lrtb[3] = kh - pad_bottom - 1;
+    } else {
+      pad_lrtb[0] = pad_left;
+      pad_lrtb[1] = pad_right;
+      pad_lrtb[2] = pad_top;
+      pad_lrtb[3] = pad_bottom;
+    }
+    return pad_lrtb[0] | (pad_lrtb[1] << 8) | (pad_lrtb[3] << 16) | (pad_lrtb[3] << 24);
+  }
 } conv_config;
 
 
 /// @brief Returns width of the output based on kernel size, padding and stride.
 int get_conv_out_width(int width, int kx, int pad_left, int pad_right, int stride, int is_deconv) {
-  return (pad_left + (is_deconv ? (width - 1) * stride + 1 : width) + pad_right - kx) / (is_deconv ? 1 : stride) + 1;
+  if (is_deconv) {
+    return stride * (width - 1) + kx - pad_left - pad_right;
+  } else {
+    return (pad_left + width + pad_right - kx) / stride + 1;
+  }
 }
 
 
@@ -391,13 +415,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
       cmd.run[0].p = (uint16_t)conf->kx;
     }
     cmd.run[0].pz = 1;
-    {
-      uint32_t pad_left = conf->pad_left,
-               pad_right = conf->pad_right,
-               pad_top = conf->pad_top,
-               pad_bottom = conf->pad_bottom;
-      cmd.run[0].conv_pad = pad_left | (pad_right << 8) | (pad_top << 16) | (pad_bottom << 24);
-    }
+    cmd.run[0].conv_pad = conf->pad_fpga();
     cmd.run[0].conv_stride = (uint16_t)conf->stride_x | ((uint16_t)conf->stride_y << 8);
     cmd.run[0].actfunc = conf->activation;
 

@@ -166,8 +166,10 @@ class Generator(object):
                         dw=False, dil=dil, deconv=False)
 
     def get_ox(self, width, kx, pad_left, pad_right, stride, deconv):
-        return (pad_left + ((width - 1) * stride + 1 if deconv else width) +
-                pad_right - kx) // (1 if deconv else stride) + 1
+        if deconv:
+            return stride * (width - 1) + kx - pad_left - pad_right
+        else:
+            return (pad_left + width + pad_right - kx) // stride + 1
 
     def generate(self, width, height, n_channels, kx, ky, n_kernels,
                  pad_ltrb, stride_xy, activation, dw, dil, deconv):
