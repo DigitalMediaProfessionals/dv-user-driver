@@ -36,6 +36,7 @@ class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
     ctx->Retain();
     ctx_ = ctx;
     commited_ = false;
+    last_exec_time_ = 0;
   }
 
   /// @brief Destructor.
@@ -78,9 +79,12 @@ class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
 
   /// @brief Waits for scheduled command to be completed.
   /// @param exec_id Execution id returned by Exec() call.
-  /// @param exec_time Execution time in microseconds of specified command.
   /// @return 0 on success, non-zero on error.
-  virtual int Wait(int64_t exec_id, uint64_t &exec_time) = 0;
+  virtual int Wait(int64_t exec_id) = 0;
+
+  /// @brief Get last execution time.
+  /// @return last execution in microseconds(us).
+  virtual uint64_t GetLastExecTime() = 0;
 
   /// @brief Instantiates object of a given type.
   static int Instantiate(CDMPDVContext *ctx, uint8_t device_type, CDMPDVCmdListDeviceHelper **creator) {
@@ -114,6 +118,9 @@ class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
 
   /// @brief Pointer to the context.
   CDMPDVContext *ctx_;
+
+  /// @brief Record last execution time.
+  uint64_t last_exec_time_;
 
  private:
   /// @brief If the list is in commited state.
@@ -188,7 +195,7 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
   }
 
   /// @brief Waits for scheduled command to be completed.
-  virtual int Wait(int64_t exec_id, uint64_t &exec_time) {
+  virtual int Wait(int64_t exec_id) {
     if (exec_id < 0) {
       SET_ERR("Invalid argument: exec_id = %lld", (long long)exec_id);
       return EINVAL;
@@ -198,7 +205,7 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
     for (;;) {
       int res = ioctl(fd_acc_, DMP_DV_IOC_WAIT, &dv_wait);
       if (!res) {
-        exec_time = dv_wait.cmd_exec_time;
+        last_exec_time_ = dv_wait.cmd_exec_time;
         break;
       }
       switch (errno) {
@@ -212,6 +219,10 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
       }
     }
     return 0;
+  }
+
+  virtual uint64_t GetLastExecTime() {
+    return last_exec_time_;
   }
 
   /// @brief File handle for the accelerator ioctl.
@@ -388,12 +399,20 @@ class CDMPDVCmdList : public CDMPDVBase {
 
   /// @brief Waits for the specific execution id to be completed.
   /// @return 0 on success, non-zero on error.
-  int Wait(int64_t exec_id, uint64_t &exec_time) {
+  int Wait(int64_t exec_id) {
     if (single_device_) {
-      return single_device_->Wait(exec_id, exec_time);
+      return single_device_->Wait(exec_id);
     }
     SET_ERR("Having different device types in the single command list is not yet implemented");
     return -1;
+  }
+
+  uint64_t GetLastExecTime() {
+    if (single_device_) {
+      return single_device_->GetLastExecTime();
+    }
+    SET_ERR("Having different device types in the single command list is not yet implemented");
+    return 0;
   }
 
  protected:

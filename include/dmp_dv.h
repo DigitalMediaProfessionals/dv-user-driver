@@ -234,10 +234,15 @@ int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist cmdlist);
 /// @brief Waits for the specific scheduled command to be completed.
 /// @param cmdlist Handle to command list, when NULL the error is returned.
 /// @param exec_id Id of the scheduled command to wait for completion.
-/// @param exec_time Execution time in microseconds of specified command.
 /// @return 0 on success, non-zero otherwise.
 /// @details It is thread-safe.
-int dmp_dv_cmdlist_wait(dmp_dv_cmdlist cmdlist, int64_t exec_id, uint64_t *exec_time);
+int dmp_dv_cmdlist_wait(dmp_dv_cmdlist cmdlist, int64_t exec_id);
+
+
+/// @brief Get the last execution time in microseconds of specified command.
+/// @param cmdlist Handle to command list, when NULL the error is returned.
+/// @return last execution time in mocroseconds(us), or 0 if error.
+uint64_t dmp_dv_get_last_cmdlist_exec_time(dmp_dv_cmdlist cmdlist);
 
 
 /// @brief Memory buffer specification.

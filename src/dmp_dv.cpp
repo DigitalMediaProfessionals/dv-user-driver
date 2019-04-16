@@ -256,17 +256,21 @@ int64_t dmp_dv_cmdlist_exec(dmp_dv_cmdlist cmdlist) {
 }
 
 
-int dmp_dv_cmdlist_wait(dmp_dv_cmdlist cmdlist, int64_t exec_id, uint64_t *exec_time) {
+int dmp_dv_cmdlist_wait(dmp_dv_cmdlist cmdlist, int64_t exec_id) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return EINVAL;
   }
-  uint64_t temp_exec_time;
-  int error = ((CDMPDVCmdList*)cmdlist)->Wait(exec_id, temp_exec_time);
-  if (!error && exec_time) {
-    *exec_time = temp_exec_time;
+  return ((CDMPDVCmdList*)cmdlist)->Wait(exec_id);
+}
+
+
+uint64_t dmp_dv_get_last_cmdlist_exec_time(dmp_dv_cmdlist cmdlist) {
+  if (!cmdlist) {
+    SET_ERR("Invalid argument: cmdlist is NULL");
+    return 0;
   }
-  return error;
+  return ((CDMPDVCmdList*)cmdlist)->GetLastExecTime();
 }
 
 
