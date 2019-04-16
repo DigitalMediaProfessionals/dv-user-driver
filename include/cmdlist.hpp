@@ -78,8 +78,9 @@ class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
 
   /// @brief Waits for scheduled command to be completed.
   /// @param exec_id Execution id returned by Exec() call.
+  /// @param exec_time Execution time in microseconds of specified command.
   /// @return 0 on success, non-zero on error.
-  virtual int Wait(int64_t exec_id) = 0;
+  virtual int Wait(int64_t exec_id, uint64_t &exec_time) = 0;
 
   /// @brief Instantiates object of a given type.
   static int Instantiate(CDMPDVContext *ctx, uint8_t device_type, CDMPDVCmdListDeviceHelper **creator) {
@@ -187,14 +188,17 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
   }
 
   /// @brief Waits for scheduled command to be completed.
-  virtual int Wait(int64_t exec_id) {
+  virtual int Wait(int64_t exec_id, uint64_t &exec_time) {
     if (exec_id < 0) {
       SET_ERR("Invalid argument: exec_id = %lld", (long long)exec_id);
       return EINVAL;
     }
+    dmp_dv_kwait dv_wait;
+    dv_wait.cmd_id = exec_id;
     for (;;) {
-      int res = ioctl(fd_acc_, DMP_DV_IOC_WAIT, &exec_id);
+      int res = ioctl(fd_acc_, DMP_DV_IOC_WAIT, &dv_wait);
       if (!res) {
+        exec_time = dv_wait.cmd_exec_time;
         break;
       }
       switch (errno) {
@@ -384,9 +388,9 @@ class CDMPDVCmdList : public CDMPDVBase {
 
   /// @brief Waits for the specific execution id to be completed.
   /// @return 0 on success, non-zero on error.
-  int Wait(int64_t exec_id) {
+  int Wait(int64_t exec_id, uint64_t &exec_time) {
     if (single_device_) {
-      return single_device_->Wait(exec_id);
+      return single_device_->Wait(exec_id, exec_time);
     }
     SET_ERR("Having different device types in the single command list is not yet implemented");
     return -1;
