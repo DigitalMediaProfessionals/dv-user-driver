@@ -36,6 +36,8 @@
 #include "dmp_dv.h"
 #include "../../dv-kernel-driver/uapi/dmp-dv.h"
 #include "../../dv-kernel-driver/uapi/dimensions.h"
+#include "../../dv-kernel-driver/uapi/dmp_dv_cmdraw_v0.h"
+#include "../../dv-kernel-driver/uapi/dmp_dv_cmdraw_v1.h"
 
 
 #ifdef __cplusplus

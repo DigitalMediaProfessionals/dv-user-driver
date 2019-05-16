@@ -26,6 +26,7 @@
 #include "context.hpp"
 #include "mem.hpp"
 #include "dmp_dv_cmdraw_v0.h"
+#include "dmp_dv_cmdraw_v1.h"
 
 
 /// @brief Helper object work working with command list specific to the device type (CONV or FC).
