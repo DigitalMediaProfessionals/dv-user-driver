@@ -136,6 +136,10 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       SET_ERR("Invalid argument: cmd->topo is 0");
       return -1;
     }
+    if (!cmd->z) {
+      SET_ERR("Invalid argument: cmd->z is 0");
+      return -1;
+    }
 
     const int max_kernel_size = ctx_->get_max_kernel_size();
 
@@ -159,6 +163,21 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
     bool valid_multi_run = true;
 
     for (uint32_t topo = cmd->topo, i_run = 0; topo; topo >>= 1, ++i_run) {
+      if ((cmd->run[i_run].conv_enable) && (!cmd->run[i_run].pz)) {
+        SET_ERR("Invalid argument: cmd->run[%d]->pz is 0", i_run);
+        return -1;
+      }
+      if (cmd->run[i_run].conv_enable) {
+        switch (cmd->run[i_run].pool_enable) {
+          case 0:  // no pooling
+            break;
+          case 1:  // max pooling
+            break;
+          default:
+            SET_ERR("cmd->run[%d] pooling of type %d cannot be combined with convolution", i_run, cmd->run[i_run].pool_enable);
+            return -1;
+        }
+      }
       const int is_deconv = (cmd->run[i_run].conv_enable & 4) ? 1 : 0;
       const int kx = cmd->run[i_run].p & 0xFF;
       const int ky = (cmd->run[i_run].p & 0xFF00) ? (cmd->run[i_run].p & 0xFF00) >> 8 : kx;
@@ -355,6 +374,11 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       if (tiles < 1) {
         SET_ERR("cmd->run[%d] requires at least %d bytes of unified buffer: w=%d h=%d c=%d m=%d p=0x%04x dil=0x%04x",
                 i_run, u_b_in + u_b_out, w, h, c, m, kcmd.run[i_run].p, kcmd.run[i_run].conv_dilation);
+        return -1;
+      }
+      if ((tiles > 1) && (kcmd.run[i_run].conv_enable) && (kcmd.run[i_run].pool_enable)) {
+        SET_ERR("cmd->run[%d] requires %d (> 1) tiles and cannot contain convolution together with pooling",
+                i_run, tiles);
         return -1;
       }
 
