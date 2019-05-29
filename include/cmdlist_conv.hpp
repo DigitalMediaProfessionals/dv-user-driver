@@ -523,10 +523,10 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
     }
 
     // Reuse v0 implementation
-    uint8_t *kcmd_v0 = kcmd;
+    uint8_t *kcmd_v0 = (uint8_t *)kcmd;
     if (kcmd)
       kcmd_v0 += sizeof(struct dmp_dv_kbuf);
-    int ret = FillKCommand_v0(kcmd_v0, &cmd->conv_cmd, size);
+    int ret = FillKCommand_v0((dmp_dv_kcmdraw_conv_v0*)kcmd_v0, &cmd->conv_cmd, size);
     size += sizeof(struct dmp_dv_kbuf);
 
     // Fill v1 data
