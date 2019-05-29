@@ -424,13 +424,8 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       return -1;
     }
 
-    if (cmd->is_u8_input) {
-      if (!cmd->u8tofp16_table.mem) {
-        SET_ERR("Invalid argument: cmd->u8tofp16_table.mem is NULL");
-        return -1;
-      }
-
-      input_bufs.push_back(std::make_pair(cmd->u8tofp16_table, UINT8_MAX + 1));
+    if (cmd->u8tofp16_table.mem) {
+      input_bufs.push_back(std::make_pair(cmd->u8tofp16_table, 6 * 256));
     }
 
     return CheckRaw_v0(&cmd->conv_cmd, input_bufs, output_bufs);
@@ -527,17 +522,21 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       return -1;
     }
 
-	int ret;
+    // Reuse v0 implementation
+    uint8_t *kcmd_v0 = kcmd;
+    if (kcmd)
+      kcmd_v0 += sizeof(struct dmp_dv_kbuf);
+    int ret = FillKCommand_v0(kcmd_v0, &cmd->conv_cmd, size);
+    size += sizeof(struct dmp_dv_kbuf);
+
+    // Fill v1 data
     if (kcmd) {
-      kcmd->is_u8_input = cmd->is_u8_input;
+      kcmd->header.size = size;
+      kcmd->header.version = 1;
       kcmd->u8tofp16_table.fd = CDMPDVMem::get_fd(cmd->u8tofp16_table.mem);
       kcmd->u8tofp16_table.rsvd = 0;
       kcmd->u8tofp16_table.offs = cmd->u8tofp16_table.offs;
-	  ret = FillKCommand_v0(&kcmd->conv_cmd, &cmd->conv_cmd, size);
-    } else {
-	  ret = FillKCommand_v0(NULL, &cmd->conv_cmd, size);
-	}
-	size += sizeof(struct dmp_dv_kcmdraw) + 64 + sizeof(struct dmp_dv_kbuf);
+    }
 
     return ret;
   }
