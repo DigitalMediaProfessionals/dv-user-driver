@@ -525,9 +525,9 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
     // Reuse v0 implementation
     uint8_t *kcmd_v0 = (uint8_t *)kcmd;
     if (kcmd)
-      kcmd_v0 += sizeof(struct dmp_dv_kbuf);
+      kcmd_v0 += sizeof(struct dmp_dv_kbuf) + 8;
     int ret = FillKCommand_v0((dmp_dv_kcmdraw_conv_v0*)kcmd_v0, &cmd->conv_cmd, size);
-    size += sizeof(struct dmp_dv_kbuf);
+    size += sizeof(struct dmp_dv_kbuf) + 8;
 
     // Fill v1 data
     if (kcmd) {
@@ -536,6 +536,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       kcmd->u8tofp16_table.fd = CDMPDVMem::get_fd(cmd->u8tofp16_table.mem);
       kcmd->u8tofp16_table.rsvd = 0;
       kcmd->u8tofp16_table.offs = cmd->u8tofp16_table.offs;
+      kcmd->is_bgr = cmd->is_bgr;
     }
 
     return ret;
