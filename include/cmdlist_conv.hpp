@@ -52,6 +52,9 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
           case 0:
             return CheckRaw_v0((dmp_dv_cmdraw_conv_v0*)cmd, input_bufs, output_bufs);
 
+          case 1:
+            return CheckRaw_v1((dmp_dv_cmdraw_conv_v1*)cmd, input_bufs, output_bufs);
+
           default:
             SET_ERR("Invalid argument: cmd->version %d is not supported with device_type %d",
                     (int)cmd->version, cmd->device_type);
@@ -85,6 +88,9 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         switch (cmd->version) {
           case 0:
             return FillKCommand_v0((dmp_dv_kcmdraw_conv_v0*)kcmd, (dmp_dv_cmdraw_conv_v0*)cmd, size);
+
+          case 1:
+            return FillKCommand_v1((dmp_dv_kcmdraw_conv_v1*)kcmd, (dmp_dv_cmdraw_conv_v1*)cmd, size);
 
           default:
             SET_ERR("Invalid argument: cmd->version %d is not supported", (int)cmd->version);
@@ -432,6 +438,23 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
     return 0;
   }
 
+  /// @brief Checks command of version 0 for validness.
+  int CheckRaw_v1(struct dmp_dv_cmdraw_conv_v1 *cmd,
+                  std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& input_bufs,
+                  std::vector<std::pair<struct dmp_dv_buf, uint64_t> >& output_bufs) {
+    if (cmd->header.size != sizeof(struct dmp_dv_cmdraw_conv_v1)) {
+      SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
+              (int)cmd->header.size, (int)cmd->header.version);
+      return -1;
+    }
+
+    if (cmd->u8tofp16_table.mem) {
+      input_bufs.push_back(std::make_pair(cmd->u8tofp16_table, 6 * 256));
+    }
+
+    return CheckRaw_v0(&cmd->conv_cmd, input_bufs, output_bufs);
+  }
+
   /// @brief Fills command of version 0 in the format suitable for later execution on the device.
   int FillKCommand_v0(struct dmp_dv_kcmdraw_conv_v0 *kcmd, struct dmp_dv_cmdraw_conv_v0 *cmd, uint32_t& size) {
     if (cmd->header.size != sizeof(struct dmp_dv_cmdraw_conv_v0)) {
@@ -514,6 +537,33 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
 
     size = req_size;
     return 0;
+  }
+
+  int FillKCommand_v1(struct dmp_dv_kcmdraw_conv_v1 *kcmd, struct dmp_dv_cmdraw_conv_v1 *cmd, uint32_t& size) {
+    if (cmd->header.size != sizeof(struct dmp_dv_cmdraw_conv_v1)) {
+      SET_ERR("Invalid argument: cmd->size %d is incorrect for version %d",
+              (int)cmd->header.size, (int)cmd->header.version);
+      return -1;
+    }
+
+    // Reuse v0 implementation
+    uint8_t *kcmd_v0 = (uint8_t *)kcmd;
+    if (kcmd)
+      kcmd_v0 += sizeof(struct dmp_dv_kbuf) + 8;
+    int ret = FillKCommand_v0((dmp_dv_kcmdraw_conv_v0*)kcmd_v0, &cmd->conv_cmd, size);
+    size += sizeof(struct dmp_dv_kbuf) + 8;
+
+    // Fill v1 data
+    if (kcmd) {
+      kcmd->header.size = size;
+      kcmd->header.version = 1;
+      kcmd->u8tofp16_table.fd = CDMPDVMem::get_fd(cmd->u8tofp16_table.mem);
+      kcmd->u8tofp16_table.rsvd = 0;
+      kcmd->u8tofp16_table.offs = cmd->u8tofp16_table.offs;
+      kcmd->to_bgr = cmd->to_bgr;
+    }
+
+    return ret;
   }
 
   /// @brief Checks command of version 0 for validness for legacy FC configuration.
