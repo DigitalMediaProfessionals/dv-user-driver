@@ -265,7 +265,7 @@ int dmp_dv_cmdlist_wait(dmp_dv_cmdlist cmdlist, int64_t exec_id) {
 }
 
 
-uint64_t dmp_dv_get_last_cmdlist_exec_time(dmp_dv_cmdlist cmdlist) {
+uint64_t dmp_dv_cmdlist_get_last_exec_time(dmp_dv_cmdlist cmdlist) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
     return 0;
