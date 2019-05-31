@@ -28,7 +28,7 @@ struct dmp_dv_cmdraw_conv_v1 {
   struct dmp_dv_cmdraw header;  // General structure information
 
   struct dmp_dv_buf u8tofp16_table;
-  uint16_t is_bgr;
+  uint16_t to_bgr;
   uint16_t rsvd[3];
 
   struct dmp_dv_cmdraw_conv_v0 conv_cmd;

@@ -536,7 +536,7 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
       kcmd->u8tofp16_table.fd = CDMPDVMem::get_fd(cmd->u8tofp16_table.mem);
       kcmd->u8tofp16_table.rsvd = 0;
       kcmd->u8tofp16_table.offs = cmd->u8tofp16_table.offs;
-      kcmd->is_bgr = cmd->is_bgr;
+      kcmd->to_bgr = cmd->to_bgr;
     }
 
     return ret;
