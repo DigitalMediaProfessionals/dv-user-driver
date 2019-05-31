@@ -30,7 +30,7 @@ install:
 	echo ldconfig
 	ldconfig
 	echo Copying header files to /usr/include/
-	cp include/dmp_dv.h include/dmp_dv_cmdraw_v0.h /usr/include/
+	cp include/dmp_dv.h include/dmp_dv_cmdraw_v*.h /usr/include/
 	echo Successfully installed
 
 clean:
