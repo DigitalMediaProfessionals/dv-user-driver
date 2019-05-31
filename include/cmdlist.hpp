@@ -84,7 +84,7 @@ class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
 
   /// @brief Get last execution time.
   /// @return last execution in microseconds(us).
-  virtual uint64_t GetLastExecTime() = 0;
+  virtual int64_t GetLastExecTime() = 0;
 
   /// @brief Instantiates object of a given type.
   static int Instantiate(CDMPDVContext *ctx, uint8_t device_type, CDMPDVCmdListDeviceHelper **creator) {
@@ -120,7 +120,7 @@ class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
   CDMPDVContext *ctx_;
 
   /// @brief Record last execution time.
-  uint64_t last_exec_time_;
+  int64_t last_exec_time_;
 
  private:
   /// @brief If the list is in commited state.
@@ -221,7 +221,7 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
     return 0;
   }
 
-  virtual uint64_t GetLastExecTime() {
+  virtual int64_t GetLastExecTime() {
     return last_exec_time_;
   }
 
@@ -407,12 +407,12 @@ class CDMPDVCmdList : public CDMPDVBase {
     return -1;
   }
 
-  uint64_t GetLastExecTime() {
+  int64_t GetLastExecTime() {
     if (single_device_) {
       return single_device_->GetLastExecTime();
     }
     SET_ERR("Having different device types in the single command list is not yet implemented");
-    return 0;
+    return -1;
   }
 
  protected:
