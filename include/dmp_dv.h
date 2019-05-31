@@ -241,7 +241,7 @@ int dmp_dv_cmdlist_wait(dmp_dv_cmdlist cmdlist, int64_t exec_id);
 
 /// @brief Get the last execution time in microseconds of specified command.
 /// @param cmdlist Handle to command list, when NULL the error is returned.
-/// @return last execution time in mocroseconds(us), or 0 if error.
+/// @return last execution time in microseconds(us), or 0 if error.
 uint64_t dmp_dv_cmdlist_get_last_exec_time(dmp_dv_cmdlist cmdlist);
 
 
