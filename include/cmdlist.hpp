@@ -36,6 +36,7 @@ class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
     ctx->Retain();
     ctx_ = ctx;
     commited_ = false;
+    last_exec_time_ = 0;
   }
 
   /// @brief Destructor.
@@ -81,6 +82,10 @@ class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
   /// @return 0 on success, non-zero on error.
   virtual int Wait(int64_t exec_id) = 0;
 
+  /// @brief Get last execution time.
+  /// @return last execution in microseconds(us).
+  virtual int64_t GetLastExecTime() = 0;
+
   /// @brief Instantiates object of a given type.
   static int Instantiate(CDMPDVContext *ctx, uint8_t device_type, CDMPDVCmdListDeviceHelper **creator) {
     if (device_type >= DMP_DV_DEV_COUNT) {
@@ -113,6 +118,9 @@ class CDMPDVCmdListDeviceHelper : public CDMPDVBase {
 
   /// @brief Pointer to the context.
   CDMPDVContext *ctx_;
+
+  /// @brief Record last execution time.
+  int64_t last_exec_time_;
 
  private:
   /// @brief If the list is in commited state.
@@ -192,9 +200,12 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
       SET_ERR("Invalid argument: exec_id = %lld", (long long)exec_id);
       return EINVAL;
     }
+    dmp_dv_kwait dv_wait;
+    dv_wait.cmd_id = exec_id;
     for (;;) {
-      int res = ioctl(fd_acc_, DMP_DV_IOC_WAIT, &exec_id);
+      int res = ioctl(fd_acc_, DMP_DV_IOC_WAIT, &dv_wait);
       if (!res) {
+        last_exec_time_ = dv_wait.cmd_exec_time;
         break;
       }
       switch (errno) {
@@ -208,6 +219,10 @@ class CDMPDVCmdListKHelper : public CDMPDVCmdListDeviceHelper {
       }
     }
     return 0;
+  }
+
+  virtual int64_t GetLastExecTime() {
+    return last_exec_time_;
   }
 
   /// @brief File handle for the accelerator ioctl.
@@ -387,6 +402,14 @@ class CDMPDVCmdList : public CDMPDVBase {
   int Wait(int64_t exec_id) {
     if (single_device_) {
       return single_device_->Wait(exec_id);
+    }
+    SET_ERR("Having different device types in the single command list is not yet implemented");
+    return -1;
+  }
+
+  int64_t GetLastExecTime() {
+    if (single_device_) {
+      return single_device_->GetLastExecTime();
     }
     SET_ERR("Having different device types in the single command list is not yet implemented");
     return -1;

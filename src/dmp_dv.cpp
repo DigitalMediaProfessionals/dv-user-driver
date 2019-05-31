@@ -265,6 +265,15 @@ int dmp_dv_cmdlist_wait(dmp_dv_cmdlist cmdlist, int64_t exec_id) {
 }
 
 
+int64_t dmp_dv_cmdlist_get_last_exec_time(dmp_dv_cmdlist cmdlist) {
+  if (!cmdlist) {
+    SET_ERR("Invalid argument: cmdlist is NULL");
+    return -1;
+  }
+  return ((CDMPDVCmdList*)cmdlist)->GetLastExecTime();
+}
+
+
 int dmp_dv_cmdlist_add_raw(dmp_dv_cmdlist cmdlist, struct dmp_dv_cmdraw *cmd) {
   if (!cmdlist) {
     SET_ERR("Invalid argument: cmdlist is NULL");
