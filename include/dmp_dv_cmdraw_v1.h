@@ -21,7 +21,7 @@
 #ifndef _DMP_DV_CMDRAW_V1_H_
 #define _DMP_DV_CMDRAW_V1_H_
 
-#include "dmp_dv.h"
+#include "dmp_dv_cmdraw_v0.h"
 
 /// @brief Raw command for convolutional block version 0.
 struct dmp_dv_cmdraw_conv_v1 {
