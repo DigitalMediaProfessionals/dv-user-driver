@@ -208,6 +208,33 @@ int64_t dmp_dv_mem_get_total_size() {
 }
 
 
+int dmp_dv_mem_is_shared(dmp_dv_mem mem) {
+  if (!mem) {
+    SET_ERR("Invalid argument: mem is NULL");
+    return 0;
+  }
+  return ((CDMPDVMem*)mem)->is_shared();
+}
+
+
+int dmp_dv_mem_to_cpu(dmp_dv_mem mem, size_t offs, size_t size, int cpu_hadnt_accessed) {
+  if (!mem) {
+    SET_ERR("Invalid argument: mem is NULL");
+    return 0;
+  }
+  return ((CDMPDVMem*)mem)->ToCPU(offs, size, cpu_hadnt_accessed);
+}
+
+
+int dmp_dv_mem_to_device(dmp_dv_mem mem, size_t offs, size_t size, int cpu_wont_access) {
+  if (!mem) {
+    SET_ERR("Invalid argument: mem is NULL");
+    return 0;
+  }
+  return ((CDMPDVMem*)mem)->ToDevice(offs, size, cpu_wont_access);
+}
+
+
 dmp_dv_cmdlist dmp_dv_cmdlist_create(dmp_dv_context ctx) {
   CDMPDVCmdList *cmdlist = new CDMPDVCmdList();
   if (!cmdlist) {

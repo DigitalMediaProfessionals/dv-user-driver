@@ -189,6 +189,55 @@ class CDMPDVMem : public CDMPDVBase {
     return sync_flags_;
   }
 
+  /// @brief Returns if memory shared with CPU or not.
+  inline bool is_shared() const {
+    return true;
+  }
+
+  int ToCPU(size_t offs, size_t size, int cpu_hadnt_accessed) {
+    if (cpu_hadnt_accessed) {
+      return 0;
+    }
+    if (offs + size > real_size_) {
+      SET_ERR("Invalid memory range specified: offs=%zu size=%zu while memory buffer size is %zu",
+              offs, size, real_size_);
+      return EINVAL;
+    }
+    uint8_t *end = map_ptr_ + size;
+    for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> 6) << 6); addr < end; addr += 64) {
+      asm("DC CIVAC, %0"
+          : /* No outputs. */
+          : "r" (addr));
+    }
+    asm("DSB SY");  // data sync barrier
+    return 0;
+  }
+
+  int ToDevice(size_t offs, size_t size, int cpu_wont_access) {
+    if (offs + size > real_size_) {
+      SET_ERR("Invalid memory range specified: offs=%zu size=%zu while memory buffer size is %zu",
+              offs, size, real_size_);
+      return EINVAL;
+    }
+    uint8_t *end = map_ptr_ + size;
+    if (cpu_wont_access) {
+      for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> 6) << 6); addr < end; addr += 64) {
+        asm("DC CIVAC, %0" /* Write changes to RAM and Invalidate cache */
+            : /* No outputs */
+            : "r" (addr));
+      }
+    }
+    else {
+      for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> 6) << 6); addr < end; addr += 64) {
+        asm("DC CVAC, %0" /* Write changes to RAM and Leave data in cache */
+            : /* No outputs */
+            : "r" (addr));
+      }
+    }
+    asm("DSB SY");  // data sync barrier
+    return 0;
+  }
+
  private:
   /// @brief Pointer to dv context.
   CDMPDVContext *ctx_;
