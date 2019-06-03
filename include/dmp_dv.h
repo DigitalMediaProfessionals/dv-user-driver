@@ -206,6 +206,9 @@ int dmp_dv_mem_is_shared(dmp_dv_mem mem);
 /// @param mem Handle to allocated memory, when NULL the error is returned.
 /// @param offs Offset in the memory buffer in bytes.
 /// @param size Size of the region to synchronize in bytes.
+/// @return 0 on success, non-zero otherwise.
+/// @details In case of shared memory does cache clean and invalidate,
+///          so the memory written by CPU will have priority over memory written by device.
 int dmp_dv_mem_to_cpu(dmp_dv_mem mem, size_t offs, size_t size);
 
 
