@@ -194,6 +194,32 @@ size_t dmp_dv_mem_get_size(dmp_dv_mem mem);
 int64_t dmp_dv_mem_get_total_size();
 
 
+/// @brief Returns 1 if device memory is shared with CPU.
+/// @param mem Handle to allocated memory, when NULL the error is returned.
+/// @return  1 - device memory is shared with CPU,
+///          0 - device memory is not shared with CPU,
+///         -1 - error.
+int dmp_dv_mem_is_shared(dmp_dv_mem mem);
+
+
+/// @brief Makes sure that last changes made by device is visible to CPU.
+/// @param mem Handle to allocated memory, when NULL the error is returned.
+/// @param offs Offset in the memory buffer in bytes.
+/// @param size Size of the region to synchronize in bytes.
+int dmp_dv_mem_to_cpu(dmp_dv_mem mem, size_t offs, size_t size);
+
+
+/// @brief Makes sure that last changes made by CPU is visible to device.
+/// @param mem Handle to allocated memory, when NULL the error is returned.
+/// @param offs Offset in the memory buffer in bytes.
+/// @param size Size of the region to synchronize in bytes.
+/// @param cpu_wont_access Hint that CPU won't access the memory region while device is using it.
+/// @details If mem is shared and cpu_wont_access flag was non-zero, the call to dmp_dv_mem_to_cpu() is unnecessary.
+///          In either case, CPU should not write to that memory region while device is using it,
+///          otherwise data coherency is not guaranteed.
+int dmp_dv_mem_to_device(dmp_dv_mem mem, size_t offs, size_t size, int cpu_wont_access);
+
+
 /// @brief Creates command list.
 /// @param ctx Context for working with DV accelerator, when NULL the error is returned.
 /// @return Handle to command list or NULL on error.
