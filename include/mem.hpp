@@ -21,6 +21,10 @@
 #include "context.hpp"
 
 
+#define CACHE_LINE_SIZE 64
+#define CACHE_LINE_LOG2 6
+
+
 /// @brief Implementation of dmp_dv_mem.
 class CDMPDVMem : public CDMPDVBase {
  public:
@@ -204,7 +208,8 @@ class CDMPDVMem : public CDMPDVBase {
       return EINVAL;
     }
     uint8_t *end = map_ptr_ + size;
-    for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> 6) << 6); addr < end; addr += 64) {
+    for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> CACHE_LINE_LOG2) << CACHE_LINE_LOG2);
+         addr < end; addr += CACHE_LINE_SIZE) {
       asm("DC CIVAC, %0"
           : /* No outputs. */
           : "r" (addr));
@@ -221,14 +226,16 @@ class CDMPDVMem : public CDMPDVBase {
     }
     uint8_t *end = map_ptr_ + size;
     if (cpu_wont_access) {
-      for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> 6) << 6); addr < end; addr += 64) {
+      for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> CACHE_LINE_LOG2) << CACHE_LINE_LOG2);
+           addr < end; addr += CACHE_LINE_SIZE) {
         asm("DC CIVAC, %0" /* Write changes to RAM and Invalidate cache */
             : /* No outputs */
             : "r" (addr));
       }
     }
     else {
-      for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> 6) << 6); addr < end; addr += 64) {
+      for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> CACHE_LINE_LOG2) << CACHE_LINE_LOG2);
+           addr < end; addr += CACHE_LINE_SIZE) {
         asm("DC CVAC, %0" /* Write changes to RAM and Leave data in cache */
             : /* No outputs */
             : "r" (addr));
