@@ -200,6 +200,7 @@ class CDMPDVMem : public CDMPDVBase {
       return EINVAL;
     }
     uint8_t *end = map_ptr_ + size;
+#ifdef __aarch64__
     if (cpu_wont_read) {
       for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> CACHE_LINE_LOG2) << CACHE_LINE_LOG2);
            addr < end; addr += CACHE_LINE_SIZE) {
@@ -217,6 +218,9 @@ class CDMPDVMem : public CDMPDVBase {
       }
     }
     asm("DSB SY");  // data sync barrier
+#else
+    __builtin___clear_cache(map_ptr_ + offs, end);
+#endif
     return 0;
   }
 
@@ -230,6 +234,7 @@ class CDMPDVMem : public CDMPDVBase {
       return EINVAL;
     }
     uint8_t *end = map_ptr_ + size;
+#ifdef __aarch64__
     for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> CACHE_LINE_LOG2) << CACHE_LINE_LOG2);
          addr < end; addr += CACHE_LINE_SIZE) {
       asm("DC CIVAC, %0"
@@ -237,6 +242,9 @@ class CDMPDVMem : public CDMPDVBase {
           : "r" (addr));
     }
     asm("DSB SY");  // data sync barrier
+#else
+    __builtin___clear_cache(map_ptr_ + offs, end);
+#endif
     return 0;
   }
 
