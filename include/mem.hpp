@@ -21,6 +21,10 @@
 #include "context.hpp"
 
 
+#define CACHE_LINE_SIZE 64
+#define CACHE_LINE_LOG2 6
+
+
 /// @brief Implementation of dmp_dv_mem.
 class CDMPDVMem : public CDMPDVBase {
  public:
@@ -187,6 +191,61 @@ class CDMPDVMem : public CDMPDVBase {
   /// @brief Returns sync flags.
   inline int get_sync_flags() const {
     return sync_flags_;
+  }
+
+  int ToDevice(size_t offs, size_t size, int cpu_wont_read, int as_device_output) {
+    if (offs + size > real_size_) {
+      SET_ERR("Invalid memory range specified: offs=%zu size=%zu while memory buffer size is %zu",
+              offs, size, real_size_);
+      return EINVAL;
+    }
+    uint8_t *end = map_ptr_ + size;
+#ifdef __aarch64__
+    if (cpu_wont_read) {
+      for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> CACHE_LINE_LOG2) << CACHE_LINE_LOG2);
+           addr < end; addr += CACHE_LINE_SIZE) {
+        asm("DC CIVAC, %0" /* Write changes to RAM and Invalidate cache */
+            : /* No outputs */
+            : "r" (addr));
+      }
+    }
+    else {
+      for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> CACHE_LINE_LOG2) << CACHE_LINE_LOG2);
+           addr < end; addr += CACHE_LINE_SIZE) {
+        asm("DC CVAC, %0" /* Write changes to RAM and Leave data in cache */
+            : /* No outputs */
+            : "r" (addr));
+      }
+    }
+    asm("DSB SY");  // data sync barrier
+#else
+    __builtin___clear_cache(map_ptr_ + offs, end);
+#endif
+    return 0;
+  }
+
+  int ToCPU(size_t offs, size_t size, int cpu_hadnt_read) {
+    if (cpu_hadnt_read) {
+      return 0;
+    }
+    if (offs + size > real_size_) {
+      SET_ERR("Invalid memory range specified: offs=%zu size=%zu while memory buffer size is %zu",
+              offs, size, real_size_);
+      return EINVAL;
+    }
+    uint8_t *end = map_ptr_ + size;
+#ifdef __aarch64__
+    for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> CACHE_LINE_LOG2) << CACHE_LINE_LOG2);
+         addr < end; addr += CACHE_LINE_SIZE) {
+      asm("DC CIVAC, %0"
+          : /* No outputs. */
+          : "r" (addr));
+    }
+    asm("DSB SY");  // data sync barrier
+#else
+    __builtin___clear_cache(map_ptr_ + offs, end);
+#endif
+    return 0;
   }
 
  private:
