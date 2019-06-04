@@ -194,34 +194,26 @@ size_t dmp_dv_mem_get_size(dmp_dv_mem mem);
 int64_t dmp_dv_mem_get_total_size();
 
 
-/// @brief Returns 1 if device memory is shared with CPU.
+
+/// @brief Makes sure that last changes made by CPU is visible to device.
 /// @param mem Handle to allocated memory, when NULL the error is returned.
-/// @return  1 - device memory is shared with CPU,
-///          0 - device memory is not shared with CPU,
-///         -1 - error.
-int dmp_dv_mem_is_shared(dmp_dv_mem mem);
+/// @param offs Offset in the memory buffer in bytes.
+/// @param size Size of the region to synchronize in bytes.
+/// @param cpu_wont_read Hint that CPU won't read the specified memory region before dmp_dv_mem_to_cpu() call.
+///                      This will result in cache lines clear for that region in case of shared memory.
+/// @param as_device_output Hint that this memory region will be used by device only as output.
+/// @details CPU in general should not write to that memory region after this function call before dmp_dv_mem_to_cpu()
+///          as CPU writes might take priority over device writes.
+int dmp_dv_mem_to_device(dmp_dv_mem mem, size_t offs, size_t size, int cpu_wont_read, int as_device_output);
 
 
 /// @brief Makes sure that last changes made by device is visible to CPU.
 /// @param mem Handle to allocated memory, when NULL the error is returned.
 /// @param offs Offset in the memory buffer in bytes.
 /// @param size Size of the region to synchronize in bytes.
-/// @param cpu_hadnt_accessed Hint the CPU hadn't accesses the memory region while device was using it.
+/// @param cpu_hadnt_read Hint that CPU hadn't read the specified memory region after dmp_dv_mem_to_device() before this function call.
 /// @return 0 on success, non-zero otherwise.
-/// @details In case of shared memory does cache clean and invalidate,
-///          so the memory written by CPU will have priority over memory written by device.
-///          If cpu_hadnt_accessed != 0 and memory is shared, does nothing.
-int dmp_dv_mem_to_cpu(dmp_dv_mem mem, size_t offs, size_t size, int cpu_hadnt_accessed);
-
-
-/// @brief Makes sure that last changes made by CPU is visible to device.
-/// @param mem Handle to allocated memory, when NULL the error is returned.
-/// @param offs Offset in the memory buffer in bytes.
-/// @param size Size of the region to synchronize in bytes.
-/// @param cpu_wont_access Hint that CPU won't access the memory region while device is using it.
-/// @details If mem is shared and cpu_wont_access flag != 0,
-///          the dmp_dv_mem_to_cpu() with cpu_hadnt_accessed flag != 0 will do nothing.
-int dmp_dv_mem_to_device(dmp_dv_mem mem, size_t offs, size_t size, int cpu_wont_access);
+int dmp_dv_mem_to_cpu(dmp_dv_mem mem, size_t offs, size_t size, int cpu_hadnt_read);
 
 
 /// @brief Creates command list.

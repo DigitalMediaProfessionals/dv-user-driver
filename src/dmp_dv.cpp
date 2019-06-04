@@ -75,7 +75,7 @@ void dmp_dv_set_last_error_message(const char *format, ...) {
 
 
 const char *dmp_dv_get_version_string() {
-  return "7.1.20190603";
+  return "7.1.20190604";
 }
 
 
@@ -208,30 +208,21 @@ int64_t dmp_dv_mem_get_total_size() {
 }
 
 
-int dmp_dv_mem_is_shared(dmp_dv_mem mem) {
+int dmp_dv_mem_to_device(dmp_dv_mem mem, size_t offs, size_t size, int cpu_wont_read, int as_device_output) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return 0;
   }
-  return ((CDMPDVMem*)mem)->is_shared();
+  return ((CDMPDVMem*)mem)->ToDevice(offs, size, cpu_wont_read, as_device_output);
 }
 
 
-int dmp_dv_mem_to_cpu(dmp_dv_mem mem, size_t offs, size_t size, int cpu_hadnt_accessed) {
+int dmp_dv_mem_to_cpu(dmp_dv_mem mem, size_t offs, size_t size, int cpu_hadnt_read) {
   if (!mem) {
     SET_ERR("Invalid argument: mem is NULL");
     return 0;
   }
-  return ((CDMPDVMem*)mem)->ToCPU(offs, size, cpu_hadnt_accessed);
-}
-
-
-int dmp_dv_mem_to_device(dmp_dv_mem mem, size_t offs, size_t size, int cpu_wont_access) {
-  if (!mem) {
-    SET_ERR("Invalid argument: mem is NULL");
-    return 0;
-  }
-  return ((CDMPDVMem*)mem)->ToDevice(offs, size, cpu_wont_access);
+  return ((CDMPDVMem*)mem)->ToCPU(offs, size, cpu_hadnt_read);
 }
 
 
