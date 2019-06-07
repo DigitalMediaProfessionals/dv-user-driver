@@ -198,10 +198,11 @@ int64_t dmp_dv_mem_get_total_size();
 /// @brief Makes sure that last changes made by CPU is visible to device.
 /// @param mem Handle to allocated memory, when NULL the error is returned.
 /// @param offs Offset in the memory buffer in bytes.
-/// @param size Size of the region to synchronize in bytes.
+/// @param size Size of the region to synchronize in bytes, if 0 the function does nothing.
 /// @param cpu_wont_read Hint that CPU won't read the specified memory region before dmp_dv_mem_to_cpu() call.
 ///                      This will result in cache lines clear for that region in case of shared memory.
 /// @param as_device_output Hint that this memory region will be used by device only as output.
+/// @return 0 on success, non-zero otherwise (e.g. invalid offset/size combination).
 /// @details CPU in general should not write to that memory region after this function call before dmp_dv_mem_to_cpu()
 ///          as CPU writes might take priority over device writes.
 int dmp_dv_mem_to_device(dmp_dv_mem mem, size_t offs, size_t size, int cpu_wont_read, int as_device_output);
@@ -210,9 +211,9 @@ int dmp_dv_mem_to_device(dmp_dv_mem mem, size_t offs, size_t size, int cpu_wont_
 /// @brief Makes sure that last changes made by device is visible to CPU.
 /// @param mem Handle to allocated memory, when NULL the error is returned.
 /// @param offs Offset in the memory buffer in bytes.
-/// @param size Size of the region to synchronize in bytes.
+/// @param size Size of the region to synchronize in bytes, if 0 the function does nothing.
 /// @param cpu_hadnt_read Hint that CPU hadn't read the specified memory region after dmp_dv_mem_to_device() before this function call.
-/// @return 0 on success, non-zero otherwise.
+/// @return 0 on success, non-zero otherwise (e.g. invalid offset/size combination).
 int dmp_dv_mem_to_cpu(dmp_dv_mem mem, size_t offs, size_t size, int cpu_hadnt_read);
 
 

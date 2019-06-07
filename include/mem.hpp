@@ -199,6 +199,9 @@ class CDMPDVMem : public CDMPDVBase {
               offs, size, real_size_);
       return EINVAL;
     }
+    if (!size) {
+      return 0;
+    }
     uint8_t *end = map_ptr_ + size;
 #ifdef __aarch64__
     if (cpu_wont_read) {
@@ -232,6 +235,9 @@ class CDMPDVMem : public CDMPDVBase {
       SET_ERR("Invalid memory range specified: offs=%zu size=%zu while memory buffer size is %zu",
               offs, size, real_size_);
       return EINVAL;
+    }
+    if (!size) {
+      return 0;
     }
     uint8_t *end = map_ptr_ + size;
 #ifdef __aarch64__
