@@ -202,6 +202,10 @@ class CDMPDVMem : public CDMPDVBase {
     if (!size) {
       return 0;
     }
+    if (!map_ptr_) {
+      SET_ERR("Memory must be mapped before starting synchronization");
+      return EINVAL;
+    }
     uint8_t *end = map_ptr_ + size;
 #ifdef __aarch64__
     if (cpu_wont_read) {
@@ -238,6 +242,10 @@ class CDMPDVMem : public CDMPDVBase {
     }
     if (!size) {
       return 0;
+    }
+    if (!map_ptr_) {
+      SET_ERR("Memory must be mapped before starting synchronization");
+      return EINVAL;
     }
     uint8_t *end = map_ptr_ + size;
 #ifdef __aarch64__
