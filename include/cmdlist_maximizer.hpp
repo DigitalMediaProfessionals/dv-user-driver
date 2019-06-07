@@ -21,6 +21,11 @@
 
 #include "cmdlist.hpp"
 
+#ifdef __x86_64__
+#include "half.h"
+typedef half_float::half __fp16;
+#endif
+
 /// @brief Helper object work working with command list for MAXIMIZER
 class CDMPDVCmdListMaximizerHelper : public CDMPDVCmdListKHelper {
   public:
