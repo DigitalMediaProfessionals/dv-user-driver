@@ -193,7 +193,7 @@ class CDMPDVMem : public CDMPDVBase {
     return sync_flags_;
   }
 
-  int ToDevice(size_t offs, size_t size, int cpu_wont_read, int as_device_output) {
+  int ToDevice(size_t offs, size_t size, int flags) {
     if (offs + size > real_size_) {
       SET_ERR("Invalid memory range specified: offs=%zu size=%zu while memory buffer size is %zu",
               offs, size, real_size_);
@@ -208,7 +208,7 @@ class CDMPDVMem : public CDMPDVBase {
     }
     uint8_t *end = map_ptr_ + size;
 #ifdef __aarch64__
-    if (cpu_wont_read) {
+    if (flags & DMP_DV_MEM_CPU_WONT_READ) {
       for (uint8_t *addr = (uint8_t*)((((size_t)(map_ptr_ + offs)) >> CACHE_LINE_LOG2) << CACHE_LINE_LOG2);
            addr < end; addr += CACHE_LINE_SIZE) {
         asm("DC CIVAC, %0" /* Write changes to RAM and Invalidate cache */
@@ -231,8 +231,8 @@ class CDMPDVMem : public CDMPDVBase {
     return 0;
   }
 
-  int ToCPU(size_t offs, size_t size, int cpu_hadnt_read) {
-    if (cpu_hadnt_read) {
+  int ToCPU(size_t offs, size_t size, int flags) {
+    if (flags & DMP_DV_MEM_CPU_HADNT_READ) {
       return 0;
     }
     if (offs + size > real_size_) {
