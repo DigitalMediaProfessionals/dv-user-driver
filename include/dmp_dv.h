@@ -211,6 +211,9 @@ int64_t dmp_dv_mem_get_total_size();
 /// @return 0 on success, non-zero otherwise (e.g. invalid offset/size/flags combination).
 /// @details CPU in general should not write to that memory region after this function call before dmp_dv_mem_to_cpu()
 ///          as CPU writes might take priority over device writes.
+///          This function copies memory from CPU to Device or flushes caches in case of shared memory,
+///          so after it's call the memory content visible to Device will become the same as memory content visible to CPU,
+///          thus it behaves differently from dmp_dv_mem_sync_start/end.
 int dmp_dv_mem_to_device(dmp_dv_mem mem, size_t offs, size_t size, int flags);
 
 
@@ -222,6 +225,9 @@ int dmp_dv_mem_to_device(dmp_dv_mem mem, size_t offs, size_t size, int flags);
 ///              0 - default,
 ///              DMP_DV_MEM_CPU_HADNT_READ - hint that CPU hadn't read the specified memory region after dmp_dv_mem_to_device() before this function call.
 /// @return 0 on success, non-zero otherwise (e.g. invalid offset/size/flags combination).
+/// @details This function copies memory from Device to CPU or flushes caches in case of shared memory,
+///          so after it's call the memory content visible to CPU will become the same as memory content visible to Device,
+///          thus it behaves differently from dmp_dv_mem_sync_start/end.
 int dmp_dv_mem_to_cpu(dmp_dv_mem mem, size_t offs, size_t size, int flags);
 
 
