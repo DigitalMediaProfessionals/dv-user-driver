@@ -206,7 +206,9 @@ int64_t dmp_dv_mem_get_total_size();
 /// @param size Size of the region to synchronize in bytes, if 0 the function does nothing.
 /// @param flags Flags controlling the behavior:
 ///              0 - default,
-///              DMP_DV_MEM_CPU_WONT_READ - hint that CPU won't read the specified memory region before dmp_dv_mem_to_cpu() call,
+///              DMP_DV_MEM_CPU_WONT_READ - hint that CPU won't read the specified memory region before dmp_dv_mem_to_cpu() call.
+///                  This is dangerous option as you should be 100% sure that CPU won't touch that region
+///                  neither from userspace nor kernel.
 ///              DMP_DV_MEM_AS_DEV_OUTPUT - Hint that this memory region will be used by Device only as output.
 /// @return 0 on success, non-zero otherwise (e.g. invalid offset/size/flags combination).
 /// @details CPU in general should not write to that memory region after this function call before dmp_dv_mem_to_cpu()
@@ -223,7 +225,10 @@ int dmp_dv_mem_to_device(dmp_dv_mem mem, size_t offs, size_t size, int flags);
 /// @param size Size of the region to synchronize in bytes, if 0 the function does nothing.
 /// @param flags Flags controlling the behavior:
 ///              0 - default,
-///              DMP_DV_MEM_CPU_HADNT_READ - hint that CPU hadn't read the specified memory region after dmp_dv_mem_to_device() before this function call.
+///              DMP_DV_MEM_CPU_HADNT_READ - hint that CPU hadn't read the specified memory region
+///                  after dmp_dv_mem_to_device() before this function call.
+///                  This is dangerous option as you should be 100% sure that CPU hadn't touched that region
+///                  neither from userspace nor kernel.
 /// @return 0 on success, non-zero otherwise (e.g. invalid offset/size/flags combination).
 /// @details This function copies memory from Device to CPU or flushes caches in case of shared memory,
 ///          so after it's call the memory content visible to CPU will become the same as memory content visible to Device,
