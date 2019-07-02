@@ -54,38 +54,38 @@ uint32_t xorshift128(uint32_t state[4]) {
 }
 
 
-/// @brief Half floats used in test (uniform in [-1, 1]).
+/// @brief Half floats used in test.
 static const uint16_t valid_floats_u[256] = {
-       13330, 14745, 46058, 46868, 12012, 14870, 14660, 14730, 14361,
-       15021, 44493, 15172,  8256, 13678, 47179, 11284, 47678, 12933,
-       14245, 47536, 15318, 45116, 48088, 13020, 47217, 14955, 13132,
-       13783, 12044, 46757, 46384, 46793, 45467, 14077, 12699, 47258,
-       14891, 47287, 12427, 13731, 44173, 47793, 15118, 14612, 48098,
-       12998, 12498, 46399, 15218, 47490, 15169, 47814, 47462, 47954,
-       14536, 43071, 47329, 45182, 13498, 13420, 47989, 46681, 47569,
-       14774, 46235, 44882, 47731, 47989, 14230, 14925, 14472, 46064,
-       46377, 13604, 15252, 45499, 12971, 46490, 13791, 13545, 47893,
-       13681, 14655, 11266, 12543, 11596, 47521, 44529, 46757, 46597,
-       47859, 47155, 15118, 45743, 15104, 14534, 47610, 14963, 46366,
-       15080, 14566, 13670, 15073, 12528, 45529, 45303, 46647, 15124,
-       13896, 15328, 47098, 46274, 14317, 46743, 45261, 13458, 12603,
-       15128, 15009, 15332, 47314, 11199, 14354, 46222, 46760, 13787,
-       47761, 42951, 12790, 47618, 15233, 47493, 41865, 12192, 14982,
-       45123, 45378, 15178, 14235, 47393, 15161, 14906, 13749, 47215,
-       15283, 14391, 46227, 14958, 15271, 10967, 14451, 13291, 13368,
-       15051, 48115, 48050, 15309, 15226, 12757, 12701, 46341, 14426,
-       14511, 14907, 47390, 12790, 14899, 14194, 14812, 14823, 14478,
-       13289, 11131, 12555, 14087, 14585, 14933, 47289, 15171, 14168,
-       47831, 47700, 46176, 47406, 14994, 44573, 46676, 15172, 13628,
-       47867, 47277, 14793, 15266, 47220, 14923, 14977, 14997, 13464,
-       47545, 47495, 47276, 47645, 46115, 12382, 47691, 14565, 46783,
-       14529, 14569, 47367, 43776, 47795, 47253, 47471, 47431, 48069,
-       42683, 15289, 46553, 47658, 44959, 47156, 48106, 14811, 47181,
-       13879, 14300, 47923, 48009, 14225, 15052, 15199, 47460, 46476,
-       13511, 45752, 14172, 46667, 47255, 46515, 47804, 47194, 13758,
-       13393, 45545, 14531, 47694, 15356, 14966, 47259, 14167, 46319,
-       44035, 42651, 47635, 12978
-};
+       51328, 48128, 17408, 17920, 17408, 16896, 50944, 15360, 18176,
+       49152, 51328, 16896, 49664, 17408, 16896, 17408, 18560, 49664,
+       17408, 17408, 49152, 50176, 18432, 17920, 49664, 49152, 50432,
+       16384, 18176, 15360, 51328, 50176, 50432, 15360, 50176, 17920,
+       18432, 18432, 50688, 49664, 50688, 15360, 49664, 50688, 48128,
+       16384, 18176, 18560, 17408, 50688, 17664, 49664, 51328, 18176,
+       50432, 18432, 16384, 50176, 49664, 17920, 18560, 50432, 17408,
+       15360, 16896, 16384, 50688, 50688, 50176, 49152, 15360, 17408,
+       16896, 16896, 17664, 16384, 15360, 17408, 18176, 51328, 17664,
+       17664, 17408, 17664, 50944, 17408, 15360, 17664, 18560, 50944,
+       50176, 17408, 51200, 17408, 48128, 16896, 18176, 50688, 50944,
+       51328, 18560, 18560, 50176, 51200, 15360, 17664, 18560, 48128,
+       17408, 50176, 18176, 48128, 49664, 17664, 49664, 16896, 16896,
+       17408, 50944, 15360, 50176, 17920, 16896, 49152, 48128, 49152,
+       50176, 18432, 18176, 16896, 49152, 50688, 48128, 17664, 16896,
+       49664, 50944, 17920, 49664, 48128, 16384, 51200, 50944, 18432,
+       17664, 50944, 51200, 48128, 18560, 50688, 17664, 49664, 50432,
+       17920, 18176, 50176, 51200, 50944, 17920, 51200, 16896, 18432,
+       16896, 18176, 50944, 17920, 50176, 51328, 51200, 15360, 51200,
+       50432, 16384, 49152, 15360, 16896, 50944, 50432, 49152, 18176,
+       50432, 49152, 49664, 49152, 17920, 16896, 18176, 50176, 49664,
+       18560, 49152, 50432, 16896, 48128, 18176, 17408, 17408, 17664,
+       50432, 16384, 51328, 16896, 17920, 17664, 16384, 50944, 48128,
+       50432, 50944, 18560, 17920, 49152, 17920, 50176, 17920, 49152,
+       16384, 18176, 15360, 17664, 18560, 50432, 16896, 18432, 50944,
+       51200, 18432, 49152, 17408, 51328, 51328, 16896, 18560, 18560,
+       51328, 50688, 16896, 17920, 50688, 50688, 17408, 50176, 49152,
+       17920, 50944, 18560, 18176, 16384, 16896, 16384, 18176, 49152,
+       17664, 49664, 18176, 17664
+};  // [-9, ..., 9] except zero
 
 
 volatile void *v_ptr = NULL;
@@ -117,7 +117,7 @@ int test_add_act_pool(uint32_t state[4]) {
   dmp_dv_context ctx = dmp_dv_context_create();
   dmp_dv_mem input_mem = NULL, eltwise_mem = NULL, output_mem = NULL, weights_mem = NULL;
   dmp_dv_cmdlist cmdlist = NULL;
-  const int w = 8, h = 8, c = 1;
+  const int w = 2, h = 2, c = 32;
   uint16_t *weights_ptr = NULL;
   __fp16 *x0, *x1, *y16;
   const char *s_no_add = getenv("NO_ADD");
@@ -164,7 +164,6 @@ int test_add_act_pool(uint32_t state[4]) {
     goto L_EXIT;
   }
 
-  
   if (do_conv) {
     const int n_channels = c;
     const int kx = 1;
@@ -217,11 +216,11 @@ int test_add_act_pool(uint32_t state[4]) {
     memset(x1, 0, max_input_bytes);
   }
   memset(y16, 0xFF, max_input_bytes);  // set output to nan
-  
+
   v_ptr = x0;
   v_ptr = x1;
   v_ptr = y16;
-  
+
   if ((dmp_dv_mem_sync_end(input_mem)) ||
       (dmp_dv_mem_sync_end(eltwise_mem)) ||
       (dmp_dv_mem_sync_end(output_mem))) {
@@ -298,7 +297,7 @@ int test_add_act_pool(uint32_t state[4]) {
         ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
         goto L_EXIT;
       }
-      
+
       break;
     }
 
@@ -329,6 +328,7 @@ int test_add_act_pool(uint32_t state[4]) {
     float max_diff = 0;
     for (int c_start = 0, o_offs = 0, i_offs = 0; c_start < c; c_start += 8) {
       const int c_stop = (c_start + 8 <= c) ? c_start + 8 : c;
+      LOG("\nc_start=%d c_stop=%d c=%d\n\n", c_start, c_stop, c);
       if (do_pool) {
         for (int i_w = 0; i_w < (w >> 1); ++i_w, i_offs += (c_stop - c_start) * h) {
           for (int i_h = 0; i_h < (h >> 1); ++i_h, i_offs += (c_stop - c_start)) {
@@ -336,11 +336,11 @@ int test_add_act_pool(uint32_t state[4]) {
               const float vle = (float)y16[o_offs];
               float v0, v1, v2, v3;
               float x00[4], x11[4];
-              
+
               int offs = i_offs;
               x00[0] = (float)x0[offs]; x11[0] = (float)x1[offs];
               v0 = avg_pool ? x00[0] : x00[0] + x11[0];
-              
+
               offs = i_offs + (c_stop - c_start);
               x00[1] = (float)x0[offs]; x11[1] = (float)x1[offs];
               v1 = avg_pool ? x00[1] : x00[1] + x11[1];
@@ -348,11 +348,11 @@ int test_add_act_pool(uint32_t state[4]) {
               offs = i_offs + h * (c_stop - c_start);
               x00[2] = (float)x0[offs]; x11[2] = (float)x1[offs];
               v2 = avg_pool ? x00[2] : x00[2] + x11[2];
-              
+
               offs = i_offs + h * (c_stop - c_start) + (c_stop - c_start);
               x00[3] = (float)x0[offs]; x11[3] = (float)x1[offs];
               v3 = avg_pool ? x00[3] : x00[3] + x11[3];
-              
+
               float m0;
               if (avg_pool) {
                 v0 = (v0 + v1 + v2 + v3) + (float)x1[o_offs];
@@ -363,13 +363,13 @@ int test_add_act_pool(uint32_t state[4]) {
                       v1a = do_relu ? fmaxf(v1, 0) : v1,
                       v2a = do_relu ? fmaxf(v2, 0) : v2,
                       v3a = do_relu ? fmaxf(v3, 0) : v3;
-              
+
                  m0 = fmaxf(fmaxf(v0a, v1a), fmaxf(v2a, v3a));
               }
-              
+
               const float diff = fabsf(vle - m0);
               max_diff = fmaxf(max_diff, isnanf(diff) ? 1000.0f : diff);
-              LOG("h=%d w=%d c=%d i_offs=%d x0=[%.3f, %.3f, %.3f, %.3f] x1=[%.3f, %.3f, %.3f, %.3f] y=%.3f t=%.3f d=%.3f%s\n",
+              LOG("h=%d w=%d c=%2d i_offs=%3d x0=[%2.0f, %2.0f, %2.0f, %2.0f] x1=[%2.0f, %2.0f, %2.0f, %2.0f] y=%2.0f t=%2.0f d=%.3f%s\n",
                   i_h, i_w, i_c, i_offs, x00[0], x00[1], x00[2], x00[3], x11[0], x11[1], x11[2], x11[3], vle, m0, diff, diff > threshold ? " ERR" : "");
             }
           }
@@ -381,20 +381,21 @@ int test_add_act_pool(uint32_t state[4]) {
             for (int i_c = c_start; i_c < c_stop; ++i_c, ++o_offs, ++i_offs) {
               const float vle = (float)y16[o_offs];
               float v0 = (float)x0[i_offs] + (float)x1[i_offs];
-              
+
               float m0 = do_relu ? fmaxf(v0, 0) : v0;
-              
+
               const float diff = fabsf(vle - m0);
               max_diff = fmaxf(max_diff, isnanf(diff) ? 1000.0f : diff);
-              LOG("h=%d w=%d c=%d x0=%.3f x1=%.3f y=%.3f t=%.3f d=%.3f%s\n",
-                  i_h, i_w, i_c, x0[i_offs], x1[i_offs], vle, m0, diff, diff > threshold ? " ERR" : "");
+              LOG("h=%d w=%d c=%2d i_offs=%3d x0=%2.0f x1=%2.0f y=%.3f t=%.3f d=%.3f%s\n",
+                  i_h, i_w, i_c, i_offs, x0[i_offs], x1[i_offs], vle, m0, diff, diff > threshold ? " ERR" : "");
             }
           }
         }
       }
-      if (max_diff > threshold) {
-        goto L_EXIT;
-      }
+    }
+
+    if (max_diff > threshold) {
+      goto L_EXIT;
     }
 
     memset(y16, 0xFF, max_input_bytes);  // set output to nan for the next test
@@ -409,7 +410,7 @@ int test_add_act_pool(uint32_t state[4]) {
       ERR("dmp_dv_mem_sync_end() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
     }
-    
+
     break;
   }
 
