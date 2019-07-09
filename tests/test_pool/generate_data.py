@@ -20,7 +20,7 @@ from __future__ import division, print_function
 Generates data for testing convolutional layer.
 """
 import argparse
-import numpy
+import numpy as np
 import os
 
 import caffe
@@ -36,7 +36,17 @@ class Main(object):
         parser = argparse.ArgumentParser()
         parser.add_argument("-f", "--float", action="store_true",
                             help="Generate float random weights")
+        parser.add_argument("-g", "--negative", action="store_true",
+                            help="Use negative input")
+        parser.add_argument("-p", "--positive", action="store_true",
+                            help="Use positive input")
         args = parser.parse_args()
+
+        g, f = args.negative, args.float
+        args.negative, args.float = True, True
+        self.generate(6, 6, 9,
+                      1, (3, 3), (1, 1), (1, 1, 1, 1), args)
+        args.negative, args.float = g, f
 
         self.generate(7, 7, 1024,
                       2, (7, 7), (1, 1), (0, 0, 0, 0), args)
@@ -88,17 +98,21 @@ class Main(object):
                    pool_stride[0], pool_stride[1],
                    pool_pad[0], pool_pad[1], pool_pad[2], pool_pad[3]))
 
-        numpy.random.seed(12345)
+        np.random.seed(12345)
 
         if args.float:
-            values = numpy.random.uniform(
-                -1.0, 1.0, 1001).astype(numpy.float32)
+            values = np.random.uniform(
+                -1.0, 1.0, 1001).astype(np.float32)
         else:
-            values = numpy.array([-2.0, -1.0, 0.0, 1.0, 2.0],
-                                 dtype=numpy.float32)
+            values = np.array([-3.0, -2.0, -2.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 3.0],
+                              dtype=np.float32)
+        if args.positive:
+            values = np.fabs(values)
+        if args.negative:
+            values = -np.fabs(values)
 
-        input = numpy.random.choice(
-            values, width * height * n_channels).astype(numpy.float16)
+        input = np.random.choice(
+            values, width * height * n_channels).astype(np.float16)
         input.tofile("%s.i.bin" % prefix)
 
         caffe.set_mode_cpu()
@@ -147,13 +161,13 @@ layer {
         net = caffe.Net("data/test.prototxt", caffe.TEST)
 
         net.blobs["data"].data[0, :, :, :] = input.astype(
-            numpy.float32).reshape(n_channels, height, width)
+            np.float32).reshape(n_channels, height, width)
         del input
 
         results = net.forward()
         output = results["pool1"].copy()
 
-        output.astype(numpy.float16).tofile("%s.o.bin" % prefix)
+        output.astype(np.float16).tofile("%s.o.bin" % prefix)
 
         print("Successfully generated test input/output for %s" %
               prefix)
