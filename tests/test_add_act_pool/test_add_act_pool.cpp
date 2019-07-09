@@ -39,6 +39,8 @@ typedef half_float::half __fp16;
 #define ERR(...) fprintf(stderr, __VA_ARGS__); fflush(stderr)
 
 
+#define ALIGN64(n) (((n) & 63) ? (n) + (64 - ((n) & 63)) : (n))
+
 
 /* The state array must be initialized to not be all zero */
 uint32_t xorshift128(uint32_t state[4]) {
@@ -89,10 +91,14 @@ static const uint16_t valid_floats_u[256] = {
 
 
 volatile void *v_ptr = NULL;
+int verbosity = 0;
 
 
 /// @brief Prints command content for debugging.
 void print_cmd(dmp_dv_cmdraw_conv_v0& cmd) {
+  if (verbosity <= 0) {
+    return;
+  }
   LOG("topo = %u\nw = %u\nh = %u\nz = %u\nc = %u\ninput_circular_offset = %u\noutput_mode = %u\n",
       (uint32_t)cmd.topo, (uint32_t)cmd.w, (uint32_t)cmd.h, (uint32_t)cmd.z, (uint32_t)cmd.c,
       (uint32_t)cmd.input_circular_offset, (uint32_t)cmd.output_mode);
@@ -110,14 +116,26 @@ void print_cmd(dmp_dv_cmdraw_conv_v0& cmd) {
 }
 
 
+const float x0_preset[2][4][3] = {{{-1,  1, -1}, {-1,  1,  2}, {-2,  1,  2}, { 2,  3,  2}},
+                                  {{ 1,  2,  1}, {-3, -1, -3}, { 2,  1, -2}, {-3,  3, -1}}};
+const float x1_preset[2][4][3] = {{{-2,  1,  2}, {-1,  1,  3}, {-3,  2,  3}, {-3, -1, -2}},
+                                  {{-1, -2,  3}, {-1,  3,  2}, {-2, -1,  1}, { 2,  3, -2}}};
+
+
 int test_add_act_pool(uint32_t state[4]) {
   LOG("ENTER: test_add_act_pool\n");
 
   int result = -1;
   dmp_dv_context ctx = dmp_dv_context_create();
-  dmp_dv_mem input_mem = NULL, eltwise_mem = NULL, output_mem = NULL, weights_mem = NULL;
+  dmp_dv_mem input_mem = NULL, output_mem = NULL, weights_mem = NULL;
   dmp_dv_cmdlist cmdlist = NULL;
-  const int w = 2, h = 2, c = 32;
+  const char *s_w = getenv("W");
+  const char *s_h = getenv("H");
+  const char *s_c = getenv("C");
+  const int w = s_w ? atoi(s_w) : 4;
+  const int h = s_h ? atoi(s_h) : 2;
+  const int c = s_c ? atoi(s_c) : 3;
+  const int use_preset = ((!s_w) && (!s_h) && (!s_c)) ? 1 : 0;
   uint16_t *weights_ptr = NULL;
   __fp16 *x0, *x1, *y16;
   const char *s_no_add = getenv("NO_ADD");
@@ -136,6 +154,8 @@ int test_add_act_pool(uint32_t state[4]) {
   size_t packed_weights_size = 0;
   const int max_input_bytes = w * h * c * 2;
   const __fp16 *valid_floats = (const __fp16*)valid_floats_u;
+  const char *s_verbosity = getenv("VERBOSITY");
+  verbosity = s_verbosity ? atoi(s_verbosity) : 0;
 
   LOG("do_add=%d do_relu=%d do_abs=%d avg_pool=%d do_conv=%d do_pool=%d\n",
       do_add, do_relu, do_abs, avg_pool, do_conv, do_pool);
@@ -146,14 +166,8 @@ int test_add_act_pool(uint32_t state[4]) {
   }
   LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
 
-  input_mem = dmp_dv_mem_alloc(ctx, max_input_bytes);
+  input_mem = dmp_dv_mem_alloc(ctx, ALIGN64(max_input_bytes) * 2);
   if (!input_mem) {
-    ERR("dmp_dv_mem_alloc() failed: %s\n", dmp_dv_get_last_error_message());
-    goto L_EXIT;
-  }
-
-  eltwise_mem = dmp_dv_mem_alloc(ctx, max_input_bytes);
-  if (!eltwise_mem) {
     ERR("dmp_dv_mem_alloc() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
@@ -192,24 +206,51 @@ int test_add_act_pool(uint32_t state[4]) {
   }
 
   x0 = (__fp16*)dmp_dv_mem_map(input_mem);
-  x1 = (__fp16*)dmp_dv_mem_map(eltwise_mem);
+  x1 = (__fp16*)(((uint8_t*)x0) + ALIGN64(max_input_bytes));
   y16 = (__fp16*)dmp_dv_mem_map(output_mem);
   if ((!x0) || (!x1) || (!y16)) {
     ERR("dmp_dv_mem_map() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
   if ((dmp_dv_mem_sync_start(input_mem, 1, 1)) ||
-      (dmp_dv_mem_sync_start(eltwise_mem, 1, 1)) ||
       (dmp_dv_mem_sync_start(output_mem, 1, 1))) {
     ERR("dmp_dv_mem_sync_start() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
-  for (int i = 0; i < (max_input_bytes >> 1); ++i) {
-    x0[i] = valid_floats[xorshift128(state) >> 24];
-    x1[i] = valid_floats[xorshift128(state) >> 24];
-    if (do_abs) {
-      x0[i] = (__fp16)fabsf((float)x0[i]);
-      x1[i] = (__fp16)fabsf((float)x1[i]);
+  if (use_preset) {
+    LOG("Filling input arrays with preset values\n");
+    for (int c_start = 0; c_start < c; c_start += 8) {
+      const int c_stop = c_start + 8 < c ? c_start + 8 : c;
+      for (int i_w = 0, o_offs = 0; i_w < w; ++i_w) {
+        for (int i_h = 0; i_h < h; ++i_h) {
+          for (int i_c = c_start; i_c < c_stop; ++i_c, ++o_offs) {
+            x0[o_offs] = (__fp16)x0_preset[i_h][i_w][i_c];
+            x1[o_offs] = (__fp16)x1_preset[i_h][i_w][i_c];
+          }
+        }
+      }
+    }
+    if (verbosity > 0) {
+      LOG("x0(WHC8):");
+      for (int i = 0; i < w * h * c; ++i) {
+        LOG("%s%2.0f", (i ? ", " : " "), (float)x0[i]);
+      }
+      LOG("\n");
+      LOG("x1(WHC8):");
+      for (int i = 0; i < w * h * c; ++i) {
+        LOG("%s%2.0f", (i ? ", " : " "), (float)x1[i]);
+      }
+      LOG("\n");
+    }
+  }
+  else {
+    for (int i = 0; i < (max_input_bytes >> 1); ++i) {
+      x0[i] = valid_floats[xorshift128(state) >> 24];
+      x1[i] = valid_floats[xorshift128(state) >> 24];
+      if (do_abs) {
+        x0[i] = (__fp16)fabsf((float)x0[i]);
+        x1[i] = (__fp16)fabsf((float)x1[i]);
+      }
     }
   }
   if (!do_add) {
@@ -222,7 +263,6 @@ int test_add_act_pool(uint32_t state[4]) {
   v_ptr = y16;
 
   if ((dmp_dv_mem_sync_end(input_mem)) ||
-      (dmp_dv_mem_sync_end(eltwise_mem)) ||
       (dmp_dv_mem_sync_end(output_mem))) {
     ERR("dmp_dv_mem_sync_end() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
@@ -271,8 +311,8 @@ int test_add_act_pool(uint32_t state[4]) {
       conf.input_buf.offs = 0;
       conf.output_buf.mem = output_mem;
       conf.output_buf.offs = 0;
-      conf.eltwise_buf.mem = do_add ? eltwise_mem : NULL;
-      conf.eltwise_buf.offs = 0;
+      conf.eltwise_buf.mem = do_add ? input_mem : NULL;
+      conf.eltwise_buf.offs = do_add ? ALIGN64(max_input_bytes) : 0;
       conf.output_mode = do_add ? 1 : 0;
       if (do_conv) {
         conf.run[0].conv_enable = 3;  // depthwise dummy 1x1 conv
@@ -320,7 +360,6 @@ int test_add_act_pool(uint32_t state[4]) {
 
     // Check the last config for correctness
     if ((dmp_dv_mem_sync_start(input_mem, 1, 1)) ||
-        (dmp_dv_mem_sync_start(eltwise_mem, 1, 1)) ||
         (dmp_dv_mem_sync_start(output_mem, 1, 1))) {
       ERR("dmp_dv_mem_sync_start() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
@@ -328,7 +367,9 @@ int test_add_act_pool(uint32_t state[4]) {
     float max_diff = 0;
     for (int c_start = 0, o_offs = 0, i_offs = 0; c_start < c; c_start += 8) {
       const int c_stop = (c_start + 8 <= c) ? c_start + 8 : c;
-      LOG("\nc_start=%d c_stop=%d c=%d\n\n", c_start, c_stop, c);
+      if (verbosity > 0) {
+        LOG("\nc_start=%d c_stop=%d c=%d\n\n", c_start, c_stop, c);
+      }
       if (do_pool) {
         for (int i_w = 0; i_w < (w >> 1); ++i_w, i_offs += (c_stop - c_start) * h) {
           for (int i_h = 0; i_h < (h >> 1); ++i_h, i_offs += (c_stop - c_start)) {
@@ -369,8 +410,10 @@ int test_add_act_pool(uint32_t state[4]) {
 
               const float diff = fabsf(vle - m0);
               max_diff = fmaxf(max_diff, isnanf(diff) ? 1000.0f : diff);
-              LOG("h=%d w=%d c=%2d i_offs=%3d x0=[%2.0f, %2.0f, %2.0f, %2.0f] x1=[%2.0f, %2.0f, %2.0f, %2.0f] y=%2.0f t=%2.0f d=%.3f%s\n",
-                  i_h, i_w, i_c, i_offs, x00[0], x00[1], x00[2], x00[3], x11[0], x11[1], x11[2], x11[3], vle, m0, diff, diff > threshold ? " ERR" : "");
+              if (verbosity > 0) {
+                LOG("h=%d w=%d c=%2d i_offs=%3d x0=[%2.0f, %2.0f, %2.0f, %2.0f] x1=[%2.0f, %2.0f, %2.0f, %2.0f] y=%2.0f t=%2.0f d=%.3f%s\n",
+                    i_h, i_w, i_c, i_offs, x00[0], x00[1], x00[2], x00[3], x11[0], x11[1], x11[2], x11[3], vle, m0, diff, diff > threshold ? " ERR" : "");
+              }
             }
           }
         }
@@ -386,8 +429,10 @@ int test_add_act_pool(uint32_t state[4]) {
 
               const float diff = fabsf(vle - m0);
               max_diff = fmaxf(max_diff, isnanf(diff) ? 1000.0f : diff);
-              LOG("h=%d w=%d c=%2d i_offs=%3d x0=%2.0f x1=%2.0f y=%.3f t=%.3f d=%.3f%s\n",
-                  i_h, i_w, i_c, i_offs, x0[i_offs], x1[i_offs], vle, m0, diff, diff > threshold ? " ERR" : "");
+              if (verbosity > 0) {
+                LOG("h=%d w=%d c=%2d i_offs=%3d x0=%2.0f x1=%2.0f y=%.3f t=%.3f d=%.3f%s\n",
+                    i_h, i_w, i_c, i_offs, x0[i_offs], x1[i_offs], vle, m0, diff, diff > threshold ? " ERR" : "");
+              }
             }
           }
         }
@@ -405,7 +450,6 @@ int test_add_act_pool(uint32_t state[4]) {
     v_ptr = y16;
 
     if ((dmp_dv_mem_sync_end(input_mem)) ||
-        (dmp_dv_mem_sync_end(eltwise_mem)) ||
         (dmp_dv_mem_sync_end(output_mem))) {
       ERR("dmp_dv_mem_sync_end() failed: %s\n", dmp_dv_get_last_error_message());
       goto L_EXIT;
@@ -421,7 +465,6 @@ int test_add_act_pool(uint32_t state[4]) {
 
   dmp_dv_mem_release(weights_mem);
   dmp_dv_mem_release(output_mem);
-  dmp_dv_mem_release(eltwise_mem);
   dmp_dv_mem_release(input_mem);
   dmp_dv_context_release(ctx);
 
@@ -481,7 +524,7 @@ int main(int argc, char **argv) {
 
   uint32_t state[4] = {(uint32_t)(seed & 0xFFF), (uint32_t)((seed >> 12) & 0xFFF), (uint32_t)((seed >> 24) & 0xFFF), (uint32_t)((seed >> 36) & 0xFFF)};
   LOG("Using seed: [%u, %u, %u, %u]\n", (unsigned)state[0], (unsigned)state[1], (unsigned)state[2], (unsigned)state[3]);
-  for (int i = 0; i < 1; ++i) {
+  for (int i = 0; i < 3; ++i) {
     res = test_add_act_pool(state);
     if (res) {
       ++n_err;
