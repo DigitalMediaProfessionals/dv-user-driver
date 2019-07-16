@@ -532,6 +532,75 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         kcmd->run[i_run].rectifi_en = cmd->run[i_run].rectifi_en;
         kcmd->run[i_run].lrn = cmd->run[i_run].lrn;
         kcmd->run[i_run].rsvd = cmd->run[i_run].rsvd;
+
+        // Add dummy 1x1 conv in case of element-wise add to ensure compatibility with HW
+        if ((cmd->eltwise_buf.mem) && (!cmd->run[i_run].conv_enable)) {
+          if (cmd->run[i_run].pool_enable == 2) {  // average pooling
+            // Already compatible
+          }
+          else if (!cmd->run[i_run].pool_enable) {
+            // Add dummy 1x1 average pooling
+            kcmd->run[i_run].pool_enable = 2;  // element-wise add requires conv module to be active
+            kcmd->run[i_run].pool_size = 0x0101;
+            kcmd->run[i_run].pool_pad = 0x00000000;
+            kcmd->run[i_run].pool_stride = 0x0101;
+            kcmd->run[i_run].pool_avg_param = 15360;  // 1.0 in FP16
+          }
+          else {
+            // Add dummy 1x1 depthwise conv explicitly
+            size_t packed_weights_size = 0;
+            int res = dmp_dv_pack_conv_weights(
+                1, 1, 1, cmd->run[i_run].m,
+                NULL, NULL, NULL, NULL, NULL, &packed_weights_size);
+            if (res) {
+              return res;
+            }
+            dmp_dv_mem mem = dmp_dv_mem_alloc((dmp_dv_context)ctx_, packed_weights_size);
+            uint8_t *ptr = NULL;
+            if (!mem) {
+              return ENOMEM;
+            }
+            ptr = dmp_dv_mem_map(mem);
+            res = -1;
+            if ((!ptr) || ((res = dmp_dv_mem_sync_start(mem, 0, 1)))) {
+              dmp_dv_mem_release(mem);
+              return res;
+            }
+            uint16_t *weights = (uint16_t*)malloc((unsigned)cmd->run[i_run].m << 1);
+            uint16_t *bias = (uint16_t*)malloc((unsigned)cmd->run[i_run].m << 1);
+            if ((!weights) || (!bias)) {
+              SET_ERR("Failed to allocate %u bytes of host memory", (unsigned)cmd->run[i_run].m << 2);
+              dmp_dv_mem_release(mem);
+              return res;
+            }
+            for (int i = 0; i < (int)cmd->run[i_run].m; ++i) {
+              weights[i] = 15360;  // 1.0 in FP16
+            }
+            memset(bias, 0, cmd->run[i_run].m << 1);
+            res = dmp_dv_pack_conv_weights(
+                1, 1, 1, cmd->run[i_run].m,
+                NULL, weights, bias, NULL,
+                ptr, &packed_weights_size);
+            free(bias);
+            free(weights);
+            dmp_dv_mem_unmap(mem);
+            if (res) {
+              dmp_dv_mem_release(mem);
+              return res;
+            }
+            kcmd->run[i_run].weight_buf.fd = CDMPDVMem::get_fd(mem);
+            kcmd->run[i_run].weight_buf.rsvd = 0;
+            kcmd->run[i_run].weight_buf.offs = 0;
+            kcmd->run[i_run].conv_enable = 3;  // depthwise
+            kcmd->run[i_run].p = 0x0101;
+            kcmd->run[i_run].pz = 1;
+            kcmd->run[i_run].conv_stride = 0x0101;
+            kcmd->run[i_run].conv_pad = 0x00000000;
+            kcmd->run[i_run].conv_dilation = 0x0101;
+            kcmd->run[i_run].weight_fmt = 1;  // FP16
+            helper_bufs_.push_back(mem);
+          }
+        }
       }
     }
 
