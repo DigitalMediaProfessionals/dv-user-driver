@@ -135,7 +135,6 @@ int test_add_act_pool(uint32_t state[4]) {
   const int w = s_w ? atoi(s_w) : 4;
   const int h = s_h ? atoi(s_h) : 2;
   const int c = s_c ? atoi(s_c) : 3;
-  const int use_preset = ((!s_w) && (!s_h) && (!s_c)) ? 1 : 0;
   uint16_t *weights_ptr = NULL;
   __fp16 *x0, *x1, *y16;
   const char *s_no_add = getenv("NO_ADD");
@@ -156,9 +155,16 @@ int test_add_act_pool(uint32_t state[4]) {
   const __fp16 *valid_floats = (const __fp16*)valid_floats_u;
   const char *s_verbosity = getenv("VERBOSITY");
   verbosity = s_verbosity ? atoi(s_verbosity) : 0;
+  const char *s_batch = getenv("BATCH");
+  int batch = s_batch ? atoi(s_batch) : 1;
+  batch = batch < 1 ? 1 : batch;
+  const int use_preset = ((!s_w) && (!s_h) && (!s_c) && (batch == 1)) ? 1 : 0;
+  const char *s_out_offs = getenv("OUT_OFFS");
+  int out_offs = s_out_offs ? atoi(s_out_offs) : 0;
+  out_offs = out_offs < 0 ? 0 : out_offs;
 
-  LOG("do_add=%d do_relu=%d do_abs=%d avg_pool=%d do_conv=%d do_pool=%d\n",
-      do_add, do_relu, do_abs, avg_pool, do_conv, do_pool);
+  LOG("do_add=%d do_relu=%d do_abs=%d avg_pool=%d do_conv=%d do_pool=%d batch=%d out_offs=%d\n",
+      do_add, do_relu, do_abs, avg_pool, do_conv, do_pool, batch, out_offs);
 
   if (!ctx) {
     ERR("dmp_dv_context_create() failed: %s\n", dmp_dv_get_last_error_message());
@@ -166,13 +172,13 @@ int test_add_act_pool(uint32_t state[4]) {
   }
   LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
 
-  input_mem = dmp_dv_mem_alloc(ctx, ALIGN64(max_input_bytes) * 2);
+  input_mem = dmp_dv_mem_alloc(ctx, ALIGN64(max_input_bytes * batch) * 2);
   if (!input_mem) {
     ERR("dmp_dv_mem_alloc() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
 
-  output_mem = dmp_dv_mem_alloc(ctx, max_input_bytes);
+  output_mem = dmp_dv_mem_alloc(ctx, max_input_bytes * batch + out_offs);
   if (!output_mem) {
     ERR("dmp_dv_mem_alloc() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
@@ -206,9 +212,9 @@ int test_add_act_pool(uint32_t state[4]) {
   }
 
   x0 = (__fp16*)dmp_dv_mem_map(input_mem);
-  x1 = (__fp16*)(((uint8_t*)x0) + ALIGN64(max_input_bytes));
-  y16 = (__fp16*)dmp_dv_mem_map(output_mem);
-  if ((!x0) || (!x1) || (!y16)) {
+  x1 = (__fp16*)(((uint8_t*)x0) + ALIGN64(max_input_bytes * batch));
+  y16 = (__fp16*)(dmp_dv_mem_map(output_mem) + out_offs);
+  if ((!x0) || (!x1) || ((size_t)y16 == (size_t)out_offs)) {
     ERR("dmp_dv_mem_map() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
@@ -244,7 +250,7 @@ int test_add_act_pool(uint32_t state[4]) {
     }
   }
   else {
-    for (int i = 0; i < (max_input_bytes >> 1); ++i) {
+    for (int i = 0; i < (max_input_bytes >> 1) * batch; ++i) {
       x0[i] = valid_floats[xorshift128(state) >> 24];
       x1[i] = valid_floats[xorshift128(state) >> 24];
       if (do_abs) {
@@ -254,9 +260,9 @@ int test_add_act_pool(uint32_t state[4]) {
     }
   }
   if (!do_add) {
-    memset(x1, 0, max_input_bytes);
+    memset(x1, 0, max_input_bytes * batch);
   }
-  memset(y16, 0xFF, max_input_bytes);  // set output to nan
+  memset(y16, 0xFF, max_input_bytes * batch);  // set output to NaN
 
   v_ptr = x0;
   v_ptr = x1;
@@ -276,68 +282,69 @@ int test_add_act_pool(uint32_t state[4]) {
     }
 
     for (int j = 0; j < confs_per_cmdlist; ++j) {
-      if (do_conv) {
-        const int n_channels = 1;
-        const int kx = 1;
-        const int ky = 1;
-        const int n_kernels = c;
-        const uint16_t *quant_map = NULL;
-        uint16_t w16[c], b16[c];
-        for (int i_c = 0; i_c < c; ++i_c) {
-          w16[i_c] = 15360;
-          b16[i_c] = 0;
+      for (int i_batch = 0; i_batch < batch; ++i_batch) {
+        if (do_conv) {
+          const int n_channels = 1;
+          const int kx = 1;
+          const int ky = 1;
+          const int n_kernels = c;
+          const uint16_t *quant_map = NULL;
+          uint16_t w16[c], b16[c];
+          for (int i_c = 0; i_c < c; ++i_c) {
+            w16[i_c] = 15360;
+            b16[i_c] = 0;
+          }
+          const void *weights = w16;
+          const uint16_t *bias = b16;
+          const uint16_t *prelu = NULL;
+          dmp_dv_pack_conv_weights(
+            n_channels, kx, ky, n_kernels,
+            quant_map,
+            weights, bias, prelu,
+            (uint8_t*)weights_ptr, &packed_weights_size);
         }
-        const void *weights = w16;
-        const uint16_t *bias = b16;
-        const uint16_t *prelu = NULL;
-        dmp_dv_pack_conv_weights(
-          n_channels, kx, ky, n_kernels,
-          quant_map,
-          weights, bias, prelu,
-          (uint8_t*)weights_ptr, &packed_weights_size);
-      }
 
-      struct dmp_dv_cmdraw_conv_v0 conf;
-      memset(&conf, 0, sizeof(conf));
-      conf.header.size = sizeof(conf);
-      conf.header.device_type = DMP_DV_DEV_CONV;
-      conf.header.version = 0;
-      conf.topo = 1;
-      conf.w = w;
-      conf.h = h;
-      conf.z = 1;
-      conf.c = c;
-      conf.input_buf.mem = input_mem;
-      conf.input_buf.offs = 0;
-      conf.output_buf.mem = output_mem;
-      conf.output_buf.offs = 0;
-      conf.eltwise_buf.mem = do_add ? input_mem : NULL;
-      conf.eltwise_buf.offs = do_add ? ALIGN64(max_input_bytes) : 0;
-      conf.output_mode = do_add ? 1 : 0;
-      if (do_conv) {
-        conf.run[0].conv_enable = 3;  // depthwise dummy 1x1 conv
-        conf.run[0].conv_stride = 0x0101;
-        conf.run[0].weight_buf.mem = weights_mem;
-        conf.run[0].weight_buf.offs = 0;
-      }
-      conf.run[0].m = c;
-      conf.run[0].p = 0x0101;
-      conf.run[0].pz = 1;
-      if (do_pool) {
-        conf.run[0].pool_enable = avg_pool ? 2 : 1;
-        conf.run[0].pool_size = 0x0202;
-        conf.run[0].pool_stride = 0x0202;
-        conf.run[0].pool_avg_param = avg_pool ? 15360 : 0;
-      }
-      conf.run[0].actfunc = do_relu ? 2 : 0;
+        struct dmp_dv_cmdraw_conv_v0 conf;
+        memset(&conf, 0, sizeof(conf));
+        conf.header.size = sizeof(conf);
+        conf.header.device_type = DMP_DV_DEV_CONV;
+        conf.header.version = 0;
+        conf.topo = 1;
+        conf.w = w;
+        conf.h = h;
+        conf.z = 1;
+        conf.c = c;
+        conf.input_buf.mem = input_mem;
+        conf.input_buf.offs = i_batch * w * h * c * 2;
+        conf.output_buf.mem = output_mem;
+        conf.output_buf.offs = (do_pool ? i_batch * (w >> 1) * (h >> 1) * c * 2 : i_batch * w * h * c * 2) + out_offs;
+        conf.eltwise_buf.mem = do_add ? input_mem : NULL;
+        conf.eltwise_buf.offs = do_add ? ALIGN64(max_input_bytes) + i_batch * w * h * c * 2 : 0;
+        conf.output_mode = do_add ? 1 : 0;
+        if (do_conv) {
+          conf.run[0].conv_enable = 3;  // depthwise dummy 1x1 conv
+          conf.run[0].conv_stride = 0x0101;
+          conf.run[0].weight_buf.mem = weights_mem;
+          conf.run[0].weight_buf.offs = 0;
+        }
+        conf.run[0].m = c;
+        conf.run[0].p = 0x0101;
+        conf.run[0].pz = 1;
+        if (do_pool) {
+          conf.run[0].pool_enable = avg_pool ? 2 : 1;
+          conf.run[0].pool_size = 0x0202;
+          conf.run[0].pool_stride = 0x0202;
+          conf.run[0].pool_avg_param = avg_pool ? 15360 : 0;
+        }
+        conf.run[0].actfunc = do_relu ? 2 : 0;
 
-      print_cmd(conf);
+        print_cmd(conf);
 
-      if (dmp_dv_cmdlist_add_raw(cmdlist, (struct dmp_dv_cmdraw*)&conf)) {
-        ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
-        goto L_EXIT;
+        if (dmp_dv_cmdlist_add_raw(cmdlist, (struct dmp_dv_cmdraw*)&conf)) {
+          ERR("dmp_dv_cmdlist_add_raw() failed: %s\n", dmp_dv_get_last_error_message());
+          goto L_EXIT;
+        }
       }
-
       break;
     }
 
@@ -365,7 +372,9 @@ int test_add_act_pool(uint32_t state[4]) {
       goto L_EXIT;
     }
     float max_diff = 0;
-    for (int c_start = 0, o_offs = 0, i_offs = 0; c_start < c; c_start += 8) {
+    for (int i_batch = 0, o_offs = 0, i_offs = 0; i_batch < batch; ++i_batch) {
+
+    for (int c_start = 0; c_start < c; c_start += 8) {
       const int c_stop = (c_start + 8 <= c) ? c_start + 8 : c;
       if (verbosity > 0) {
         LOG("\nc_start=%d c_stop=%d c=%d\n\n", c_start, c_stop, c);
@@ -438,6 +447,8 @@ int test_add_act_pool(uint32_t state[4]) {
         }
       }
     }
+
+    }  // batch loop
 
     if (max_diff > threshold) {
       goto L_EXIT;
@@ -524,7 +535,9 @@ int main(int argc, char **argv) {
 
   uint32_t state[4] = {(uint32_t)(seed & 0xFFF), (uint32_t)((seed >> 12) & 0xFFF), (uint32_t)((seed >> 24) & 0xFFF), (uint32_t)((seed >> 36) & 0xFFF)};
   LOG("Using seed: [%u, %u, %u, %u]\n", (unsigned)state[0], (unsigned)state[1], (unsigned)state[2], (unsigned)state[3]);
-  for (int i = 0; i < 3; ++i) {
+  const char *s_repeat = getenv("REPEAT");
+  int repeat = s_repeat ? atoi(s_repeat) : 1;
+  for (int i = 0; i < repeat; ++i) {
     res = test_add_act_pool(state);
     if (res) {
       ++n_err;
