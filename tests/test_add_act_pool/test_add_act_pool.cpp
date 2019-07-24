@@ -374,7 +374,7 @@ int test_add_act_pool(uint32_t state[4]) {
     float max_diff = 0;
     for (int i_batch = 0, o_offs = 0, i_offs = 0; i_batch < batch; ++i_batch) {
 
-    for (int c_start = 0; c_start < c; c_start += 8) {
+    for (int c_start = 0, o_offs_batch = 0; c_start < c; c_start += 8) {
       const int c_stop = (c_start + 8 <= c) ? c_start + 8 : c;
       if (verbosity > 0) {
         LOG("\nc_start=%d c_stop=%d c=%d\n\n", c_start, c_stop, c);
@@ -382,7 +382,7 @@ int test_add_act_pool(uint32_t state[4]) {
       if (do_pool) {
         for (int i_w = 0; i_w < (w >> 1); ++i_w, i_offs += (c_stop - c_start) * h) {
           for (int i_h = 0; i_h < (h >> 1); ++i_h, i_offs += (c_stop - c_start)) {
-            for (int i_c = c_start; i_c < c_stop; ++i_c, ++o_offs, ++i_offs) {
+            for (int i_c = c_start; i_c < c_stop; ++i_c, ++o_offs, ++i_offs, ++o_offs_batch) {
               const float vle = (float)y16[o_offs];
               float v0, v1, v2, v3;
               float x00[4], x11[4];
@@ -405,7 +405,7 @@ int test_add_act_pool(uint32_t state[4]) {
 
               float m0;
               if (avg_pool) {
-                v0 = (v0 + v1 + v2 + v3) + (float)x1[o_offs];
+                v0 = (v0 + v1 + v2 + v3) + (float)x1[i_batch * w * h * c + o_offs_batch];
                 m0 = do_relu ? fmaxf(v0, 0) : v0;
               }
               else {
