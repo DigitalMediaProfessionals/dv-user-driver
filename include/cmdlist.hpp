@@ -464,8 +464,8 @@ class CDMPDVCmdList : public CDMPDVBase {
       SET_ERR("Memory handle in buffer is NULL");
       return EINVAL;
     }
-    if (buf.offs & 15) {
-      SET_ERR("Offset in buffer must be 16-bytes aligned, got %llu",
+    if (buf.offs & 1) {
+      SET_ERR("Offset in buffer must be 2-bytes aligned, got %llu",
               (unsigned long long)buf.offs);
       return EINVAL;
     }
