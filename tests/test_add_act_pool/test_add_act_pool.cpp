@@ -151,7 +151,6 @@ int test_add_act_pool(uint32_t state[4]) {
   const int do_pool = s_no_pool ? (atoi(s_no_pool) > 0 ? 0 : 1) : 1;
   const float threshold = 0.01f;
   size_t packed_weights_size = 0;
-  const int max_input_bytes = w * h * c * 2;
   const __fp16 *valid_floats = (const __fp16*)valid_floats_u;
   const char *s_verbosity = getenv("VERBOSITY");
   verbosity = s_verbosity ? atoi(s_verbosity) : 0;
@@ -162,6 +161,7 @@ int test_add_act_pool(uint32_t state[4]) {
   const char *s_out_offs = getenv("OUT_OFFS");
   int out_offs = s_out_offs ? atoi(s_out_offs) : 0;
   out_offs = out_offs < 0 ? 0 : out_offs;
+  const int eltwise_base_offs = ALIGN64(batch * w * h * c * 2);
 
   LOG("do_add=%d do_relu=%d do_abs=%d avg_pool=%d do_conv=%d do_pool=%d batch=%d out_offs=%d\n",
       do_add, do_relu, do_abs, avg_pool, do_conv, do_pool, batch, out_offs);
@@ -172,13 +172,13 @@ int test_add_act_pool(uint32_t state[4]) {
   }
   LOG("Successfully created context: %s\n", dmp_dv_context_get_info_string(ctx));
 
-  input_mem = dmp_dv_mem_alloc(ctx, ALIGN64(max_input_bytes * batch) * 2);
+  input_mem = dmp_dv_mem_alloc(ctx, eltwise_base_offs * 2);
   if (!input_mem) {
     ERR("dmp_dv_mem_alloc() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
   }
 
-  output_mem = dmp_dv_mem_alloc(ctx, max_input_bytes * batch + out_offs);
+  output_mem = dmp_dv_mem_alloc(ctx, eltwise_base_offs + out_offs);
   if (!output_mem) {
     ERR("dmp_dv_mem_alloc() failed: %s\n", dmp_dv_get_last_error_message());
     goto L_EXIT;
@@ -212,7 +212,7 @@ int test_add_act_pool(uint32_t state[4]) {
   }
 
   x0 = (__fp16*)dmp_dv_mem_map(input_mem);
-  x1 = (__fp16*)(((uint8_t*)x0) + ALIGN64(max_input_bytes * batch));
+  x1 = (__fp16*)(((uint8_t*)x0) + eltwise_base_offs);
   y16 = (__fp16*)(dmp_dv_mem_map(output_mem) + out_offs);
   if ((!x0) || (!x1) || ((size_t)y16 == (size_t)out_offs)) {
     ERR("dmp_dv_mem_map() failed: %s\n", dmp_dv_get_last_error_message());
@@ -250,7 +250,7 @@ int test_add_act_pool(uint32_t state[4]) {
     }
   }
   else {
-    for (int i = 0; i < (max_input_bytes >> 1) * batch; ++i) {
+    for (int i = 0; i < (batch * w * h * c); ++i) {
       x0[i] = valid_floats[xorshift128(state) >> 24];
       x1[i] = valid_floats[xorshift128(state) >> 24];
       if (do_abs) {
@@ -260,9 +260,9 @@ int test_add_act_pool(uint32_t state[4]) {
     }
   }
   if (!do_add) {
-    memset(x1, 0, max_input_bytes * batch);
+    memset(x1, 0, batch * w * h * c * 2);
   }
-  memset(y16, 0xFF, max_input_bytes * batch);  // set output to NaN
+  memset(y16, 0xFF, batch * w * h * c * 2);  // set output to NaN
 
   v_ptr = x0;
   v_ptr = x1;
@@ -319,7 +319,7 @@ int test_add_act_pool(uint32_t state[4]) {
         conf.output_buf.mem = output_mem;
         conf.output_buf.offs = (do_pool ? i_batch * (w >> 1) * (h >> 1) * c * 2 : i_batch * w * h * c * 2) + out_offs;
         conf.eltwise_buf.mem = do_add ? input_mem : NULL;
-        conf.eltwise_buf.offs = do_add ? ALIGN64(max_input_bytes * batch) + i_batch * w * h * c * 2 : 0;
+        conf.eltwise_buf.offs = do_add ? eltwise_base_offs + conf.input_buf.offs : 0;
         conf.output_mode = do_add ? 1 : 0;
         if (do_conv) {
           conf.run[0].conv_enable = 3;  // depthwise dummy 1x1 conv
@@ -454,7 +454,7 @@ int test_add_act_pool(uint32_t state[4]) {
       goto L_EXIT;
     }
 
-    memset(y16, 0xFF, max_input_bytes);  // set output to nan for the next test
+    memset(y16, 0xFF, eltwise_base_offs);  // set output to nan for the next test
 
     v_ptr = x0;
     v_ptr = x1;
