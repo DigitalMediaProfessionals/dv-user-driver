@@ -319,7 +319,7 @@ int test_add_act_pool(uint32_t state[4]) {
         conf.output_buf.mem = output_mem;
         conf.output_buf.offs = (do_pool ? i_batch * (w >> 1) * (h >> 1) * c * 2 : i_batch * w * h * c * 2) + out_offs;
         conf.eltwise_buf.mem = do_add ? input_mem : NULL;
-        conf.eltwise_buf.offs = do_add ? ALIGN64(max_input_bytes) + i_batch * w * h * c * 2 : 0;
+        conf.eltwise_buf.offs = do_add ? ALIGN64(max_input_bytes * batch) + i_batch * w * h * c * 2 : 0;
         conf.output_mode = do_add ? 1 : 0;
         if (do_conv) {
           conf.run[0].conv_enable = 3;  // depthwise dummy 1x1 conv
