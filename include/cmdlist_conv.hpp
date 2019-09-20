@@ -382,11 +382,11 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
                 i_run, u_b_in + u_b_out, w, h, c, m, kcmd.run[i_run].p, kcmd.run[i_run].conv_dilation);
         return -1;
       }
-      if ((tiles > 1) && (kcmd.run[i_run].conv_enable) && (kcmd.run[i_run].pool_enable)) {
+      /*if ((tiles > 1) && (kcmd.run[i_run].conv_enable) && (kcmd.run[i_run].pool_enable)) {
         SET_ERR("cmd->run[%d] requires %d (> 1) tiles and cannot contain convolution together with pooling",
                 i_run, tiles);
         return -1;
-      }
+      }*/  // there is no such restriction in HW since 20190729
 
       if ((kcmd.z > 1) || (kcmd.run[i_run].pz > 1) ||
           (dil[0] > 1) || (dil[1] > 1)) {
