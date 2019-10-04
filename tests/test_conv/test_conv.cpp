@@ -74,6 +74,7 @@ typedef struct conv_config_impl {
       pad_left, pad_top, pad_right, pad_bottom, stride_x, stride_y, activation;
   int tpe;  // 0 - 2D, 1 - depthwise, >1 - dilation
   int deconv;  // 0 - convolution, 1 - deconvolution
+  int batch_size;
   bool quantized;
   bool hash_set;
   bool failed;
@@ -402,6 +403,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     cmd.header.size = sizeof(cmd);
     cmd.header.device_type = DMP_DV_DEV_CONV;
     cmd.header.version = 0;
+    cmd.input_circular_offset = conf->batch_size;
     cmd.w = conf->width;
     cmd.h = conf->height;
     cmd.c = conf->n_channels;
@@ -419,7 +421,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     cmd.run[0].conv_stride = (uint16_t)conf->stride_x | ((uint16_t)conf->stride_y << 8);
     cmd.run[0].actfunc = conf->activation;
 
-    conf->io_size = (roundup(conf->width * conf->height * conf->n_channels) + roundup(out_width * out_height * conf->n_kernels)) * sizeof(__fp16);
+    conf->io_size = (roundup(conf->batch_size * conf->width * conf->height * conf->n_channels) + roundup(conf->batch_size * out_width * out_height * conf->n_kernels)) * sizeof(__fp16);
     conf->io_mem = dmp_dv_mem_alloc(ctx, conf->io_offs + conf->io_size);
     if (!conf->io_mem) {
       ERR("dmp_dv_mem_alloc() failed for %zu bytes: %s\n", conf->io_offs + conf->io_size, dmp_dv_get_last_error_message());
@@ -430,7 +432,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     cmd.input_buf.mem = conf->io_mem;
     cmd.input_buf.offs = conf->io_offs;
     cmd.output_buf.mem = conf->io_mem;
-    cmd.output_buf.offs = conf->io_offs + roundup(conf->width * conf->height * conf->n_channels) * sizeof(__fp16);
+    cmd.output_buf.offs = conf->io_offs + roundup(conf->batch_size * conf->width * conf->height * conf->n_channels) * sizeof(__fp16);
 
     weights_size = 0;
     if (conf->tpe < 2) {
@@ -462,7 +464,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     cmd.run[0].weight_buf.offs = conf->weights_offs;
     cmd.run[0].weight_fmt = conf->quantized ? 3 : 1;
 
-    weights = dmp_dv_mem_map(conf->weights_mem);;
+    weights = dmp_dv_mem_map(conf->weights_mem);
     if (!weights) {
       ERR("dmp_dv_mem_map() failed for weights: %s\n", dmp_dv_get_last_error_message());
       conf->failed = true;
@@ -549,6 +551,10 @@ int test_conv(const std::vector<conv_config*>& confs) {
         }
       }
     }
+    // Copy first input to fit the entire batch
+    for (int i = 1; i < conf->batch_size; ++i) {
+      memcpy(conf->io_ptr + i * conf->width * conf->height * conf->n_channels, conf->io_ptr, conf->width * conf->height * conf->n_channels * sizeof(__fp16));
+    }
     if (dmp_dv_mem_sync_end(conf->io_mem)) {
       ERR("dmp_dv_mem_sync_end() failed for input/output: %s\n", dmp_dv_get_last_error_message());
       conf->failed = true;
@@ -617,7 +623,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
     // Compare output with the gold one
     out_width = get_conv_out_width(conf->width, kxfull, conf->pad_left, conf->pad_right, conf->stride_x, conf->deconv);
     out_height = get_conv_out_width(conf->height, kyfull, conf->pad_top, conf->pad_bottom, conf->stride_y, conf->deconv);
-    const int o_offs = roundup(conf->width * conf->height * conf->n_channels);
+    const int o_offs = roundup(conf->batch_size * conf->width * conf->height * conf->n_channels);
     /*FILE *fy = fopen("y.fp16", "wb");
     if (fy) {
       if ((int)fwrite(conf->io_ptr + o_offs, sizeof(__fp16), out_height * out_width * conf->n_kernels, fy) != out_height * out_width * conf->n_kernels) {
@@ -629,7 +635,7 @@ int test_conv(const std::vector<conv_config*>& confs) {
       uint8_t hash[32];
       SHA256_CTX sha256;
       SHA256_Init(&sha256);
-      SHA256_Update(&sha256, conf->io_ptr + o_offs, out_height * out_width * conf->n_kernels * sizeof(__fp16));
+      SHA256_Update(&sha256, conf->io_ptr + o_offs, conf->batch_size * out_height * out_width * conf->n_kernels * sizeof(__fp16));
       SHA256_Final(hash, &sha256);
       if (memcmp(conf->hash, hash, 32)) {
         ERR("Hash differs\n");
@@ -706,8 +712,15 @@ int test_conv(const std::vector<conv_config*>& confs) {
           goto L_EXIT;
         }
       }
+      for (int i = 1; i < conf->batch_size; ++i) {
+        if (memcmp(conf->io_ptr + o_offs, conf->io_ptr + o_offs + i * out_height * out_width * conf->n_kernels, out_height * out_width * conf->n_kernels * sizeof(__fp16))) {
+          conf->failed = true;
+          ERR("FAILED: batch_size=%d sample=%d: %s\n", conf->batch_size, i, prefix);
+          goto L_EXIT;
+        }
+      }
       if (!conf->failed) {  // compute hash
-        const int output_size = out_height * out_width * conf->n_kernels * sizeof(__fp16);
+        const int output_size = conf->batch_size * out_height * out_width * conf->n_kernels * sizeof(__fp16);
         if (o_offs * sizeof(__fp16) + output_size > conf->io_size) {
           ERR("Incorrect allocation size for input/output");
           _exit(-1);
@@ -924,13 +937,19 @@ int main(int argc, char **argv) {
   std::mt19937 mt_rand(time(NULL));
   std::uniform_int_distribution<int> rnd_offs(0, 1024);
 
+  const char *s_batch_min = getenv("BATCH_MIN");
+  const int batch_min = std::min(std::max((s_batch_min ? atoi(s_batch_min) : 1), 1), 32768);
+  const char *s_batch_max = getenv("BATCH_MAX");
+  const int batch_max = std::min(std::max((s_batch_max ? atoi(s_batch_max) : 1), batch_min), 32768);
+  std::uniform_int_distribution<int> rnd_batch(batch_min, batch_max);
+
   const int n_passes = 2;
   for (int i_pass = 0; i_pass < n_passes; ++i_pass) {
     // Randomize configrations order
     std::shuffle(configs.begin(), configs.end(), mt_rand);
 
-    // Execute configurations in different chunk sizes
-    const size_t pack_sizes[2] = {1, 50};
+    // Execute configurations in different chunk, batch sizes
+    const int pack_sizes[2] = {1, 50};
     const int n_packs = 2;
     for (int i_pack = 0; i_pack < n_packs; ++i_pack) {
       std::vector<conv_config*> confs;
@@ -942,8 +961,13 @@ int main(int argc, char **argv) {
         }
         conf->io_offs = rnd_offs(mt_rand) << 4;
         conf->weights_offs = rnd_offs(mt_rand) << 4;
+        const int batch_size = rnd_batch(mt_rand);
+        if (conf->batch_size != batch_size) {
+          conf->batch_size = batch_size;
+          conf->hash_set = false;
+        }
         confs.push_back(conf);
-        if (confs.size() < pack_sizes[i_pack]) {
+        if ((int)confs.size() < pack_sizes[i_pack]) {
           continue;
         }
         res = test_conv(confs);
