@@ -103,11 +103,12 @@ class CDMPDVMem : public CDMPDVBase {
     if (map_ptr_) {
       return map_ptr_;
     }
-    map_ptr_ = (uint8_t*)mmap(NULL, real_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd_mem_, 0);
-    if (map_ptr_ == MAP_FAILED) {
+    void *ptr = mmap(NULL, real_size_, PROT_READ | PROT_WRITE, MAP_SHARED, fd_mem_, 0);
+    if (ptr == MAP_FAILED) {
       SET_ERR("mmap() on allocated from /dev/ion file descriptor failed for %zu bytes", real_size_);
       return NULL;
     }
+    map_ptr_ = (uint8_t*)ptr;
     return map_ptr_;
   }
 
