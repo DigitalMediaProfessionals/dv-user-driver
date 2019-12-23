@@ -111,7 +111,7 @@ typedef struct conv_config_impl {
       pad_lrtb[2] = pad_top;
       pad_lrtb[3] = pad_bottom;
     }
-    return pad_lrtb[0] | (pad_lrtb[1] << 8) | (pad_lrtb[3] << 16) | (pad_lrtb[3] << 24);
+    return pad_lrtb[0] | (pad_lrtb[1] << 8) | (pad_lrtb[2] << 16) | (pad_lrtb[3] << 24);
   }
 } conv_config;
 
