@@ -320,9 +320,9 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
           SET_ERR("Deconvolution with dilation only supports stride 1");
           return -1;
         }
-        const int ox = get_conv_out_width(w, kxfull, pad[0], pad[1], 1, is_deconv),
-                  oy = get_conv_out_width(h, kyfull, pad[2], pad[3], 1, is_deconv);
-        if ((ox != w) || (oy != h)) {
+        const int ox = get_conv_out_width(w, kxfull, pad[0], pad[1], stride[0], is_deconv),
+                  oy = get_conv_out_width(h, kyfull, pad[2], pad[3], stride[1], is_deconv);
+        if ((ox * stride[0] != w) || (oy * stride[1] != h)) {
           SET_ERR("Dilated convolution only supports \"same\" padding: (%d, %d, %d) => (%d, %d, %d); "
                   "w=%d, h=%d, kx=%d, ky=%d, pad_lrtb=(%d, %d, %d, %d), dil=(%d, %d)",
                   h, w, c, oy, ox, m, w, h, kx, ky, pad[0], pad[1], pad[2], pad[3], dil[0], dil[1]);
