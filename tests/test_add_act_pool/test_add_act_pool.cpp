@@ -25,6 +25,8 @@
 #include <string.h>
 #include <math.h>
 
+#include <algorithm>
+
 #include "dmp_dv.h"
 #include "dmp_dv_cmdraw_v0.h"
 
@@ -33,6 +35,13 @@
 typedef half_float::half __fp16;
 #endif
 
+
+/// @brief Offset within NWHC8 layout.
+#define NWHC8_OFFS(n, h, w, c, i_n, i_h, i_w, i_c) \
+    (((i_n) * ((w) * (h) * (c))) + /* sample beginning */ \
+     ((((i_c) >> 3) << 3) * ((w) * (h))) + /* 8-channel beginning */ \
+     (((i_w) * (h) + (i_h)) * std::min((c) - (((i_c) >> 3) << 3), 8)) + /* pixel start */ \
+     ((i_c) & 7))
 
 
 #define LOG(...) fprintf(stdout, __VA_ARGS__); fflush(stdout)
@@ -162,9 +171,18 @@ int test_add_act_pool(uint32_t state[4]) {
   int out_offs = s_out_offs ? atoi(s_out_offs) : 0;
   out_offs = out_offs < 0 ? 0 : out_offs;
   const int eltwise_base_offs = ALIGN64(batch * w * h * c * 2);
+  const char *s_pool_size = getenv("POOL_SIZE");
+  const int pool_size = s_pool_size ? atoi(s_pool_size) : 2;
+  const char *s_pool_stride = getenv("POOL_STRIDE");
+  const int pool_stride = s_pool_stride ? atoi(s_pool_stride) : 2;
 
-  LOG("do_add=%d do_relu=%d do_abs=%d avg_pool=%d do_conv=%d do_pool=%d batch=%d out_offs=%d\n",
-      do_add, do_relu, do_abs, avg_pool, do_conv, do_pool, batch, out_offs);
+  LOG("do_add=%d do_relu=%d do_abs=%d avg_pool=%d do_conv=%d do_pool=%d batch=%d out_offs=%d pool_size=%d pool_stride=%d\n",
+      do_add, do_relu, do_abs, avg_pool, do_conv, do_pool, batch, out_offs, pool_size, pool_stride);
+
+  if ((pool_size != 2) && (pool_size != 3)) {
+    ERR("Only pool_size 2 and 3 is implemented\n");
+    return 1;
+  }
 
   if (!ctx) {
     ERR("dmp_dv_context_create() failed: %s\n", dmp_dv_get_last_error_message());
@@ -332,9 +350,16 @@ int test_add_act_pool(uint32_t state[4]) {
         conf.run[0].pz = 1;
         if (do_pool) {
           conf.run[0].pool_enable = avg_pool ? 2 : 1;
-          conf.run[0].pool_size = 0x0202;
-          conf.run[0].pool_stride = 0x0202;
+          conf.run[0].pool_size = (uint16_t)pool_size | ((uint16_t)pool_size << 8);
+          conf.run[0].pool_stride = (uint16_t)pool_stride | ((uint16_t)pool_stride << 8);
           conf.run[0].pool_avg_param = avg_pool ? 15360 : 0;
+          const uint32_t pad_left = 0;
+          const uint32_t w_apps = w / pool_stride + (w % pool_stride ? 1 : 0);
+          const uint32_t pad_right = pool_stride * (w_apps - 1) + pool_size - w;
+          const uint32_t pad_top = 0;
+          const uint32_t h_apps = h / pool_stride + (h % pool_stride ? 1 : 0);
+          const uint32_t pad_bottom = pool_stride * (h_apps - 1) + pool_size - h;
+          conf.run[0].pool_pad = pad_left | (pad_right << 8) | (pad_top << 16) | (pad_bottom << 24);
         }
         conf.run[0].actfunc = do_relu ? 2 : 0;
 
@@ -372,56 +397,78 @@ int test_add_act_pool(uint32_t state[4]) {
       goto L_EXIT;
     }
     float max_diff = 0;
-    for (int i_batch = 0, o_offs = 0, i_offs = 0; i_batch < batch; ++i_batch) {
+    for (int i_batch = 0, i_offs = 0, o_offs = 0; i_batch < batch; ++i_batch) {
 
-    for (int c_start = 0, o_offs_batch = 0; c_start < c; c_start += 8) {
+    for (int c_start = 0; c_start < c; c_start += 8) {
       const int c_stop = (c_start + 8 <= c) ? c_start + 8 : c;
       if (verbosity > 0) {
         LOG("\nc_start=%d c_stop=%d c=%d\n\n", c_start, c_stop, c);
       }
       if (do_pool) {
-        for (int i_w = 0; i_w < (w >> 1); ++i_w, i_offs += (c_stop - c_start) * h) {
-          for (int i_h = 0; i_h < (h >> 1); ++i_h, i_offs += (c_stop - c_start)) {
-            for (int i_c = c_start; i_c < c_stop; ++i_c, ++o_offs, ++i_offs, ++o_offs_batch) {
-              const float vle = (float)y16[o_offs];
-              float v0, v1, v2, v3;
-              float x00[4], x11[4];
-
-              int offs = i_offs;
-              x00[0] = (float)x0[offs]; x11[0] = (float)x1[offs];
-              v0 = avg_pool ? x00[0] : x00[0] + x11[0];
-
-              offs = i_offs + (c_stop - c_start);
-              x00[1] = (float)x0[offs]; x11[1] = (float)x1[offs];
-              v1 = avg_pool ? x00[1] : x00[1] + x11[1];
-
-              offs = i_offs + h * (c_stop - c_start);
-              x00[2] = (float)x0[offs]; x11[2] = (float)x1[offs];
-              v2 = avg_pool ? x00[2] : x00[2] + x11[2];
-
-              offs = i_offs + h * (c_stop - c_start) + (c_stop - c_start);
-              x00[3] = (float)x0[offs]; x11[3] = (float)x1[offs];
-              v3 = avg_pool ? x00[3] : x00[3] + x11[3];
-
-              float m0;
-              if (avg_pool) {
-                v0 = (v0 + v1 + v2 + v3) + (float)x1[i_batch * w * h * c + o_offs_batch];
-                m0 = do_relu ? fmaxf(v0, 0) : v0;
+        const int w_out = w / pool_stride;
+        const int h_out = h / pool_stride;
+        for (int i_w = 0; i_w < w_out; ++i_w) {
+          for (int i_h = 0; i_h < h_out; ++i_h) {
+            for (int i_c = c_start; i_c < c_stop; ++i_c) {
+              // Read pool window
+              float window[2][16];
+              bool window_valid[16];
+              const float border_value = avg_pool ? 0 : -1.0e6f;
+              float acc = border_value;
+              for (int i_w_src = i_w * pool_stride, wnd_offs = 0; i_w_src < i_w * pool_stride + pool_size; ++i_w_src) {
+                for (int i_h_src = i_h * pool_stride; i_h_src < i_h * pool_stride + pool_size; ++i_h_src, ++wnd_offs) {
+                  const int offs = NWHC8_OFFS(batch, w, h, c, i_batch, i_w_src, i_h_src, i_c);
+                  window[0][wnd_offs] = ((i_w_src < w) && (i_h_src < h)) ? x0[offs] : border_value;
+                  window_valid[wnd_offs] = (i_w_src < w) && (i_h_src < h);
+                  float vle = window[0][wnd_offs];
+                  if (do_add) {
+                    window[1][wnd_offs] = ((i_w_src < w) && (i_h_src < h)) ? x1[offs] : border_value;
+                    vle += window[1][wnd_offs];
+                  }
+                  if (do_relu) {
+                    vle = fabsf(vle);
+                  }
+                  if (avg_pool) {
+                    acc += vle * (1.0f / (pool_size * pool_size));
+                  }
+                  else {
+                    acc = fmaxf(acc, vle);
+                  }
+                }
               }
-              else {
-                float v0a = do_relu ? fmaxf(v0, 0) : v0,
-                      v1a = do_relu ? fmaxf(v1, 0) : v1,
-                      v2a = do_relu ? fmaxf(v2, 0) : v2,
-                      v3a = do_relu ? fmaxf(v3, 0) : v3;
+              const float t = acc;  // target
+              const float y = y16[NWHC8_OFFS(batch, w_out, h_out, c, i_batch, i_w, i_h, i_c)];  // FPGA output
 
-                 m0 = fmaxf(fmaxf(v0a, v1a), fmaxf(v2a, v3a));
-              }
-
-              const float diff = fabsf(vle - m0);
+              const float diff = fabsf(y - t);
               max_diff = fmaxf(max_diff, isnanf(diff) ? 1000.0f : diff);
               if (verbosity > 0) {
-                LOG("h=%d w=%d c=%2d i_offs=%3d x0=[%2.0f, %2.0f, %2.0f, %2.0f] x1=[%2.0f, %2.0f, %2.0f, %2.0f] y=%2.0f t=%2.0f d=%.3f%s\n",
-                    i_h, i_w, i_c, i_offs, x00[0], x00[1], x00[2], x00[3], x11[0], x11[1], x11[2], x11[3], vle, m0, diff, diff > threshold ? " ERR" : "");
+                LOG("h=%d w=%d c=%2d y=%3.0f t=%3.0f d=%6.3f%s",
+                    i_h, i_w, i_c, y, t, diff, (isnanf(diff) ? 1000.0f : diff) > threshold ? " ERR " : "  OK ");
+                if (verbosity > 1) {
+                  LOG(" x0=[");
+                  for (int i = 0; i < pool_size * pool_size; ++i) {
+                    if (window_valid[i]) {
+                      LOG("%s%2.0f", i ? ", " : "", window[0][i]);
+                    }
+                    else {
+                      LOG("%s ~", i ? ", " : "");
+                    }
+                  }
+                  LOG("]");
+                  if (do_add) {
+                    LOG(" x1=[");
+                    for (int i = 0; i < pool_size * pool_size; ++i) {
+                      if (window_valid[i]) {
+                        LOG("%s%2.0f", i ? ", " : "", window[1][i]);
+                      }
+                      else {
+                        LOG("%s ~", i ? ", " : "");
+                      }
+                    }
+                    LOG("]");
+                  }
+                }
+                LOG("\n");
               }
             }
           }
@@ -439,8 +486,8 @@ int test_add_act_pool(uint32_t state[4]) {
               const float diff = fabsf(vle - m0);
               max_diff = fmaxf(max_diff, isnanf(diff) ? 1000.0f : diff);
               if (verbosity > 0) {
-                LOG("h=%d w=%d c=%2d i_offs=%3d x0=%2.0f x1=%2.0f y=%.3f t=%.3f d=%.3f%s\n",
-                    i_h, i_w, i_c, i_offs, x0[i_offs], x1[i_offs], vle, m0, diff, diff > threshold ? " ERR" : "");
+                LOG("h=%d w=%d c=%2d x0=%2.0f x1=%2.0f y=%.3f t=%.3f d=%.3f%s\n",
+                    i_h, i_w, i_c, x0[i_offs], x1[i_offs], vle, m0, diff, (isnanf(diff) ? 1000.0f : diff) > threshold ? " ERR" : "");
               }
             }
           }
@@ -519,11 +566,11 @@ int test_add_act_pool(uint32_t state[4]) {
 
 int main(int argc, char **argv) {
   const char *s_seed = getenv("SEED");
-  uint64_t seed;
-  if (s_seed) {
+  uint64_t seed = 0;
+  if ((s_seed) && (s_seed[0])) {
     seed = (uint64_t)atoll(s_seed);
   }
-  else {
+  if (seed == 0) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     seed = ((uint64_t)ts.tv_sec << 29) ^ (uint64_t)ts.tv_nsec;
