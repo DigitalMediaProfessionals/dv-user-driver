@@ -426,6 +426,9 @@ int test_add_act_pool(uint32_t state[4]) {
                     vle += window[1][wnd_offs];
                   }
                   if (do_relu) {
+                    vle = fmaxf(vle, 0.0f);
+                  }
+                  if (do_abs) {
                     vle = fabsf(vle);
                   }
                   if (avg_pool) {
