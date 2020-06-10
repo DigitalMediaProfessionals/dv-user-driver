@@ -105,7 +105,7 @@ int verbosity = 0;
 
 /// @brief Prints command content for debugging.
 void print_cmd(dmp_dv_cmdraw_conv_v0& cmd) {
-  if (verbosity <= 0) {
+  if (verbosity < 0) {
     return;
   }
   LOG("topo = %u\nw = %u\nh = %u\nz = %u\nc = %u\ninput_circular_offset = %u\noutput_mode = %u\n",
@@ -405,8 +405,8 @@ int test_add_act_pool(uint32_t state[4]) {
         LOG("\nc_start=%d c_stop=%d c=%d\n\n", c_start, c_stop, c);
       }
       if (do_pool) {
-        const int w_out = w / pool_stride;
-        const int h_out = h / pool_stride;
+        const int w_out = (w / pool_stride) + (w % pool_stride ? 1 : 0);
+        const int h_out = (h / pool_stride) + (h % pool_stride ? 1 : 0);
         for (int i_w = 0; i_w < w_out; ++i_w) {
           for (int i_h = 0; i_h < h_out; ++i_h) {
             for (int i_c = c_start; i_c < c_stop; ++i_c) {
