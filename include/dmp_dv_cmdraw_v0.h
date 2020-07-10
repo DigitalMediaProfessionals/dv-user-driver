@@ -63,7 +63,7 @@ struct dmp_dv_cmdraw_conv_v0 {
   uint16_t h;                      // Input Height
   uint16_t z;                      // Input Depth
   uint16_t c;                      // Input Channels
-  uint16_t input_circular_offset;  // Input Depth circular offset
+  uint16_t input_circular_offset;  // Input Depth circular offset, stores batch size in the latest HW
   uint16_t output_mode;            // 0 = concat,
                                    // 1 = elementwise add, order is: [conv]->[add]->[max_pool]->[activation]
                                    //                            or  [avg_pool]->[add]->[activation].
