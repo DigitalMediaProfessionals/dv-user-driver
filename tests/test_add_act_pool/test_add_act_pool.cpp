@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 /*
- * @brief Test upsampling layer.
+ * @brief Tests add+act+pool.
  */
 #include <unistd.h>
 #include <sys/mman.h>
