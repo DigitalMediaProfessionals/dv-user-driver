@@ -534,6 +534,14 @@ class CDMPDVCmdListConvHelper : public CDMPDVCmdListKHelper {
         kcmd->run[i_run].rectifi_en = cmd->run[i_run].rectifi_en;
         kcmd->run[i_run].lrn = cmd->run[i_run].lrn;
         kcmd->run[i_run].rsvd = cmd->run[i_run].rsvd;
+
+        if ((!kcmd->run[i_run].conv_enable) && (!kcmd->run[i_run].pool_enable)) {  // insert dummy 1x1 average pooling
+          kcmd->run[i_run].pool_enable = 2;
+          kcmd->run[i_run].pool_size = 0x0101;
+          kcmd->run[i_run].pool_stride = 0x0101;
+          kcmd->run[i_run].pool_pad = 0x00000000;
+          kcmd->run[i_run].pool_avg_param = 15360;  // 1.0 in half float
+        }
       }
     }
 
