@@ -13,9 +13,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/*
- * @brief Shared library exported functions implementation.
- */
+/// @file
+/// @brief Shared library exported functions implementation.
+
 #include <string.h>
 #include <stdarg.h>
 

@@ -13,9 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/*
- * @brief Base object with reference counting and common methods.
- */
+/// @file
+/// @brief Base object with reference counting and common methods.
 #pragma once
 
 #include "common.h"

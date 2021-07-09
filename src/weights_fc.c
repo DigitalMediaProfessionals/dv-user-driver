@@ -13,9 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/*
- * @brief Weights-packing helper functions for fully connected layer.
- */
+/// @file
+/// @brief Weights-packing helper functions for fully connected layer.
 
 #include "common.h"
 

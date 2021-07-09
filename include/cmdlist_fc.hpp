@@ -13,10 +13,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/*
- * @brief Helper object work working with command list for FC accelerator implementation.
- * @details FC accelerator is deprecated and this file exists for backward compatibility.
- */
+/// @file
+/// @brief Helper object work working with command list for FC accelerator implementation.
+/// @details FC accelerator is deprecated and this file exists for backward compatibility.
 #pragma once
 
 #include "cmdlist.hpp"

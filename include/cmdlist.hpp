@@ -13,9 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/*
- * @brief dmp_dv_cmdlist implementation.
- */
+/// @file
+/// @brief dmp_dv_cmdlist implementation.
 #pragma once
 
 #include <vector>

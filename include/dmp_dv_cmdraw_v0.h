@@ -13,9 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/*
- * @brief User-space definition of dv_cmdraw structure version v0.
- */
+/// @file
+/// @brief User-space definition of dv_cmdraw structure version 0.
 #pragma once
 
 #ifndef _DMP_DV_CMDRAW_V0_H_

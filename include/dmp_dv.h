@@ -13,9 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/*
- * @brief User-space driver interface.
- */
+/// @file
+/// @brief User-space driver interface.
 #pragma once
 
 #ifndef _DMP_DV_H_
